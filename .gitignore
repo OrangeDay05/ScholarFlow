@@ -40,5 +40,5 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
-/.sites-dev.*.log
+/.sites-dev*.log
 /preview-*.png

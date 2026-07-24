@@ -1,0 +1,143 @@
+.wrap {
+  margin-top: 36px;
+  padding: 20px;
+  border: 1px solid var(--line);
+  background: rgb(255 255 255 / 45%);
+}
+
+.heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 14px;
+}
+
+.heading p,
+.heading span {
+  margin: 0;
+}
+
+.heading p {
+  color: var(--ink);
+  font-family: var(--font-serif);
+  font-size: 17px;
+}
+
+.heading span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+
+.state {
+  display: flex;
+  min-height: 66px;
+  align-items: center;
+  gap: 10px;
+  padding: 11px;
+  border: 1px solid transparent;
+  background: var(--paper-strong);
+}
+
+.state strong,
+.state small {
+  display: block;
+}
+
+.state strong {
+  color: var(--ink);
+  font-size: 12px;
+}
+
+.state small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.dot {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.loading {
+  color: #42737b;
+}
+
+.empty {
+  color: #8b8a81;
+}
+
+.success {
+  color: var(--green);
+  border-color: rgb(0 119 70 / 18%);
+}
+
+.failure {
+  color: #a74437;
+  border-color: rgb(167 68 55 / 18%);
+}
+
+.warning {
+  color: #a36a14;
+  border-color: rgb(163 106 20 / 20%);
+}
+
+.taskStates {
+  display: flex;
+  margin-top: 12px;
+  padding-top: 12px;
+  align-items: center;
+  gap: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.taskStates span {
+  margin-right: 4px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.taskStates strong {
+  padding: 5px 8px;
+  border: 1px solid var(--line);
+  color: var(--muted-strong);
+  font-size: 9px;
+}
+
+.taskStates strong:nth-of-type(2) {
+  border-color: rgb(0 119 70 / 20%);
+  color: var(--green);
+}
+
+@media (max-width: 760px) {
+  .heading {
+    display: block;
+  }
+
+  .heading span {
+    display: block;
+    margin-top: 6px;
+  }
+
+  .grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .state:last-child {
+    grid-column: 1 / -1;
+  }
+
+  .taskStates {
+    flex-wrap: wrap;
+  }
+}

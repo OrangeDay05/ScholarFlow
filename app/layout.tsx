@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "研序 ScholarFlow｜AI 论文研究与写作工作台",
-  description: "从论文要求、文献与数据出发，管理研究思路、章节、证据和版本。",
+  description: "围绕项目、材料、诊断、章节、证据与版本组织研究写作。",
   icons: {
     icon: "/favicon.svg",
     shortcut: "/favicon.svg",
