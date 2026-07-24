@@ -41,9 +41,7 @@ export function AppShell({
         <nav className={styles.nav} aria-label="主要导航">
           <Link href="/projects">项目</Link>
           <Link href="/projects/new">新建项目</Link>
-          <span className={styles.disabledNav} aria-label="当前阶段未开放">
-            帮助
-          </span>
+          <Link href="/admin/users">管理演示</Link>
         </nav>
         <div className={styles.account}>
           <MockBadge />
@@ -65,4 +63,3 @@ export function AppShell({
     </div>
   );
 }
-
