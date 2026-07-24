@@ -8,6 +8,7 @@
 - 当前状态：WAITING_USER_REVIEW
 - 活动工程：`site/`（唯一活动工程）
 - 当前分支：`m1/visual-baseline`
+- M1 审核提交：`21ed74a`
 - 本地预览：`http://localhost:3000/`
 - 生产部署：未授权、未执行
 - Sites `project_id`：两个工程均未配置
