@@ -18,7 +18,7 @@ export default function NewProjectPage() {
       <section className={styles.intro} aria-label="创建说明">
         <MockBadge />
         <p>
-          M1 只展示创建结构与演示队列，不会上传、解析或调用 AI。所有入口都会先生成一张可修改的诊断卡草稿。
+          M2 提供完整的前端演示流程：填写、查看 Mock 队列并确认创建。不会真实上传、解析或调用 AI。
         </p>
       </section>
 

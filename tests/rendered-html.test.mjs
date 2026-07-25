@@ -29,14 +29,20 @@ async function render(pathname) {
   return { response, html: await response.text() };
 }
 
-test("server-renders the six M1 review routes", async () => {
+test("server-renders the M2 clickable-loop and admin routes", async () => {
   const routes = [
     ["/login", /进入你的论文工作区/],
     ["/projects", /当前最重要的下一步/],
     ["/projects/new", /先说，你手里有什么/],
     ["/projects/new/idea", /把一个念头，变成研究起点/],
     ["/projects/demo/diagnosis", /项目诊断卡/],
-    ["/projects/demo/editor", /章节助手/],
+    ["/projects/demo/outline", /确认论文目录/],
+    ["/projects/demo/editor", /AI 工作台/],
+    ["/projects/demo/export", /Word 导出检查/],
+    ["/admin/users", /用户管理/],
+    ["/admin/projects-files", /项目与文件/],
+    ["/admin/tasks", /AI 任务/],
+    ["/admin/models-skills", /模型与 Skill/],
   ];
 
   for (const [pathname, expectation] of routes) {
@@ -78,16 +84,93 @@ test("freezes five creation paths and six product-level skills", async () => {
 });
 
 test("keeps approved creation-card colors and DOCX-only export", async () => {
-  const [creationCss, editorSource] = await Promise.all([
+  const [creationCss, editorSource, exportSource] = await Promise.all([
     readFile(new URL("../app/projects/new/new.module.css", import.meta.url), "utf8"),
     readFile(
-      new URL("../app/projects/[projectId]/editor/page.tsx", import.meta.url),
+      new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/projects/[projectId]/export/page.tsx", import.meta.url),
       "utf8",
     ),
   ]);
 
   assert.match(creationCss, /#fffbe2/i);
   assert.match(creationCss, /#185208/i);
-  assert.match(editorSource, /导出 DOCX/);
-  assert.doesNotMatch(editorSource, /导出 (?:PDF|Markdown)/i);
+  assert.match(editorSource, /DOCX 检查/);
+  assert.match(exportSource, /只提供 DOCX/);
+  assert.doesNotMatch(`${editorSource}\n${exportSource}`, /导出 (?:PDF|Markdown)/i);
+});
+
+test("freezes M2 workflow states, evidence boundaries, and backup-model choice", async () => {
+  const [workspaceSource, editorSource, diagnosisSource, outlineSource] = await Promise.all([
+    readFile(new URL("../app/lib/MockWorkspaceContext.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/projects/[projectId]/diagnosis/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/projects/[projectId]/outline/page.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  for (const status of ["queued", "parsing", "success", "failed", "cancelled"]) {
+    assert.match(workspaceSource, new RegExp(`"${status}"`));
+  }
+
+  assert.match(workspaceSource, /confirmedDiagnosis/);
+  assert.match(diagnosisSource, /待重新确认/);
+  assert.match(outlineSource, /确认目录并进入编辑器/);
+  assert.match(editorSource, /DeepSeek 备用模型/);
+  assert.match(editorSource, /恢复为新版本/);
+  assert.match(editorSource, /无法确认/);
+  assert.match(editorSource, /页码/);
+  assert.match(editorSource, /段落/);
+  assert.match(editorSource, /项目规划/);
+  assert.match(editorSource, /写作与资料/);
+  assert.match(editorSource, /检查与验证/);
+  assert.match(editorSource, /任务准备状态/);
+  assert.match(editorSource, /disabled=\{!availability\.enabled\}/);
+});
+
+test("freezes the independent editor workspace and evidence linkage", async () => {
+  const [editorSource, editorCss] = await Promise.all([
+    readFile(
+      new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/projects/[projectId]/editor/Editor.module.css", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  for (const landmark of [
+    "data-editor-workspace",
+    "data-document-scroll",
+    "data-assistant-scroll",
+    "IntersectionObserver",
+    "paperStack",
+    "focusEvidence",
+    "focusClaim",
+    "workspaceWithoutLeft",
+    "workspaceWithoutRight",
+    "本次材料授权",
+    "引用证据",
+    "任务记录",
+  ]) {
+    assert.match(editorSource, new RegExp(landmark));
+  }
+
+  assert.match(editorCss, /height:\s*100dvh/);
+  assert.match(editorCss, /\.documentArea[\s\S]*?overflow-y:\s*auto/);
+  assert.match(editorCss, /\.assistantScroll[\s\S]*?overflow-y:\s*auto/);
+  assert.match(editorCss, /\.taskDock/);
+  assert.match(editorCss, /@media \(max-width:\s*820px\)/);
 });

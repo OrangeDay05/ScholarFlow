@@ -1,61 +1,118 @@
+"use client";
+
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell, MockBadge } from "@/app/components/AppShell";
+import {
+  type DiagnosisDraft,
+  useMockWorkspace,
+} from "@/app/lib/MockWorkspaceContext";
 import styles from "./diagnosis.module.css";
 
-const fields = [
+const diagnosisFields: Array<{
+  key: keyof DiagnosisDraft;
+  label: string;
+  origin: string;
+  placeholder: string;
+  multiline?: boolean;
+}> = [
   {
-    label: "研究主题",
-    value: "数字平台中的知识协作机制",
+    key: "title",
+    label: "论文题目",
     origin: "用户输入",
-    complete: true,
+    placeholder: "请输入暂定论文题目",
   },
   {
-    label: "核心研究问题",
-    value: "远程研究团队如何通过平台实践形成共同理解？",
-    origin: "AI 归纳 · Mock",
-    complete: true,
+    key: "paperType",
+    label: "论文类型",
+    origin: "用户输入",
+    placeholder: "例如：期刊论文、本科论文",
   },
   {
+    key: "language",
+    label: "写作语言",
+    origin: "用户输入",
+    placeholder: "例如：中文、英文或双语",
+  },
+  {
+    key: "researchObject",
     label: "研究对象",
-    value: "跨机构远程研究团队",
     origin: "用户输入",
-    complete: true,
+    placeholder: "请说明研究对象与范围",
+    multiline: true,
   },
   {
+    key: "researchQuestion",
+    label: "核心研究问题",
+    origin: "AI 归纳 · Mock",
+    placeholder: "请输入准备回答的核心问题",
+    multiline: true,
+  },
+  {
+    key: "method",
     label: "拟采用方法",
-    value: "尚未确认：访谈、案例研究或数字民族志",
-    origin: "缺失信息",
-    complete: false,
+    origin: "待用户确认",
+    placeholder: "例如：半结构访谈、案例研究；尚未决定可以留空",
+    multiline: true,
   },
   {
-    label: "目标与边界",
-    value: "期刊论文 · 中英双语 · 12,000 字 · APA 7th",
-    origin: "用户输入",
-    complete: true,
-  },
-  {
-    label: "材料范围",
-    value: "12 篇用户上传文献；3 份访谈材料待补充",
-    origin: "上传材料 · Mock",
-    complete: false,
+    key: "requirements",
+    label: "文章要求",
+    origin: "上传要求 · Mock",
+    placeholder: "字数、引用格式、截止日期与其他硬性要求",
+    multiline: true,
   },
 ];
 
-export default async function DiagnosisPage({
-  searchParams,
-}: {
-  searchParams: Promise<{ status?: string | string[] }>;
-}) {
-  const { status } = await searchParams;
-  const normalizedStatus = Array.isArray(status) ? status[0] : status;
-  const confirmed = normalizedStatus === "confirmed";
+export default function DiagnosisPage() {
+  const router = useRouter();
+  const {
+    diagnosis,
+    diagnosisStatus,
+    updateDiagnosis,
+    confirmDiagnosis,
+    reopenDiagnosis,
+  } = useMockWorkspace();
+
+  const confirmed = diagnosisStatus === "confirmed";
+  const updated = diagnosisStatus === "updated";
+  const missingFields = diagnosisFields.filter(({ key }) => !diagnosis[key].trim());
+
+  const statusCopy = confirmed
+    ? {
+        kicker: "已确认 · v1",
+        title: "已确认版本已经保留",
+        detail: "后续写作可读取这份版本。你仍可修改，改动会成为待重新确认的新草稿。",
+        seal: "确",
+        sealLabel: "CONFIRMED",
+      }
+    : updated
+      ? {
+          kicker: "修改草稿 · 待重新确认",
+          title: "修改不会覆盖已确认版本",
+          detail: "v1 已保留。重新确认前，后续写作仍以此前确认版本为准。",
+          seal: "改",
+          sealLabel: "RECONFIRM",
+        }
+      : {
+          kicker: "草稿 · 等待确认",
+          title: "先确认系统对文章要求的理解",
+          detail: "黄色项目表示仍缺少信息；可以带着缺失项继续，但系统不会据此虚构研究方法或数据。",
+          seal: "诊",
+          sealLabel: "DRAFT",
+        };
+
+  function confirmAndContinue() {
+    confirmDiagnosis();
+    router.push("/projects/demo/outline");
+  }
 
   return (
     <AppShell
       compact
       eyebrow="数字平台中的知识协作机制研究"
       title="项目诊断卡"
-      description="核对系统对研究任务的理解。只有确认后的诊断卡，才能成为正式章节写作的上下文。"
+      description="这是一张写作前的研究任务确认单。核对题目、问题、方法与要求，再把它交给目录和章节流程。"
       action={
         <Link className={styles.backLink} href="/projects">
           ← 项目列表
@@ -64,106 +121,144 @@ export default async function DiagnosisPage({
     >
       <section
         className={`${styles.statusHero} ${
-          confirmed ? styles.statusConfirmed : styles.statusDraft
+          confirmed ? styles.statusConfirmed : updated ? styles.statusUpdated : styles.statusDraft
         }`}
-        aria-label={confirmed ? "诊断卡已确认" : "诊断卡草稿"}
+        aria-live="polite"
       >
         <div>
-          <span className={styles.statusKicker}>
-            {confirmed ? "已确认 · v1" : "草稿 · 等待确认"}
-          </span>
-          <h2>
-            {confirmed ? "这张诊断卡可以用于正式写作" : "请先确认研究方法与材料范围"}
-          </h2>
-          <p>
-            {confirmed
-              ? "后续章节写作会读取这份确认版本；若材料变化，诊断卡将重新标为“需更新”。"
-              : "当前内容包含用户输入、AI 归纳和缺失信息。确认前，通用章节写作保持阻断。"}
-          </p>
+          <span className={styles.statusKicker}>{statusCopy.kicker}</span>
+          <h2>{statusCopy.title}</h2>
+          <p>{statusCopy.detail}</p>
         </div>
         <div className={styles.statusSeal} aria-hidden="true">
-          <span>{confirmed ? "确" : "诊"}</span>
-          <small>{confirmed ? "CONFIRMED" : "DRAFT"}</small>
+          <span>{statusCopy.seal}</span>
+          <small>{statusCopy.sealLabel}</small>
         </div>
       </section>
 
       <div className={styles.metaRow}>
         <MockBadge />
         <span>诊断清晰度</span>
-        <strong>4 / 6 项明确</strong>
-        <span>更新于今天 20:36</span>
+        <strong>
+          {diagnosisFields.length - missingFields.length} / {diagnosisFields.length} 项明确
+        </strong>
+        <span>{confirmed ? "已确认版本 v1" : updated ? "修改草稿未确认" : "诊断草稿"}</span>
       </div>
 
       <div className={styles.contentGrid}>
-        <section className={styles.diagnosisCard}>
+        <form className={styles.diagnosisCard} onSubmit={(event) => event.preventDefault()}>
           <header className={styles.cardHeader}>
             <div>
               <span>01</span>
               <h2>系统对项目的理解</h2>
             </div>
-            <p>{confirmed ? "确认版本 · 字段已锁定" : "草稿版本 · 可修改"}</p>
+            <p>{confirmed ? "确认版本 · 只读" : updated ? "修改草稿 · 可编辑" : "草稿 · 可编辑"}</p>
           </header>
 
           <div className={styles.fieldList}>
-            {fields.map((field) => (
-              <article
-                className={`${styles.fieldRow} ${!field.complete ? styles.fieldMissing : ""}`}
-                key={field.label}
-              >
-                <div className={styles.fieldLabel}>
-                  <span>{field.label}</span>
-                  <small className={field.complete ? styles.origin : styles.missingOrigin}>
-                    {field.origin}
-                  </small>
+            {diagnosisFields.map((field) => {
+              const missing = !diagnosis[field.key].trim();
+              const fieldId = `diagnosis-${field.key}`;
+
+              return (
+                <div
+                  className={`${styles.fieldRow} ${missing ? styles.fieldMissing : ""}`}
+                  key={field.key}
+                >
+                  <label className={styles.fieldLabel} htmlFor={fieldId}>
+                    <span>{field.label}</span>
+                    <small className={missing ? styles.missingOrigin : styles.origin}>
+                      {missing ? "缺失信息" : field.origin}
+                    </small>
+                  </label>
+                  {field.multiline ? (
+                    <textarea
+                      id={fieldId}
+                      value={diagnosis[field.key]}
+                      placeholder={field.placeholder}
+                      readOnly={confirmed}
+                      rows={field.key === "requirements" ? 3 : 2}
+                      onChange={(event) => updateDiagnosis(field.key, event.target.value)}
+                    />
+                  ) : (
+                    <input
+                      id={fieldId}
+                      value={diagnosis[field.key]}
+                      placeholder={field.placeholder}
+                      readOnly={confirmed}
+                      onChange={(event) => updateDiagnosis(field.key, event.target.value)}
+                    />
+                  )}
+                  <span className={styles.fieldState}>
+                    {confirmed ? "已确认" : missing ? "需补充" : "可修改"}
+                  </span>
                 </div>
-                <p>{field.value}</p>
-                <span className={styles.fieldState}>
-                  {confirmed && field.complete ? "已锁定" : field.complete ? "可修改" : "需补充"}
-                </span>
-              </article>
-            ))}
+              );
+            })}
           </div>
-        </section>
+        </form>
 
         <aside className={styles.riskPanel}>
           <header>
             <span>02</span>
-            <h2>风险与下一步</h2>
+            <h2>缺失、风险与下一步</h2>
           </header>
-          <article className={styles.highRisk}>
-            <span>高优先级</span>
-            <h3>研究方法尚未确认</h3>
-            <p>当前问题可以支持访谈或案例研究，但尚无材料证明已经完成数据收集。</p>
+          <article className={diagnosis.method.trim() ? styles.resolvedRisk : styles.highRisk}>
+            <span>{diagnosis.method.trim() ? "已补充" : "高优先级"}</span>
+            <h3>{diagnosis.method.trim() ? "研究方法已有说明" : "研究方法尚未确认"}</h3>
+            <p>
+              {diagnosis.method.trim()
+                ? "系统会把这段内容作为方法边界，但仍不会假定数据已经采集。"
+                : "可以先确认文章方向，但结果章节不会根据方法建议生成虚构数据。"}
+            </p>
           </article>
           <article className={styles.mediumRisk}>
-            <span>需补材料</span>
-            <h3>访谈材料仍为空</h3>
-            <p>结果章节不能根据方法建议虚构。请在写作前补充真实研究数据。</p>
+            <span>缺失材料</span>
+            <h3>真实研究数据尚未提供</h3>
+            <p>访谈、问卷或实验结果需要后续上传。当前只能规划结果章节，不能生成研究结论。</p>
           </article>
           <article className={styles.scopeNote}>
-            <span>核验范围</span>
-            <p>本卡只基于用户输入和演示材料，不包含公开数据库或外部来源核验。</p>
+            <span>下一步</span>
+            <ol>
+              <li>确认题目、研究问题与文章要求。</li>
+              <li>生成并调整论文目录。</li>
+              <li>按章节继续补充文献和研究材料。</li>
+            </ol>
           </article>
         </aside>
       </div>
 
-      <footer className={`${styles.confirmBar} ${confirmed ? styles.confirmedBar : ""}`}>
+      <footer
+        className={`${styles.confirmBar} ${
+          confirmed ? styles.confirmedBar : updated ? styles.updatedBar : ""
+        }`}
+      >
         <div>
-          <strong>{confirmed ? "诊断卡已确认" : "确认前请核对所有黄色缺失项"}</strong>
+          <strong>
+            {confirmed
+              ? "诊断卡已确认，仍可继续修改"
+              : updated
+                ? "修改草稿等待重新确认"
+                : missingFields.length
+                  ? `仍有 ${missingFields.length} 项缺失信息`
+                  : "诊断信息已填写完整"}
+          </strong>
           <span>
             {confirmed
-              ? "已确认版本将进入编辑器；后续修改仍会保留版本记录。"
-              : "确认代表你认可当前研究边界，不代表系统已验证研究结论。"}
+              ? "点击修改后会建立新草稿，不覆盖已确认的 v1。"
+              : updated
+                ? "重新确认后，目录与后续任务才会读取本次修改。"
+                : "确认表示认可当前研究边界，不代表系统已经验证研究结论。"}
           </span>
         </div>
         <div className={styles.confirmActions}>
           {confirmed ? (
             <>
-              <Link className={styles.secondaryAction} href="/projects/demo/diagnosis">
-                返回草稿视图
-              </Link>
-              <Link className={styles.primaryAction} href="/projects/demo/editor">
-                进入论文编辑器 →
+              <button className={styles.secondaryAction} type="button" onClick={reopenDiagnosis}>
+                修改诊断卡
+              </button>
+              <Link className={styles.primaryAction} href="/projects/demo/outline">
+                查看论文目录 →
               </Link>
             </>
           ) : (
@@ -171,12 +266,9 @@ export default async function DiagnosisPage({
               <Link className={styles.secondaryAction} href="/projects/new">
                 补充材料
               </Link>
-              <Link
-                className={styles.primaryAction}
-                href="/projects/demo/diagnosis?status=confirmed"
-              >
-                确认诊断卡（演示） →
-              </Link>
+              <button className={styles.primaryAction} type="button" onClick={confirmAndContinue}>
+                {updated ? "重新确认并更新目录 →" : "确认并生成目录 →"}
+              </button>
             </>
           )}
         </div>

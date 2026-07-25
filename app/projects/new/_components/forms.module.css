@@ -18,6 +18,55 @@
   font-size: 12px;
 }
 
+.stepper {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin-bottom: 18px;
+  border: 1px solid var(--line);
+  background: rgb(255 255 255 / 48%);
+}
+
+.step {
+  display: flex;
+  min-height: 58px;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-right: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.step:last-child {
+  border-right: 0;
+}
+
+.step > span {
+  display: grid;
+  width: 27px;
+  height: 27px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid currentColor;
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.step strong {
+  font-size: 11px;
+  font-weight: 750;
+}
+
+.stepActive {
+  background: var(--forest);
+  color: var(--cream);
+}
+
+.stepDone {
+  background: var(--mint);
+  color: var(--forest);
+}
+
 .formLayout {
   display: grid;
   grid-template-columns: minmax(0, 1.72fr) minmax(250px, 0.72fr);
@@ -208,6 +257,14 @@
   background: var(--paper);
 }
 
+.choice input,
+.choiceActive input {
+  width: 14px;
+  height: 14px;
+  margin: 0 0 5px;
+  accent-color: var(--green);
+}
+
 .choiceActive {
   border-color: var(--green);
   background: var(--mint);
@@ -235,6 +292,24 @@
   text-align: center;
 }
 
+.uploadBox > input {
+  width: min(100%, 430px);
+  margin-bottom: 17px;
+  color: var(--muted-strong);
+  font-size: 10px;
+}
+
+.uploadBox > input::file-selector-button {
+  margin-right: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--forest);
+  background: transparent;
+  color: var(--forest);
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 750;
+}
+
 .uploadBox strong {
   display: block;
   color: var(--forest);
@@ -255,6 +330,37 @@
 .queue {
   border: 1px solid var(--line);
   background: var(--paper);
+}
+
+.queueArea {
+  display: grid;
+  gap: 14px;
+}
+
+.stateLegend {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.stateLegendItem {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  background: rgb(255 255 255 / 48%);
+}
+
+.stateLegendItem .queueState {
+  width: fit-content;
+}
+
+.stateLegendItem small {
+  color: var(--muted);
+  font-size: 8px;
+  line-height: 1.45;
 }
 
 .queueHeading,
@@ -362,6 +468,67 @@
   color: #6f706a;
 }
 
+.queueCancelled {
+  background: #e7e8e4;
+  color: #626761;
+  text-decoration: line-through;
+}
+
+.queueControls {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.queueControls button {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  background: transparent;
+  color: var(--forest);
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 750;
+}
+
+.queueControls button:hover {
+  border-color: var(--green);
+  background: var(--mint);
+}
+
+.emptyQueue {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 15px;
+  padding: 24px;
+  border: 1px dashed rgb(20 84 58 / 42%);
+  background: var(--paper);
+}
+
+.emptyQueue > span {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid var(--green);
+  border-radius: 50%;
+  color: var(--green);
+  font-family: var(--font-serif);
+}
+
+.emptyQueue strong {
+  font-size: 12px;
+}
+
+.emptyQueue p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
 .warningBox,
 .protectionBox {
   display: grid;
@@ -413,6 +580,11 @@
   background: #f1f3ed;
 }
 
+.actionGroup {
+  display: flex;
+  gap: 8px;
+}
+
 .secondaryButton,
 .primaryButton {
   display: inline-flex;
@@ -430,8 +602,7 @@
 .secondaryButton {
   background: transparent;
   color: var(--forest);
-  cursor: not-allowed;
-  opacity: 0.58;
+  cursor: pointer;
 }
 
 .secondaryButton span {
@@ -441,10 +612,90 @@
 .primaryButton {
   background: var(--forest);
   color: var(--cream);
+  cursor: pointer;
 }
 
 .primaryButton:hover {
   background: var(--green);
+}
+
+.primaryButton:disabled {
+  border-color: #9b9f98;
+  background: #9b9f98;
+  cursor: not-allowed;
+}
+
+.reviewPanel {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 24px;
+  min-height: 440px;
+  align-content: start;
+  padding: 44px 36px;
+}
+
+.reviewStamp {
+  display: grid;
+  width: 68px;
+  height: 68px;
+  place-items: center;
+  border: 1px solid var(--green);
+  border-radius: 50%;
+  color: var(--green);
+  font-family: var(--font-serif);
+  font-size: 20px;
+}
+
+.reviewKicker {
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.14em;
+}
+
+.reviewPanel h2 {
+  max-width: 650px;
+  margin: 12px 0 28px;
+  font-family: var(--font-serif);
+  font-size: clamp(26px, 3vw, 39px);
+  font-weight: 500;
+  letter-spacing: -0.04em;
+  line-height: 1.16;
+}
+
+.reviewPanel dl {
+  display: grid;
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+
+.reviewPanel dl > div {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 16px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.reviewPanel dt {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.reviewPanel dd {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+}
+
+.reviewWarning {
+  margin: 20px 0 0;
+  padding: 14px 16px;
+  border-left: 3px solid var(--green);
+  background: var(--mint);
+  color: var(--forest);
+  font-size: 10px;
+  line-height: 1.6;
 }
 
 @media (max-width: 780px) {
@@ -470,12 +721,27 @@
     line-height: 1.5;
   }
 
+  .stepper {
+    grid-template-columns: 1fr;
+  }
+
+  .step {
+    min-height: 48px;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .step:last-child {
+    border-bottom: 0;
+  }
+
   .section {
     padding: 24px 18px;
   }
 
   .fieldGrid,
-  .choiceGrid {
+  .choiceGrid,
+  .stateLegend {
     grid-template-columns: 1fr;
   }
 
@@ -484,6 +750,11 @@
     padding: 20px 18px;
   }
 
+  .actionGroup {
+    flex-direction: column-reverse;
+  }
+
+  .actionGroup,
   .secondaryButton,
   .primaryButton {
     width: 100%;
@@ -494,7 +765,21 @@
     flex-wrap: wrap;
   }
 
-  .queueState {
+  .queueControls {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
     margin-left: 50px;
+  }
+
+  .reviewPanel {
+    grid-template-columns: 1fr;
+    min-height: 0;
+    padding: 28px 18px;
+  }
+
+  .reviewPanel dl > div {
+    grid-template-columns: 1fr;
+    gap: 5px;
   }
 }

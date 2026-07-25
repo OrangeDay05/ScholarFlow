@@ -31,6 +31,12 @@
   color: var(--forest);
 }
 
+.statusUpdated {
+  border-color: rgb(163 106 20 / 40%);
+  background: #fff0bd;
+  color: #684b16;
+}
+
 .statusKicker {
   font-size: 10px;
   font-weight: 850;
@@ -202,11 +208,45 @@
   color: #684b16;
 }
 
-.fieldRow p {
-  margin: 0;
+.fieldRow input,
+.fieldRow textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 0;
+  background: transparent;
   color: var(--muted-strong);
   font-size: 12px;
   line-height: 1.65;
+  outline: none;
+  resize: vertical;
+}
+
+.fieldRow input {
+  min-height: 42px;
+  padding: 8px 10px;
+}
+
+.fieldRow textarea {
+  min-height: 64px;
+  padding: 9px 10px;
+}
+
+.fieldRow input:not([readonly]),
+.fieldRow textarea:not([readonly]) {
+  border-color: var(--line);
+  background: var(--paper-strong);
+}
+
+.fieldRow input:not([readonly]):focus,
+.fieldRow textarea:not([readonly]):focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 3px rgb(0 119 70 / 9%);
+}
+
+.fieldRow input::placeholder,
+.fieldRow textarea::placeholder {
+  color: var(--muted);
 }
 
 .fieldState {
@@ -256,19 +296,40 @@
   color: var(--green);
 }
 
+.resolvedRisk > span {
+  color: var(--green);
+}
+
 .highRisk h3,
-.mediumRisk h3 {
+.mediumRisk h3,
+.resolvedRisk h3 {
   margin: 9px 0 0;
   font-size: 13px;
 }
 
 .highRisk p,
 .mediumRisk p,
-.scopeNote p {
+.scopeNote p,
+.resolvedRisk p {
   margin: 8px 0 0;
   color: var(--muted);
   font-size: 10px;
   line-height: 1.65;
+}
+
+.resolvedRisk {
+  margin: 0;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+  background: rgb(215 234 218 / 40%);
+}
+
+.scopeNote ol {
+  margin: 10px 0 0;
+  padding-left: 17px;
+  color: var(--muted-strong);
+  font-size: 10px;
+  line-height: 1.8;
 }
 
 .confirmBar {
@@ -290,6 +351,11 @@
 .confirmedBar {
   border-color: rgb(0 119 70 / 35%);
   background: rgb(215 234 218 / 96%);
+}
+
+.updatedBar {
+  border-color: rgb(163 106 20 / 38%);
+  background: rgb(255 240 189 / 96%);
 }
 
 .confirmBar strong,
@@ -324,6 +390,7 @@
   font-size: 10px;
   font-weight: 800;
   text-decoration: none;
+  white-space: nowrap;
 }
 
 .secondaryAction {
@@ -395,6 +462,12 @@
   }
 
   .fieldRow p {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .fieldRow input,
+  .fieldRow textarea {
     grid-column: 1 / -1;
     grid-row: 2;
   }

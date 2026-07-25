@@ -60,6 +60,7 @@ type MockWorkspaceValue = {
   draftSaved: boolean;
   saveCreationDraft: () => void;
   diagnosis: DiagnosisDraft;
+  confirmedDiagnosis: DiagnosisDraft | null;
   diagnosisStatus: "draft" | "confirmed" | "updated";
   updateDiagnosis: (field: keyof DiagnosisDraft, value: string) => void;
   confirmDiagnosis: () => void;
@@ -170,6 +171,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
   const [files, setFiles] = useState(initialFiles);
   const [draftSaved, setDraftSaved] = useState(false);
   const [diagnosis, setDiagnosis] = useState(initialDiagnosis);
+  const [confirmedDiagnosis, setConfirmedDiagnosis] = useState<DiagnosisDraft | null>(null);
   const [diagnosisStatus, setDiagnosisStatus] = useState<"draft" | "confirmed" | "updated">(
     "draft",
   );
@@ -294,9 +296,13 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       draftSaved,
       saveCreationDraft: () => setDraftSaved(true),
       diagnosis,
+      confirmedDiagnosis,
       diagnosisStatus,
       updateDiagnosis,
-      confirmDiagnosis: () => setDiagnosisStatus("confirmed"),
+      confirmDiagnosis: () => {
+        setConfirmedDiagnosis({ ...diagnosis });
+        setDiagnosisStatus("confirmed");
+      },
       reopenDiagnosis: () => setDiagnosisStatus("updated"),
       outline,
       outlineConfirmed,
@@ -324,6 +330,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
     }),
     [
       diagnosis,
+      confirmedDiagnosis,
       diagnosisStatus,
       draftSaved,
       files,
@@ -358,4 +365,3 @@ export function useMockWorkspace() {
   }
   return context;
 }
-

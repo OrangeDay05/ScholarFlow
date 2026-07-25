@@ -1,0 +1,245 @@
+.backLink {
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.summary {
+  display: flex;
+  min-height: 220px;
+  padding: 32px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 30px;
+  background: var(--forest);
+  color: var(--cream);
+}
+
+.summary h2,
+.summary p {
+  margin: 0;
+}
+
+.summary h2 {
+  margin-top: 22px;
+  font-family: var(--font-serif);
+  font-size: clamp(27px, 4vw, 42px);
+  font-weight: 500;
+}
+
+.summary p {
+  max-width: 620px;
+  margin-top: 12px;
+  color: rgb(255 251 226 / 65%);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.scorePass,
+.scoreBlock {
+  display: grid;
+  width: 130px;
+  height: 130px;
+  flex: 0 0 auto;
+  place-content: center;
+  border: 1px solid rgb(255 251 226 / 32%);
+  border-radius: 50%;
+  text-align: center;
+}
+
+.scoreBlock {
+  border-color: #fadf2e;
+}
+
+.scorePass strong,
+.scoreBlock strong {
+  display: block;
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 500;
+}
+
+.scorePass span,
+.scoreBlock span {
+  display: block;
+  margin-top: 5px;
+  color: rgb(255 251 226 / 62%);
+  font-size: 9px;
+}
+
+.checkList {
+  margin-top: 22px;
+  border-top: 1px solid var(--forest);
+}
+
+.checkRow {
+  display: grid;
+  min-height: 96px;
+  padding: 18px 0;
+  grid-template-columns: 46px 72px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.index {
+  color: var(--green);
+  font-family: var(--font-serif);
+  font-size: 15px;
+}
+
+.stateMark {
+  display: inline-flex;
+  width: fit-content;
+  padding: 5px 8px;
+  border: 1px solid;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.pass {
+  border-color: rgb(0 119 70 / 20%);
+  background: var(--mint);
+  color: var(--green);
+}
+
+.warning {
+  border-color: rgb(163 106 20 / 24%);
+  background: #fff4d8;
+  color: var(--warning);
+}
+
+.block {
+  border-color: rgb(167 68 55 / 24%);
+  background: #fff0eb;
+  color: var(--danger);
+}
+
+.checkRow h3,
+.checkRow p {
+  margin: 0;
+}
+
+.checkRow h3 {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.checkRow p {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+.rowAction a,
+.rowAction button {
+  min-height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--forest);
+  background: transparent;
+  color: var(--forest);
+  font-size: 9px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.rowAction a {
+  display: inline-flex;
+  align-items: center;
+}
+
+.exportBar {
+  display: flex;
+  margin-top: 24px;
+  padding: 22px 24px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+}
+
+.exportBar strong,
+.exportBar span {
+  display: block;
+}
+
+.exportBar strong {
+  font-family: var(--font-serif);
+  font-size: 15px;
+}
+
+.exportBar span {
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.exportBar button {
+  min-height: 46px;
+  padding: 0 18px;
+  border: 1px solid var(--forest);
+  background: var(--forest);
+  color: var(--cream);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.exportBar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+
+.successNotice {
+  display: flex;
+  margin-top: 12px;
+  padding: 15px 18px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid rgb(0 119 70 / 20%);
+  background: var(--mint);
+  color: var(--forest);
+}
+
+.successNotice span {
+  color: var(--muted-strong);
+  font-size: 10px;
+}
+
+@media (max-width: 700px) {
+  .summary {
+    align-items: flex-start;
+  }
+
+  .scorePass,
+  .scoreBlock {
+    width: 94px;
+    height: 94px;
+  }
+
+  .checkRow {
+    grid-template-columns: 32px 62px minmax(0, 1fr);
+  }
+
+  .rowAction {
+    grid-column: 3;
+  }
+
+  .exportBar,
+  .successNotice {
+    display: block;
+  }
+
+  .exportBar button {
+    width: 100%;
+    margin-top: 16px;
+  }
+
+  .successNotice span {
+    display: block;
+    margin-top: 7px;
+  }
+}
