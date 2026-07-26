@@ -1,0 +1,396 @@
+.modeNotice {
+  display: flex;
+  min-height: 54px;
+  margin-bottom: 24px;
+  padding: 13px 16px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid rgb(20 84 58 / 22%);
+  background: var(--mint);
+  color: var(--forest);
+  font-size: 12px;
+}
+
+.modeNotice strong {
+  font-family: var(--font-serif);
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.modeNotice span {
+  color: var(--muted-strong);
+}
+
+.backLink {
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 800;
+  text-decoration: none;
+}
+
+.capabilityGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-top: 1px solid var(--forest);
+  border-left: 1px solid var(--line);
+}
+
+.capabilityCard {
+  display: flex;
+  min-height: 292px;
+  padding: 25px;
+  flex-direction: column;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-strong);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease;
+}
+
+.capabilityCard:hover {
+  z-index: 1;
+  background: var(--forest);
+  color: var(--cream);
+  transform: translateY(-2px);
+}
+
+.cardTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.cardIndex {
+  color: var(--green);
+  font-family: var(--font-serif);
+  font-size: 23px;
+  font-style: italic;
+}
+
+.capabilityCard:hover .cardIndex,
+.capabilityCard:hover .cardKicker,
+.capabilityCard:hover .cardSummary {
+  color: rgb(255 251 226 / 68%);
+}
+
+.cardStatus {
+  padding: 5px 8px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.capabilityCard:hover .cardStatus {
+  color: #fadf2e;
+}
+
+.cardKicker {
+  margin: 34px 0 0;
+  color: var(--muted);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.capabilityCard h2 {
+  margin: 9px 0 0;
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 500;
+  letter-spacing: -0.04em;
+}
+
+.cardSummary {
+  margin: 14px 0 0;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.cardAction {
+  display: flex;
+  margin-top: auto;
+  padding-top: 24px;
+  align-items: center;
+  justify-content: space-between;
+  border-top: 1px solid var(--line);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.cardAction span:last-child {
+  color: var(--green);
+}
+
+.capabilityCard:hover .cardAction {
+  border-color: rgb(255 251 226 / 18%);
+}
+
+.capabilityCard:hover .cardAction span:last-child {
+  color: #fadf2e;
+}
+
+.boundary {
+  display: grid;
+  margin-top: 28px;
+  padding: 25px;
+  grid-template-columns: 170px minmax(0, 1fr);
+  gap: 28px;
+  border: 1px solid var(--line);
+  background: rgb(215 234 218 / 32%);
+}
+
+.boundary strong {
+  color: var(--forest);
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.boundary p {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.workspaceGrid {
+  display: grid;
+  grid-template-columns: minmax(250px, 0.68fr) minmax(0, 1.32fr);
+  gap: 18px;
+}
+
+.setupPanel,
+.previewPanel {
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+}
+
+.panelHeading {
+  display: flex;
+  min-height: 67px;
+  padding: 18px 20px;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--line);
+}
+
+.panelHeading p,
+.panelHeading h2 {
+  margin: 0;
+}
+
+.panelHeading p {
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.16em;
+}
+
+.panelHeading h2 {
+  margin-top: 4px;
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: 500;
+}
+
+.panelHeading span {
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--forest);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.setupBody {
+  padding: 21px;
+}
+
+.prompt {
+  margin: 0 0 20px;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.inputChoice {
+  display: flex;
+  min-height: 48px;
+  padding: 10px 0;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  color: var(--ink);
+  font-size: 11px;
+}
+
+.inputChoice input {
+  accent-color: var(--green);
+}
+
+.setupAction {
+  width: 100%;
+  min-height: 45px;
+  margin-top: 20px;
+  border: 1px solid var(--forest);
+  background: var(--forest);
+  color: var(--cream);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.setupAction span {
+  margin-left: 16px;
+  color: #fadf2e;
+}
+
+.flow {
+  display: grid;
+  padding: 18px 20px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  background: rgb(215 234 218 / 26%);
+}
+
+.flowStep {
+  display: grid;
+  min-height: 66px;
+  padding: 10px;
+  align-content: space-between;
+  border-left: 2px solid var(--soft-green);
+  color: var(--muted-strong);
+  font-size: 10px;
+}
+
+.flowStep span {
+  color: var(--green);
+  font-family: var(--font-serif);
+  font-size: 14px;
+}
+
+.previewList {
+  display: grid;
+  padding: 20px;
+  gap: 12px;
+}
+
+.previewCard {
+  padding: 18px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.previewCardActive {
+  border-color: var(--green);
+  background: var(--cream);
+  box-shadow: inset 4px 0 0 var(--green);
+}
+
+.previewCard span {
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.previewCard h3 {
+  margin: 7px 0 0;
+  font-family: var(--font-serif);
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.previewCard p {
+  margin: 8px 0 0;
+  color: var(--muted-strong);
+  font-size: 11px;
+  line-height: 1.65;
+}
+
+.outputBar {
+  display: flex;
+  margin-top: 18px;
+  padding: 18px 20px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  background: var(--forest);
+  color: var(--cream);
+}
+
+.outputBar strong {
+  font-family: var(--font-serif);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.outputBar div {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.outputBar span {
+  padding: 5px 8px;
+  border: 1px solid rgb(255 251 226 / 24%);
+  color: rgb(255 251 226 / 72%);
+  font-size: 9px;
+}
+
+@media (max-width: 900px) {
+  .capabilityGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspaceGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .modeNotice,
+  .boundary,
+  .outputBar {
+    display: block;
+  }
+
+  .modeNotice span,
+  .backLink {
+    display: block;
+    margin-top: 8px;
+  }
+
+  .capabilityGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .capabilityCard {
+    min-height: 250px;
+  }
+
+  .boundary {
+    padding: 20px;
+  }
+
+  .boundary p {
+    margin-top: 10px;
+  }
+
+  .flow {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .outputBar div {
+    margin-top: 12px;
+    justify-content: flex-start;
+  }
+}

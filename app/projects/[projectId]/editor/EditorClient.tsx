@@ -7,6 +7,7 @@ import {
   type TaskStatus,
   useMockWorkspace,
 } from "@/app/lib/MockWorkspaceContext";
+import { V042_INCREMENTAL_MOCK_ENABLED } from "@/app/lib/v042-features";
 import styles from "./Editor.module.css";
 
 type EditorClientProps = {
@@ -550,6 +551,26 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           <strong>你想让 AI 完成什么？</strong>
           <span>AI 将读取当前项目上下文和你本次授权的材料。</span>
         </div>
+
+        {V042_INCREMENTAL_MOCK_ENABLED ? (
+          <details className={styles.extensionEntry} data-v042-extension-entry>
+            <summary>
+              <span>
+                <strong>研究扩展</strong>
+                <small>V0.4.2 · 6 个独立 Mock 工作区</small>
+              </span>
+              <span aria-hidden="true">＋</span>
+            </summary>
+            <div>
+              <Link href="/extensions/idea-exploration">Idea 探索</Link>
+              <Link href="/extensions/external-literature">外部文献</Link>
+              <Link href="/extensions/advanced-review">高级审稿</Link>
+              <Link href="/extensions/submission-revision">投稿返修</Link>
+              <Link href="/extensions/research-figures">科研图件</Link>
+              <Link href="/extensions/presentations">PPT</Link>
+            </div>
+          </details>
+        ) : null}
 
         <section className={styles.skillSection} aria-labelledby="skill-title">
           <div className={styles.sectionLabel} id="skill-title">

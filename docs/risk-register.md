@@ -14,3 +14,5 @@
 | R-010 | M2 Mock 被误解为真实文件解析、AI 或 DOCX 产物 | 中 | 高 | 页面持续显示 Mock；审核包逐项说明未接入能力 | Root Agent | MITIGATED |
 | R-011 | 独立滚动容器导致章节高亮或证据定位状态漂移 | 中 | 中 | 中栏用滚动容器内 IntersectionObserver；章节和证据使用稳定 ID；浏览器双向点击回归 | Root Agent | MITIGATED |
 | R-012 | 本地复测进程或日志误进入提交 | 中 | 中 | 记录准确 PID 并在复测后停止；提交前分类未跟踪文件并检查日志、PID、缓存和生成物 | Root Agent | MITIGATED |
+| R-013 | V0.4.2 新能力侵入或覆盖已批准的 M2 写作工作台 | 中 | 高 | 独立分支和路由；编辑器只加默认收起入口；统一功能开关；关闭态执行 M2 回归 | Root Agent | MITIGATED |
+| R-014 | 新页面被误认为真实外部检索、审稿、制图或 PPT 服务 | 中 | 高 | 页面持续标注 V0.4.2 Mock/未接真实服务；审核报告逐项列出未实现边界 | Root Agent | MITIGATED |

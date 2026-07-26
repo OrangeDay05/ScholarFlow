@@ -710,6 +710,76 @@
   line-height: 1.55;
 }
 
+.extensionEntry {
+  margin: 0 0 18px;
+  border: 1px solid rgb(20 84 58 / 22%);
+  background: rgb(215 234 218 / 32%);
+}
+
+.extensionEntry summary {
+  display: flex;
+  min-height: 54px;
+  padding: 11px 13px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  cursor: pointer;
+  list-style: none;
+  color: var(--forest);
+}
+
+.extensionEntry summary::-webkit-details-marker {
+  display: none;
+}
+
+.extensionEntry summary > span:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.extensionEntry summary strong {
+  font-family: var(--font-serif);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.extensionEntry summary small {
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.extensionEntry summary > span:last-child {
+  color: var(--green);
+  font-size: 16px;
+  transition: transform 160ms ease;
+}
+
+.extensionEntry[open] summary > span:last-child {
+  transform: rotate(45deg);
+}
+
+.extensionEntry > div {
+  display: grid;
+  padding: 0 12px 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.extensionEntry a {
+  padding: 8px;
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+  color: var(--forest);
+  font-size: 9px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.extensionEntry a:hover {
+  border-color: var(--green);
+  background: var(--cream);
+}
+
 .skillGroups {
   display: grid;
   gap: 14px;

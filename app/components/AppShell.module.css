@@ -74,6 +74,22 @@
   color: var(--forest);
 }
 
+.extensionNav {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.extensionNav small {
+  padding: 3px 5px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--forest);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+}
+
 .disabledNav {
   cursor: not-allowed;
   opacity: 0.45;
@@ -185,6 +201,10 @@
     box-shadow: 0 14px 40px rgb(20 84 58 / 24%);
   }
 
+  .extensionNav small {
+    display: none;
+  }
+
   .disabledNav {
     display: none;
   }
@@ -217,4 +237,3 @@
     margin-top: 22px;
   }
 }
-

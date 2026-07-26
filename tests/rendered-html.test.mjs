@@ -174,3 +174,37 @@ test("freezes the independent editor workspace and evidence linkage", async () =
   assert.match(editorCss, /\.taskDock/);
   assert.match(editorCss, /@media \(max-width:\s*820px\)/);
 });
+
+test("renders the gated V0.4.2 incremental mock pages without replacing M2", async () => {
+  const routes = [
+    ["/extensions", /研究扩展工作区/],
+    ["/extensions/idea-exploration", /Idea 探索/],
+    ["/extensions/external-literature", /外部文献/],
+    ["/extensions/advanced-review", /高级审稿/],
+    ["/extensions/submission-revision", /投稿返修/],
+    ["/extensions/research-figures", /科研图件/],
+    ["/extensions/presentations", />PPT</],
+  ];
+
+  for (const [pathname, expectation] of routes) {
+    const { response, html } = await render(pathname);
+    assert.equal(response.status, 200, `${pathname} should render`);
+    assert.match(html, expectation);
+    assert.match(html, /Mock|MOCK|演示/);
+    assert.match(html, /不改写 M2|M2 核心工作台保持不变/);
+  }
+
+  const [flagSource, shellSource, editorSource] = await Promise.all([
+    readFile(new URL("../app/lib/v042-features.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/AppShell.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(flagSource, /NEXT_PUBLIC_V042_INCREMENTAL_MOCK/);
+  assert.match(shellSource, /V042_INCREMENTAL_MOCK_ENABLED/);
+  assert.match(editorSource, /V042_INCREMENTAL_MOCK_ENABLED/);
+  assert.match(editorSource, /研究扩展/);
+});
