@@ -64,6 +64,158 @@ export const sessions = sqliteTable(
   ],
 );
 
+export const modelProviders = sqliteTable(
+  "model_providers",
+  {
+    id: text("id").primaryKey(),
+    providerKey: text("provider_key").notNull(),
+    displayName: text("display_name").notNull(),
+    dataProcessorName: text("data_processor_name").notNull(),
+    status: text("status", {
+      enum: ["MOCK_ONLY", "AVAILABLE", "DISABLED"],
+    })
+      .notNull()
+      .default("MOCK_ONLY"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("model_providers_key_uq").on(table.providerKey),
+  ],
+);
+
+export const providerModels = sqliteTable(
+  "provider_models",
+  {
+    id: text("id").primaryKey(),
+    providerId: text("provider_id")
+      .notNull()
+      .references(() => modelProviders.id, { onDelete: "cascade" }),
+    modelKey: text("model_key").notNull(),
+    displayName: text("display_name").notNull(),
+    modelVersion: text("model_version").notNull(),
+    allowedRolesJson: text("allowed_roles_json").notNull().default("[]"),
+    status: text("status", {
+      enum: ["MOCK_ONLY", "AVAILABLE", "DISABLED"],
+    })
+      .notNull()
+      .default("MOCK_ONLY"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("provider_models_provider_key_version_uq").on(
+      table.providerId,
+      table.modelKey,
+      table.modelVersion,
+    ),
+  ],
+);
+
+export const credentialMetadata = sqliteTable(
+  "credential_metadata",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    providerId: text("provider_id")
+      .notNull()
+      .references(() => modelProviders.id, { onDelete: "cascade" }),
+    credentialType: text("credential_type", {
+      enum: ["PLATFORM_CREDENTIAL", "USER_CREDENTIAL"],
+    }).notNull(),
+    label: text("label").notNull(),
+    maskedKey: text("masked_key").notNull(),
+    secretReference: text("secret_reference"),
+    allowedModelIdsJson: text("allowed_model_ids_json").notNull().default("[]"),
+    allowedProjectIdsJson: text("allowed_project_ids_json").notNull().default("[]"),
+    allowedRolesJson: text("allowed_roles_json").notNull().default("[]"),
+    status: text("status", {
+      enum: ["NOT_CONFIGURED", "MOCK_ONLY", "DISABLED", "DELETED"],
+    })
+      .notNull()
+      .default("NOT_CONFIGURED"),
+    lastTestStatus: text("last_test_status", {
+      enum: ["NOT_TESTED", "MOCK_NOT_EXECUTED"],
+    })
+      .notNull()
+      .default("NOT_TESTED"),
+    disabledAt: text("disabled_at"),
+    deletedAt: text("deleted_at"),
+    ...timestamps(),
+  },
+  (table) => [
+    index("credential_metadata_owner_provider_idx").on(
+      table.ownerUserId,
+      table.providerId,
+    ),
+  ],
+);
+
+export const executionProfiles = sqliteTable(
+  "execution_profiles",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").references(() => users.id, {
+      onDelete: "cascade",
+    }),
+    projectId: text("project_id").references(() => projects.id, {
+      onDelete: "cascade",
+    }),
+    name: text("name").notNull(),
+    mode: text("mode", {
+      enum: ["STANDARD", "STRICT", "CUSTOM"],
+    }).notNull(),
+    maxModels: integer("max_models").notNull(),
+    maxCalls: integer("max_calls").notNull(),
+    timeoutSeconds: integer("timeout_seconds").notNull(),
+    fallbackPlan: text("fallback_plan").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(true),
+    ...timestamps(),
+  },
+  (table) => [
+    index("execution_profiles_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+    ),
+  ],
+);
+
+export const executionProfileModels = sqliteTable(
+  "execution_profile_models",
+  {
+    id: text("id").primaryKey(),
+    executionProfileId: text("execution_profile_id")
+      .notNull()
+      .references(() => executionProfiles.id, { onDelete: "cascade" }),
+    providerModelId: text("provider_model_id")
+      .notNull()
+      .references(() => providerModels.id, { onDelete: "restrict" }),
+    credentialMetadataId: text("credential_metadata_id").references(
+      () => credentialMetadata.id,
+      { onDelete: "set null" },
+    ),
+    role: text("role", {
+      enum: [
+        "ROUTER",
+        "GENERATOR",
+        "REVIEWER",
+        "VERIFIER",
+        "REVISER",
+        "AGGREGATOR",
+      ],
+    }).notNull(),
+    priority: integer("priority").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("execution_profile_model_role_uq").on(
+      table.executionProfileId,
+      table.role,
+    ),
+  ],
+);
+
 export const projects = sqliteTable(
   "projects",
   {
@@ -1626,6 +1778,46 @@ export const presentationProjects = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     title: text("title").notNull(),
     presentationType: text("presentation_type").notNull(),
+    scene: text("scene", {
+      enum: [
+        "COURSE_PRESENTATION",
+        "CLASSROOM_PRESENTATION",
+        "LITERATURE_REVIEW_PRESENTATION",
+        "GROUP_PRESENTATION",
+        "FINAL_COURSE_PRESENTATION",
+        "RESEARCH_PROPOSAL",
+        "PROPOSAL_DEFENSE",
+        "MIDTERM_DEFENSE",
+        "THESIS_DEFENSE",
+        "LAB_MEETING",
+        "CONFERENCE_PRESENTATION",
+        "PAPER_SHARING",
+        "SUBMISSION_PRESENTATION",
+      ],
+    }),
+    readinessStatus: text("readiness_status", {
+      enum: [
+        "READY",
+        "READY_WITH_WARNINGS",
+        "NEEDS_CONFIRMATION",
+        "NEEDS_MATERIAL",
+        "BLOCKED",
+      ],
+    })
+      .notNull()
+      .default("NEEDS_CONFIRMATION"),
+    truthStatus: text("truth_status", {
+      enum: ["UNVERIFIED", "PARTIALLY_VERIFIED", "VERIFIED"],
+    })
+      .notNull()
+      .default("UNVERIFIED"),
+    sourceSectionVersionId: text("source_section_version_id").references(
+      () => sectionVersions.id,
+      { onDelete: "set null" },
+    ),
+    sourceMaterialSnapshotJson: text("source_material_snapshot_json")
+      .notNull()
+      .default("[]"),
     audience: text("audience").notNull().default(""),
     durationMinutes: integer("duration_minutes"),
     ...timestamps(),
@@ -1647,7 +1839,23 @@ export const presentationVersions = sqliteTable(
       .notNull()
       .references(() => presentationProjects.id, { onDelete: "cascade" }),
     versionNumber: integer("version_number").notNull(),
+    status: text("status", {
+      enum: ["DRAFT", "ADOPTED", "SUPERSEDED", "ARCHIVED"],
+    })
+      .notNull()
+      .default("DRAFT"),
+    sourcePresentationVersionId: text("source_presentation_version_id"),
+    sourceSectionVersionId: text("source_section_version_id").references(
+      () => sectionVersions.id,
+      { onDelete: "set null" },
+    ),
     sourcePaperVersionIdsJson: text("source_paper_version_ids_json").notNull().default("[]"),
+    materialSnapshotJson: text("material_snapshot_json").notNull().default("[]"),
+    verificationStatus: text("verification_status", {
+      enum: ["UNVERIFIED", "VERIFIED_WITH_WARNINGS", "VERIFIED"],
+    })
+      .notNull()
+      .default("UNVERIFIED"),
     narrativeJson: text("narrative_json").notNull().default("{}"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
@@ -1678,6 +1886,12 @@ export const slides = sqliteTable(
     contentJson: text("content_json").notNull().default("{}"),
     speakerNotes: text("speaker_notes").notNull().default(""),
     assetBindingsJson: text("asset_bindings_json").notNull().default("[]"),
+    sourceBindingsJson: text("source_bindings_json").notNull().default("[]"),
+    verificationStatus: text("verification_status", {
+      enum: ["UNVERIFIED", "VERIFIED_WITH_WARNINGS", "VERIFIED"],
+    })
+      .notNull()
+      .default("UNVERIFIED"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [

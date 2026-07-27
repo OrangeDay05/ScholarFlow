@@ -13,16 +13,18 @@ function executableSql(sql) {
 test("M4 migrations apply in order to a fresh isolated SQLite database", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys = ON");
-  const [m0, m1, m2, m3] = await Promise.all([
+  const [m0, m1, m2, m3, m4] = await Promise.all([
     migration("0000_swift_blue_shield.sql"),
     migration("0001_vengeful_tigra.sql"),
     migration("0002_petite_sir_ram.sql"),
     migration("0003_condemned_magik.sql"),
+    migration("0004_nervous_maddog.sql"),
   ]);
   db.exec(executableSql(m0));
   db.exec(executableSql(m1));
   db.exec(executableSql(m2));
   db.exec(executableSql(m3));
+  db.exec(executableSql(m4));
   const tables = db
     .prepare(
       `SELECT name FROM sqlite_master
@@ -59,7 +61,16 @@ test("M4 migrations apply in order to a fresh isolated SQLite database", async (
   ]) {
     assert.ok(tables.includes(table), `${table} should exist after 0003`);
   }
-  assert.equal(tables.length, 53);
+  for (const table of [
+    "model_providers",
+    "provider_models",
+    "credential_metadata",
+    "execution_profiles",
+    "execution_profile_models",
+  ]) {
+    assert.ok(tables.includes(table), `${table} should exist after 0004`);
+  }
+  assert.equal(tables.length, 58);
   db.close();
 });
 
@@ -78,6 +89,15 @@ test("0003 only adds privacy tables and indexes", async () => {
     executableSql(sql),
     /(?:^|;)\s*(?:DROP|DELETE|TRUNCATE|ALTER)\b/im,
   );
+});
+
+test("0004 only adds model tables, PPT columns, and indexes", async () => {
+  const sql = await migration("0004_nervous_maddog.sql");
+  assert.doesNotMatch(
+    executableSql(sql),
+    /(?:^|;)\s*(?:DROP|DELETE|TRUNCATE)\b/im,
+  );
+  assert.doesNotMatch(sql, /ALTER\s+TABLE[^;]+\b(?:DROP|RENAME)\b/i);
 });
 
 test("0001 is additive and does not contain destructive DDL", async () => {
