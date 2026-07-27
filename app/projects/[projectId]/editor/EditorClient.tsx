@@ -314,6 +314,8 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const reportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const documentScrollRef = useRef<HTMLElement | null>(null);
+  const outlineDrawerRef = useRef<HTMLDetailsElement | null>(null);
+  const assistantDrawerRef = useRef<HTMLDetailsElement | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const claimRefs = useRef<Record<string, HTMLElement | null>>({});
   const initialSectionHandledRef = useRef(false);
@@ -1710,14 +1712,30 @@ export default function EditorClient({ projectId }: EditorClientProps) {
       ) : null}
 
       <div className={styles.mobileTools}>
-        <details>
-          <summary>打开论文目录</summary>
+        <details
+          onToggle={(event) => {
+            if (event.currentTarget.open) setFocusMode(false);
+          }}
+          ref={outlineDrawerRef}
+        >
+          <summary>
+            <span className={styles.compactOpenLabel}>打开论文目录</span>
+            <span className={styles.compactCloseLabel}>关闭论文目录</span>
+          </summary>
           <div className={styles.mobileDrawer}>
             {renderOutlinePanel()}
           </div>
         </details>
-        <details>
-          <summary>打开 AI 工作台</summary>
+        <details
+          onToggle={(event) => {
+            if (event.currentTarget.open) setFocusMode(false);
+          }}
+          ref={assistantDrawerRef}
+        >
+          <summary>
+            <span className={styles.compactOpenLabel}>打开 AI 工作台</span>
+            <span className={styles.compactCloseLabel}>关闭 AI 工作台</span>
+          </summary>
           <div className={styles.mobileDrawer}>
             {renderAssistantPanel()}
           </div>
@@ -1757,6 +1775,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             </div>
             <div className={styles.panelControls} aria-label="编辑器布局">
               <button
+                className={styles.desktopSidebarAction}
                 aria-pressed={leftHidden}
                 onClick={() => {
                   setFocusMode(false);
@@ -1768,12 +1787,22 @@ export default function EditorClient({ projectId }: EditorClientProps) {
               </button>
               <button
                 aria-pressed={focusMode}
-                onClick={() => setFocusMode((current) => !current)}
+                onClick={() =>
+                  setFocusMode((current) => {
+                    const next = !current;
+                    if (next) {
+                      if (outlineDrawerRef.current) outlineDrawerRef.current.open = false;
+                      if (assistantDrawerRef.current) assistantDrawerRef.current.open = false;
+                    }
+                    return next;
+                  })
+                }
                 type="button"
               >
                 {focusMode ? "退出专注" : "专注写作"}
               </button>
               <button
+                className={styles.desktopSidebarAction}
                 aria-pressed={rightHidden}
                 onClick={() => {
                   setFocusMode(false);

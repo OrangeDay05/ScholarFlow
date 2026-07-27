@@ -177,6 +177,17 @@ test("freezes the independent editor workspace and evidence linkage", async () =
   assert.match(editorCss, /\.assistantScroll[\s\S]*?overflow-y:\s*auto/);
   assert.match(editorCss, /\.taskDock/);
   assert.match(editorCss, /@media \(max-width:\s*820px\)/);
+  assert.equal(
+    (editorSource.match(/className=\{styles\.desktopSidebarAction\}/g) ?? []).length,
+    2,
+  );
+  assert.match(editorSource, /compactOpenLabel/);
+  assert.match(editorSource, /outlineDrawerRef\.current\.open = false/);
+  assert.match(editorSource, /assistantDrawerRef\.current\.open = false/);
+  assert.match(
+    editorCss,
+    /@media \(max-width:\s*820px\)[\s\S]*?\.desktopSidebarAction\s*\{\s*display:\s*none/,
+  );
 });
 
 test("renders the gated V0.4.2 incremental mock pages without replacing M2", async () => {

@@ -2349,6 +2349,18 @@
   flex: 0 0 auto;
 }
 
+.compactCloseLabel {
+  display: none;
+}
+
+.mobileTools details[open] .compactOpenLabel {
+  display: none;
+}
+
+.mobileTools details[open] .compactCloseLabel {
+  display: inline;
+}
+
 @media (max-width: 1120px) {
   .workspace {
     grid-template-columns: 220px minmax(390px, 1fr) 300px;
@@ -2497,10 +2509,14 @@
     display: none;
   }
 
+  .desktopSidebarAction {
+    display: none;
+  }
+
   .mobileDrawer {
     position: absolute;
     z-index: 35;
-    top: 50px;
+    top: 140px;
     width: min(350px, calc(100vw - 24px));
     max-height: 70vh;
     padding: 18px 14px 22px;
