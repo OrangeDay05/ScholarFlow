@@ -33,10 +33,10 @@
 | M3-MO-1 | M3 增量 Mock | 多模型编排与凭据契约 | Root Agent | `app/lib/model-orchestration-*.ts` | V043-1 | 多模型/API Key 需求 | 角色、模式、凭据、预算、冲突和失败契约 | 上限明确；真实 Key 不进入前端状态或日志 | DONE | 无限调用或 Key 泄漏 | 五角色、三模式、两凭据类型和八失败状态已固化 |
 | M3-MO-2 | M3 增量 Mock | 模型与 API 配置界面 | Root Agent | `app/settings/models/**`、管理员和编辑器入口 | M3-MO-1 | 编排契约 | 配置、披露、冲突和失败 Mock | 页面可渲染；真实 Key 输入禁用；无供应商调用 | DONE | Mock 被误认真实连接 | 设置页、管理入口和编辑器披露已完成 |
 | M3-MO-QA | M3 增量 Mock | 多模型专项验证与审核包 | Root Agent | `tests/model-orchestration-mock.test.mjs`、`docs/reviews/M3-incremental-mocks/**` | M3-PD-QA/M3-MO-2 | 完整增量 Mock | 测试、构建、HTTP 与 review | 25 项全量测试、构建和关键路由 200 | DONE | 未经批准进入真实实现 | 审核报告已创建，停在审核门 |
-| M4-B1 | M4 | 需求与共享契约冻结 | Root Agent | `AGENTS.md`、`docs/**` | M3 完成、V0.5.1 | 需求基线与现状审计 | 有效基线、差距矩阵、批次和迁移策略 | 当前阶段、禁止项、迁移台账差异和批次停止条件一致 | IN_PROGRESS | 旧文档与新基线冲突 | 本轮执行 |
-| M4-B2 | M4 | 账号、项目、材料与五起点持久化 | Root Agent | `db/**`、`drizzle/**`、`app/api/m4/**`、`tests/**` | M4-B1 | 现有 M3 所有者隔离基础 | 增量实体、Repository 和 API | 五起点可持久化；匿名拒绝；跨用户不可见 | READY | 身份边界或旧数据回填错误 | 待执行 |
-| M4-B3 | M4 | 渐进式诊断、版本和任务就绪 | Root Agent | `db/**`、`app/api/m4/**`、`app/lib/m4-*.ts`、`tests/**` | M4-B2 | 未提交诊断持久化增量 | 完整状态、来源、版本、审计和就绪 API | AI 推测不冒充确认；历史不覆盖；任务级门控 | READY | 当前 migration 与本地台账漂移 | 待执行 |
-| M4-B4 | M4 | AI Task、审阅与采用版本关系 | Root Agent | `db/**`、`app/api/m4/**`、`tests/**` | M4-B2 | M3 双模型 Mock 契约 | 状态机、父子任务、报告、问题和用户决定 | 审阅不改正文；修订追加；部分失败不标通过 | READY | 状态转换或幂等遗漏 | 待执行 |
-| M4-B5 | M4 | 隐私处理与分析保真 | Root Agent | `db/**`、`app/api/m4/**`、`tests/**` | M4-B2 | V0.5.1 隐私分类 | 画像、副本、映射、外传和保真记录 | 六模式可区分；禁止破坏必要变量、样本和时序 | READY | 处理副本破坏研究有效性 | 待执行 |
-| M4-B6 | M4 | PPT 场景与模型/BYOK 元数据 | Root Agent | `db/**`、`app/api/m4/**`、`tests/**` | M4-B2 | PPT 与编排 Mock 契约 | 13 场景、版本/幻灯片来源；模型和凭据元数据 | PPT 不按学历门控；不接收明文 Key | READY | 场景遗漏或密钥泄漏 | 待执行 |
-| M4-B7 | M4 | 权限、迁移、测试与审核收尾 | Root Agent | `tests/**`、`docs/reviews/M4/**`、项目管理文档 | M4-B3/B4/B5/B6 | 全部 M4 增量 | 隔离、幂等、回滚说明、审核包和提交 | 全量检查通过；迁移台账一致；停在 M4 审核门 | READY | 本地数据与迁移状态不一致 | 待执行 |
+| M4-B1 | M4 | 需求与共享契约冻结 | Root Agent | `AGENTS.md`、`docs/**` | M3 完成、V0.5.1 | 需求基线与现状审计 | 有效基线、差距矩阵、批次和迁移策略 | 当前阶段、禁止项、迁移台账差异和批次停止条件一致 | DONE | 旧文档与新基线冲突 | `3c71f02` |
+| M4-B2 | M4 | 账号、项目、材料与五起点持久化 | Root Agent | `db/**`、`drizzle/**`、`app/api/m4/**`、`tests/**` | M4-B1 | 现有 M3 所有者隔离基础 | 增量实体、Repository 和 API | 五起点可持久化；匿名拒绝；跨用户不可见 | DONE | 身份边界或旧数据回填错误 | `716651a` |
+| M4-B3 | M4 | 渐进式诊断、版本和任务就绪 | Root Agent | `db/**`、`app/api/m4/**`、`app/lib/m4-*.ts`、`tests/**` | M4-B2 | 渐进式诊断 Mock 契约 | 完整状态、来源、版本、审计和就绪 API | AI 推测不冒充确认；历史不覆盖；任务级门控 | DONE | 当前 migration 与本地台账漂移 | `fe36968` |
+| M4-B4 | M4 | AI Task、审阅与采用版本关系 | Root Agent | `db/**`、`app/api/m4/**`、`tests/**` | M4-B2 | M3 双模型 Mock 契约 | 状态机、父子任务、报告、问题和用户决定 | 审阅不改正文；修订追加；部分失败不标通过 | DONE | 状态转换或幂等遗漏 | `aa1bc2e` |
+| M4-B5 | M4 | 隐私处理与分析保真 | Root Agent | `db/**`、`app/api/m4/**`、`tests/**` | M4-B2 | V0.5.1 隐私分类 | 画像、副本、映射、外传和保真记录 | 六模式可区分；禁止破坏必要变量、样本和时序 | DONE | 处理副本破坏研究有效性 | `841f304` |
+| M4-B6 | M4 | PPT 场景与模型/BYOK 元数据 | Root Agent | `db/**`、`app/api/m4/**`、`tests/**` | M4-B2 | PPT 与编排 Mock 契约 | 13 场景、版本/幻灯片来源；模型和凭据元数据 | PPT 不按学历门控；不接收明文 Key | DONE | 场景遗漏或密钥泄漏 | `3b472a5` |
+| M4-B7 | M4 | 权限、迁移、测试与审核收尾 | Root Agent | `tests/**`、`scripts/**`、`docs/reviews/M4/**`、项目管理文档 | M4-B3/B4/B5/B6 | 全部 M4 增量 | 隔离、幂等、只读预检、审核包和提交 | 全量检查通过；旧本地库漂移明确阻断盲目迁移；停在 M4 审核门 | DONE | 本地数据与迁移状态不一致 | API 隔离通过；新库迁移链通过；旧库保持只读并列为 I-015 |

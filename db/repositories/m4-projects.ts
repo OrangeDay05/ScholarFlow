@@ -247,7 +247,7 @@ function materialInsert(
   return db
     .prepare(
       `INSERT INTO materials (
-        id, owner_user_id, project_id, kind, filename, storage_key,
+        id, owner_user_id, project_id, kind, filename, object_key,
         content_type, size_bytes, status
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'queued')`,
     )
