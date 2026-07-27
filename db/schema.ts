@@ -631,13 +631,68 @@ export const aiTasks = sqliteTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     sectionId: text("section_id").references(() => sections.id, { onDelete: "set null" }),
+    parentTaskId: text("parent_task_id"),
+    taskRole: text("task_role", {
+      enum: [
+        "ROUTER",
+        "GENERATOR",
+        "REVIEWER",
+        "VERIFIER",
+        "REVISER",
+        "AGGREGATOR",
+      ],
+    }),
     productSkill: text("product_skill").notNull(),
     taskType: text("task_type").notNull(),
     status: text("status", {
-      enum: ["queued", "running", "succeeded", "needs_input", "failed", "cancelled"],
+      enum: [
+        "queued",
+        "running",
+        "succeeded",
+        "needs_input",
+        "failed",
+        "cancelled",
+        "QUEUED",
+        "PREPARING_CONTEXT",
+        "PARSING",
+        "RETRIEVING",
+        "WAITING_FOR_USER_CONFIRMATION",
+        "CALLING_MODEL",
+        "GENERATING",
+        "REVIEWING",
+        "VERIFYING",
+        "REVISING",
+        "AGGREGATING",
+        "RETRYING",
+        "PARTIALLY_COMPLETED",
+        "SUCCEEDED",
+        "FAILED",
+        "CANCELLED",
+        "BLOCKED",
+        "BUDGET_PAUSED",
+      ],
     })
       .notNull()
       .default("queued"),
+    reviewMode: text("review_mode", {
+      enum: ["none", "standard", "strict", "custom"],
+    })
+      .notNull()
+      .default("none"),
+    idempotencyKey: text("idempotency_key"),
+    executionProfileId: text("execution_profile_id"),
+    reviewedVersionId: text("reviewed_version_id").references(
+      () => sectionVersions.id,
+      { onDelete: "set null" },
+    ),
+    resultVersionId: text("result_version_id").references(
+      () => sectionVersions.id,
+      { onDelete: "set null" },
+    ),
+    maxCalls: integer("max_calls").notNull().default(1),
+    callsUsed: integer("calls_used").notNull().default(0),
+    timeoutSeconds: integer("timeout_seconds").notNull().default(120),
+    stopReason: text("stop_reason"),
     selectedMaterialIdsJson: text("selected_material_ids_json").notNull().default("[]"),
     modelConfigId: text("model_config_id"),
     skillVersionId: text("skill_version_id").references(() => skillVersions.id, {
@@ -653,6 +708,226 @@ export const aiTasks = sqliteTable(
   (table) => [
     index("ai_tasks_owner_project_idx").on(table.ownerUserId, table.projectId),
     index("ai_tasks_status_created_idx").on(table.status, table.createdAt),
+    index("ai_tasks_parent_idx").on(table.parentTaskId),
+    uniqueIndex("ai_tasks_owner_project_idempotency_uq").on(
+      table.ownerUserId,
+      table.projectId,
+      table.idempotencyKey,
+    ),
+  ],
+);
+
+export const aiTaskModelAssignments = sqliteTable(
+  "ai_task_model_assignments",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => aiTasks.id, { onDelete: "cascade" }),
+    role: text("role", {
+      enum: [
+        "ROUTER",
+        "GENERATOR",
+        "REVIEWER",
+        "VERIFIER",
+        "REVISER",
+        "AGGREGATOR",
+      ],
+    }).notNull(),
+    providerKey: text("provider_key").notNull(),
+    modelKey: text("model_key").notNull(),
+    modelVersion: text("model_version").notNull(),
+    skillKey: text("skill_key").notNull(),
+    skillVersion: text("skill_version").notNull(),
+    modelId: text("model_id"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("ai_task_model_assignment_role_uq").on(table.taskId, table.role),
+    index("ai_task_model_assignment_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+    ),
+  ],
+);
+
+export const aiTaskEvents = sqliteTable(
+  "ai_task_events",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => aiTasks.id, { onDelete: "cascade" }),
+    fromStatus: text("from_status"),
+    toStatus: text("to_status").notNull(),
+    actorType: text("actor_type", {
+      enum: ["USER", "SYSTEM", "MODEL"],
+    }).notNull(),
+    reason: text("reason"),
+    detailJson: text("detail_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("ai_task_events_owner_task_created_idx").on(
+      table.ownerUserId,
+      table.taskId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const reviewReports = sqliteTable(
+  "review_reports",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => aiTasks.id, { onDelete: "cascade" }),
+    reviewedVersionId: text("reviewed_version_id")
+      .notNull()
+      .references(() => sectionVersions.id, { onDelete: "restrict" }),
+    conclusion: text("conclusion", {
+      enum: [
+        "PASSED",
+        "PASSED_WITH_WARNINGS",
+        "REVISION_REQUIRED",
+        "BLOCKED",
+        "REVIEW_FAILED",
+      ],
+    }).notNull(),
+    summary: text("summary").notNull(),
+    highCount: integer("high_count").notNull().default(0),
+    mediumCount: integer("medium_count").notNull().default(0),
+    lowCount: integer("low_count").notNull().default(0),
+    contextSnapshotJson: text("context_snapshot_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("review_reports_task_uq").on(table.taskId),
+    index("review_reports_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+    ),
+  ],
+);
+
+export const reviewIssues = sqliteTable(
+  "review_issues",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    reportId: text("report_id")
+      .notNull()
+      .references(() => reviewReports.id, { onDelete: "cascade" }),
+    category: text("category").notNull(),
+    severity: text("severity", { enum: ["HIGH", "MEDIUM", "LOW"] }).notNull(),
+    title: text("title").notNull(),
+    detail: text("detail").notNull(),
+    suggestion: text("suggestion").notNull(),
+    modelSourcesJson: text("model_sources_json").notNull().default("[]"),
+    evidenceBindingIdsJson: text("evidence_binding_ids_json").notNull().default("[]"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("review_issues_owner_report_idx").on(table.ownerUserId, table.reportId),
+  ],
+);
+
+export const reviewIssueDecisions = sqliteTable(
+  "review_issue_decisions",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    reportId: text("report_id")
+      .notNull()
+      .references(() => reviewReports.id, { onDelete: "cascade" }),
+    issueId: text("issue_id").references(() => reviewIssues.id, {
+      onDelete: "cascade",
+    }),
+    decision: text("decision", {
+      enum: [
+        "ACCEPTED_ORIGINAL",
+        "SELECTED_FOR_REVISION",
+        "IGNORED",
+        "REVIEW_AGAIN",
+      ],
+    }).notNull(),
+    reason: text("reason"),
+    resolvedVersionId: text("resolved_version_id").references(
+      () => sectionVersions.id,
+      { onDelete: "set null" },
+    ),
+    decidedAt: text("decided_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("review_decisions_owner_report_idx").on(
+      table.ownerUserId,
+      table.reportId,
+    ),
+  ],
+);
+
+export const sectionVersionAdoptions = sqliteTable(
+  "section_version_adoptions",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sectionId: text("section_id")
+      .notNull()
+      .references(() => sections.id, { onDelete: "cascade" }),
+    versionId: text("version_id")
+      .notNull()
+      .references(() => sectionVersions.id, { onDelete: "cascade" }),
+    sourceTaskId: text("source_task_id").references(() => aiTasks.id, {
+      onDelete: "set null",
+    }),
+    candidateType: text("candidate_type", {
+      enum: ["GENERATED", "AGGREGATED", "REVISED", "RESTORED"],
+    }).notNull(),
+    adopted: integer("adopted", { mode: "boolean" }).notNull().default(false),
+    adoptedAt: text("adopted_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("section_version_adoption_version_uq").on(table.versionId),
+    index("section_version_adoption_owner_section_idx").on(
+      table.ownerUserId,
+      table.sectionId,
+    ),
   ],
 );
 

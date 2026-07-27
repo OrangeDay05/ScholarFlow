@@ -38,6 +38,14 @@ export function requireM4Actor(
 }
 
 export function m4RepositoryError(error: unknown): Response {
+  if (
+    error instanceof Error &&
+    "code" in error &&
+    (error.code === "INVALID_TRANSITION" ||
+      error.code === "CALL_LIMIT_REACHED")
+  ) {
+    return apiError(409, String(error.code), error.message);
+  }
   if (error instanceof M4ProjectRepositoryError || isM4NotFound(error)) {
     return apiError(404, error.code, error.message);
   }
