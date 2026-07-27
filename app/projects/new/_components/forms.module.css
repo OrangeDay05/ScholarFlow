@@ -181,6 +181,16 @@
   gap: 18px 14px;
 }
 
+.infoBox {
+  margin-top: 18px;
+  padding: 14px 16px;
+  border-left: 3px solid var(--green);
+  background: rgb(215 234 218 / 45%);
+  color: var(--muted-strong);
+  font-size: 10px;
+  line-height: 1.7;
+}
+
 .field,
 .fieldFull {
   display: grid;

@@ -15,3 +15,4 @@
 | I-011 | 本地 Cloudflare Worker 不会自动继承 PowerShell 中的演示身份变量 | M3 | 中 | Root Agent | RESOLVED | 仅当显式开关和邮箱同时存在时由 Vite 配置注入本地 Worker `vars`；默认匿名仍为 401 |
 | I-012 | 开发服务器热重载期间浏览器停在连接失败数据页，后续被浏览器 URL 安全策略阻断 | M3 | 低 | Root Agent | OPEN | 不绕过策略；保留重启前 M2 页面渲染证据，改用 API、SSR、构建和自动化测试完成本轮基础数据验证；下次新浏览器会话补看 D1 标签 |
 | I-013 | 一次经 `.cmd` 与日志管道的开发服务器启动只输出 banner，60 秒内未监听端口 | M3 | 低 | Root Agent | RESOLVED | 准确终止该执行单元，改用 Vinext Node CLI 直接入口；后续两次有限时启动均成功 |
+| I-014 | M3 前端可能诱导用户粘贴真实 API Key | M3 增量 Mock | 高 | Root Agent | RESOLVED | 真实 Key 输入框禁用并明确标注不收集；仅使用掩码演示值，源码测试确认无浏览器存储和供应商调用 |

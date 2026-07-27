@@ -15,11 +15,14 @@ import {
   type ReviewWorkflowStatus,
 } from "@/app/lib/dual-model-review-mock";
 import { DUAL_MODEL_REVIEW_MOCK_ENABLED } from "@/app/lib/dual-model-review-features";
+import { MODEL_ORCHESTRATION_MOCK_ENABLED } from "@/app/lib/model-orchestration-features";
+import { strictAssignment } from "@/app/lib/model-orchestration-mock";
 import { productSkills } from "@/app/lib/m1-mock";
 import {
   type TaskStatus,
   useMockWorkspace,
 } from "@/app/lib/MockWorkspaceContext";
+import { PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED } from "@/app/lib/progressive-diagnosis-features";
 import { V042_INCREMENTAL_MOCK_ENABLED } from "@/app/lib/v042-features";
 import styles from "./Editor.module.css";
 
@@ -323,7 +326,6 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     outline.find((section) => section.id === selectedSectionId) ?? outline[1];
   const leftHidden = focusMode || leftCollapsed;
   const rightHidden = focusMode || rightCollapsed;
-  const blocked = selectedSkillId === "chapter-writing" && diagnosisStatus !== "confirmed";
   const isReportOnly = selectedSkillId === "consistency" || selectedSkillId === "evidence";
   const createsVersion =
     selectedSkillId === "chapter-writing" || selectedSkillId === "revision";
@@ -344,14 +346,43 @@ export default function EditorClient({ projectId }: EditorClientProps) {
         : { enabled: false, reason: "需先授权至少一份解析成功的材料。" };
     }
     if (skillId === "chapter-writing") {
-      if (diagnosisStatus !== "confirmed") {
+      if (
+        PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED &&
+        selectedSection?.id === "results"
+      ) {
+        return {
+          enabled: false,
+          reason: "结果章节需要真实数据、样本、分析方法和结果材料。",
+        };
+      }
+      if (
+        PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED &&
+        selectedSection?.id === "method" &&
+        diagnosisStatus !== "confirmed"
+      ) {
+        return {
+          enabled: false,
+          reason: "方法章节需要确认研究对象、数据来源、样本或语料和基本研究设计。",
+        };
+      }
+      if (
+        !PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED &&
+        diagnosisStatus !== "confirmed"
+      ) {
         return { enabled: false, reason: "需先确认诊断卡。" };
       }
       if (!selectedSection) {
         return { enabled: false, reason: "需先选择当前章节。" };
       }
       return readableSelectedMaterials.length > 0
-        ? { enabled: true, reason: "诊断、章节与材料条件已满足。" }
+        ? {
+            enabled: true,
+            reason:
+              PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED &&
+              diagnosisStatus !== "confirmed"
+                ? "READY_WITH_WARNINGS：可先写候选内容，待确认项必须保留警告。"
+                : "诊断、章节与材料条件已满足。",
+          }
         : { enabled: false, reason: "需先授权至少一份解析成功的材料。" };
     }
     return selectedSection
@@ -359,6 +390,8 @@ export default function EditorClient({ projectId }: EditorClientProps) {
       : { enabled: false, reason: "需先选择当前章节。" };
   };
   const selectedSkillAvailability = skillAvailability(selectedSkillId);
+  const blocked =
+    selectedSkillId === "chapter-writing" && !selectedSkillAvailability.enabled;
   const visibleTaskStatus: VisibleTaskStatus = queued
     ? "queued"
     : usesLocalTask
@@ -920,7 +953,9 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           </button>
           {blocked ? (
             <Link href={`/projects/${projectId}/diagnosis?status=draft`}>
-              返回诊断卡确认 →
+              {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
+                ? "查看任务缺口并继续梳理 →"
+                : "返回诊断卡确认 →"}
             </Link>
           ) : null}
         </section>
@@ -1040,6 +1075,18 @@ export default function EditorClient({ projectId }: EditorClientProps) {
                       : `${selectedReviewer.skill} · ${selectedReviewer.skillVersion}`}
                   </small>
                 </article>
+                {MODEL_ORCHESTRATION_MOCK_ENABLED &&
+                reviewMode === "strict" ? (
+                  <article>
+                    <span>验证模型</span>
+                    <strong>
+                      {strictAssignment.provider} · {strictAssignment.model}
+                    </strong>
+                    <small>
+                      {strictAssignment.skill} · {strictAssignment.skill_version}
+                    </small>
+                  </article>
+                ) : null}
               </div>
 
               <dl className={styles.executionEstimate}>
@@ -1068,6 +1115,23 @@ export default function EditorClient({ projectId }: EditorClientProps) {
               <p className={styles.reviewBoundary}>
                 审阅只创建报告，不直接修改正文；不得只凭模型自身知识判断文献是否支持论断。
               </p>
+              {MODEL_ORCHESTRATION_MOCK_ENABLED ? (
+                <div className={styles.orchestrationDisclosure}>
+                  <div>
+                    <strong>
+                      {reviewMode === "strict"
+                        ? "严格模式 · 最多 3 个模型"
+                        : reviewMode === "standard"
+                          ? "标准模式 · 2 个模型"
+                          : "快速模式 · 1 个模型"}
+                    </strong>
+                    <span>
+                      平台额度 / 用户 Key、数据处理方、超时与降级方案将在执行前再次披露。
+                    </span>
+                  </div>
+                  <Link href="/settings/models">配置模型与 API →</Link>
+                </div>
+              ) : null}
             </div>
           ) : null}
         </section>
@@ -1619,10 +1683,20 @@ export default function EditorClient({ projectId }: EditorClientProps) {
         <aside className={styles.warningBar} aria-label="诊断卡未确认警告">
           <span className={styles.warningIcon}>!</span>
           <div>
-            <strong>诊断卡尚未确认，正式章节写作已阻断</strong>
-            <p>你仍可编辑现有草稿并运行检查，但不能运行“通用章节写作”。</p>
+            <strong>
+              {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
+                ? "诊断卡仍在梳理中，系统会按当前任务判断是否可继续"
+                : "诊断卡尚未确认，正式章节写作已阻断"}
+            </strong>
+            <p>
+              {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
+                ? "文献探索、题目收窄和候选问题可以先开展；方法、结果和正式引用仍需对应确认或材料。"
+                : "你仍可编辑现有草稿并运行检查，但不能运行“通用章节写作”。"}
+            </p>
           </div>
-          <Link href={`/projects/${projectId}/diagnosis?status=draft`}>去确认诊断卡</Link>
+          <Link href={`/projects/${projectId}/diagnosis?status=draft`}>
+            {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED ? "进入 AI 引导梳理" : "去确认诊断卡"}
+          </Link>
         </aside>
       ) : null}
 

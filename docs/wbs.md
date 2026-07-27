@@ -28,3 +28,8 @@
 | V043-1 | V0.4.3 Mock | 双模型复核契约与功能开关 | Root Agent | `app/lib/dual-model-review-*.ts` | M2 基线、M3 提交 | 用户双模型规则 | 三种模式、五种结论、模型/问题/流程 Mock 契约 | 关闭开关恢复 M2；无 Schema、迁移或真实模型调用 | DONE | Mock 被误认真实服务 | 模式、结论、模型记录、证据边界和无循环规则已固化 |
 | V043-2 | V0.4.3 Mock | 配置、审阅、修订与验证 UI | Root Agent | `editor/**`、`MockWorkspaceContext.tsx` | V043-1 | 双模型契约 | AI 复核标签页和追加版本流程 | 可演示 V4→R4→V5→F5，审阅不覆盖正文，用户选择问题 | DONE | 自动覆盖正文或无限循环 | 5 类用户决定、REVIEW_FAILED 保留原版和一次修订/验证已实现 |
 | V043-QA | V0.4.3 Mock | 自动化、浏览器与审核包 | Root Agent | `tests/**`、`docs/reviews/V0.4.3-dual-model-review/**` | V043-1/2 | 完整 Mock 前端 | 测试、截图和 review | 桌面/390px、控制台、构建和专项测试通过并停在审核门 | DONE | M2 响应式回归 | 5 张截图、严格复核点击链路和审核报告已完成 |
+| M3-PD-1 | M3 增量 Mock | 渐进式诊断契约与入口 | Root Agent | `app/lib/progressive-diagnosis-*.ts`、`diagnosis/**` | M2 基线 | 渐进式诊断需求 | 四入口、问题树、字段/来源、就绪、版本契约 | 单问题引导且 AI 推测不冒充确认事实 | DONE | 诊断不完整锁死项目 | 三个最低问题、停止规则和任务级就绪已实现 |
+| M3-PD-QA | M3 增量 Mock | 渐进式诊断专项验证 | Root Agent | `tests/progressive-diagnosis-mock.test.mjs` | M3-PD-1 | 前端 Mock | 契约与路由测试 | 5 项专项测试和 SSR 通过 | DONE | 状态转换遗漏 | 5/5 通过 |
+| M3-MO-1 | M3 增量 Mock | 多模型编排与凭据契约 | Root Agent | `app/lib/model-orchestration-*.ts` | V043-1 | 多模型/API Key 需求 | 角色、模式、凭据、预算、冲突和失败契约 | 上限明确；真实 Key 不进入前端状态或日志 | DONE | 无限调用或 Key 泄漏 | 五角色、三模式、两凭据类型和八失败状态已固化 |
+| M3-MO-2 | M3 增量 Mock | 模型与 API 配置界面 | Root Agent | `app/settings/models/**`、管理员和编辑器入口 | M3-MO-1 | 编排契约 | 配置、披露、冲突和失败 Mock | 页面可渲染；真实 Key 输入禁用；无供应商调用 | DONE | Mock 被误认真实连接 | 设置页、管理入口和编辑器披露已完成 |
+| M3-MO-QA | M3 增量 Mock | 多模型专项验证与审核包 | Root Agent | `tests/model-orchestration-mock.test.mjs`、`docs/reviews/M3-incremental-mocks/**` | M3-PD-QA/M3-MO-2 | 完整增量 Mock | 测试、构建、HTTP 与 review | 25 项全量测试、构建和关键路由 200 | DONE | 未经批准进入真实实现 | 审核报告已创建，停在审核门 |

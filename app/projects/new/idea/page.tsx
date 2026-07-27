@@ -20,6 +20,12 @@ export default function IdeaProjectPage() {
   const [title, setTitle] = useState(
     "数字平台中的知识协作机制：远程研究团队如何形成共同理解？",
   );
+  const [existingMaterials, setExistingMaterials] = useState(
+    "目前有课程要求、几篇参考文献和一个初步想法。",
+  );
+  const [firstHelp, setFirstHelp] = useState(
+    "先判断这个题目能不能做，并找出需要补充的信息。",
+  );
 
   function goBack() {
     setStep((current) => (current === 3 ? 2 : 1));
@@ -39,81 +45,38 @@ export default function IdeaProjectPage() {
       step={step}
     >
       {step === 1 ? (
-        <>
-          <FormSection
-            index="01"
-            title="核心 Idea"
-            description="用自然语言说明你想研究什么，以及为什么值得研究。"
-          >
-            <div className={formStyles.fieldGrid}>
-              <Field
-                label="研究主题或初步题目 *"
-                hint="建议包含研究对象、核心问题或具体情境。"
-                full
-              >
-                <textarea
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  aria-label="研究主题或初步题目"
-                />
-              </Field>
-              <Field label="研究对象" hint="不确定可留空">
-                <input defaultValue="跨机构远程研究团队" aria-label="研究对象" />
-              </Field>
-              <Field label="背景或问题">
-                <input defaultValue="线上协作中知识难以沉淀" aria-label="背景或问题" />
-              </Field>
-              <Field label="初步研究问题" full>
-                <textarea
-                  defaultValue="团队成员通过哪些实践形成共享认知？平台功能在其中扮演什么角色？"
-                  aria-label="初步研究问题"
-                />
-              </Field>
-            </div>
-          </FormSection>
-
-          <FormSection
-            index="02"
-            title="论文边界"
-            description="这些字段将成为诊断卡中的显式约束，可在确认前继续修改。"
-          >
-            <div className={formStyles.fieldGrid}>
-              <Field label="论文类型 *">
-                <select defaultValue="journal" aria-label="论文类型">
-                  <option value="course">课程论文</option>
-                  <option value="undergraduate">本科论文</option>
-                  <option value="graduate">硕士论文</option>
-                  <option value="journal">期刊论文</option>
-                  <option value="conference">会议论文</option>
-                </select>
-              </Field>
-              <Field label="目标语言 *">
-                <select defaultValue="bilingual" aria-label="目标语言">
-                  <option value="zh">中文</option>
-                  <option value="en">English</option>
-                  <option value="bilingual">中英双语</option>
-                </select>
-              </Field>
-              <Field label="目标字数">
-                <input defaultValue="12000" inputMode="numeric" aria-label="目标字数" />
-              </Field>
-              <Field label="截止日期">
-                <input defaultValue="2026-12-20" type="date" aria-label="截止日期" />
-              </Field>
-              <Field label="引用格式">
-                <select defaultValue="apa7" aria-label="引用格式">
-                  <option value="apa7">APA 7th</option>
-                  <option value="gbt">GB/T 7714</option>
-                  <option value="mla9">MLA 9th</option>
-                  <option value="unknown">暂不确定</option>
-                </select>
-              </Field>
-              <Field label="其他要求">
-                <input placeholder="例如：需包含访谈或案例分析" aria-label="其他要求" />
-              </Field>
-            </div>
-          </FormSection>
-        </>
+        <FormSection
+          index="01"
+          title="创建项目只需要这 3 个回答"
+          description="不需要专业术语。正式题目、研究问题、方法、数据和引用格式都可以在 AI 引导梳理中渐进补充。"
+        >
+          <div className={formStyles.fieldGrid}>
+            <Field label="1. 你大概想研究、写作或完成什么？" full>
+              <textarea
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                aria-label="你大概想研究写作或完成什么"
+              />
+            </Field>
+            <Field label="2. 你目前已经有哪些材料？" hint="没有材料或不确定也可以直接说明" full>
+              <textarea
+                value={existingMaterials}
+                onChange={(event) => setExistingMaterials(event.target.value)}
+                aria-label="你目前已经有哪些材料"
+              />
+            </Field>
+            <Field label="3. 你希望 AI 首先帮助你完成什么？" full>
+              <textarea
+                value={firstHelp}
+                onChange={(event) => setFirstHelp(event.target.value)}
+                aria-label="你希望 AI 首先帮助你完成什么"
+              />
+            </Field>
+          </div>
+          <div className={formStyles.infoBox}>
+            不知道研究方法、理论框架或统计方法不会阻止创建。后续每个专业字段都可以选择不知道、跳过、不适用或稍后补充。
+          </div>
+        </FormSection>
       ) : null}
 
       {step === 2 ? (
@@ -141,7 +104,7 @@ export default function IdeaProjectPage() {
         <CreationReview
           pathLabel="从一个 Idea 开始"
           title={title}
-          materialSummary="当前不绑定材料；创建后可继续补充"
+          materialSummary={`${existingMaterials} 首要帮助：${firstHelp}`}
         />
       ) : null}
 

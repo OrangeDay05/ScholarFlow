@@ -1253,6 +1253,42 @@
   line-height: 1.55;
 }
 
+.orchestrationDisclosure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px;
+  padding: 9px;
+  border: 1px solid rgb(0 119 70 / 20%);
+  border-radius: 8px;
+  background: rgb(215 234 218 / 28%);
+}
+
+.orchestrationDisclosure strong,
+.orchestrationDisclosure span {
+  display: block;
+}
+
+.orchestrationDisclosure strong {
+  color: var(--forest);
+  font-size: 8px;
+}
+
+.orchestrationDisclosure span {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.orchestrationDisclosure a {
+  flex: 0 0 auto;
+  color: var(--green);
+  font-size: 7px;
+  font-weight: 850;
+  text-decoration: none;
+}
+
 .materialWarning {
   margin: 10px 0 0;
   padding: 9px;

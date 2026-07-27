@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell, MockBadge } from "../components/AppShell";
 import { StateGallery } from "../components/StateGallery";
 import { demoProjects } from "../lib/m1-mock";
+import { PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED } from "../lib/progressive-diagnosis-features";
 import styles from "./Projects.module.css";
 
 export default function ProjectsPage() {
@@ -22,14 +23,23 @@ export default function ProjectsPage() {
             <div className={styles.stepIndex}>01</div>
             <div>
               <p>数字平台中的知识协作机制研究</p>
-              <h2>确认诊断卡，再进入正式章节写作。</h2>
+              <h2>
+                {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
+                  ? "用 AI 引导梳理下一步，不知道也可以继续。"
+                  : "确认诊断卡，再进入正式章节写作。"}
+              </h2>
               <span>
-                研究对象与方法仍需核对。诊断卡未确认时，通用章节写作会保持阻断。
+                {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
+                  ? "先利用已有材料，一次解决一个关键问题；文献探索与题目收窄不必等待整张诊断卡完成。"
+                  : "研究对象与方法仍需核对。诊断卡未确认时，通用章节写作会保持阻断。"}
               </span>
             </div>
           </div>
           <div className={styles.nextActions}>
-            <Link href="/projects/demo/diagnosis">检查诊断卡 <span aria-hidden="true">→</span></Link>
+            <Link href="/projects/demo/diagnosis">
+              {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED ? "开始 AI 引导梳理" : "检查诊断卡"}{" "}
+              <span aria-hidden="true">→</span>
+            </Link>
             <span>上次更新 · 今天 20:36</span>
           </div>
         </article>

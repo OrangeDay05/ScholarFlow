@@ -35,7 +35,7 @@ test("server-renders the M2 clickable-loop and admin routes", async () => {
     ["/projects", /当前最重要的下一步/],
     ["/projects/new", /先说，你手里有什么/],
     ["/projects/new/idea", /把一个念头，变成研究起点/],
-    ["/projects/demo/diagnosis", /项目诊断卡/],
+    ["/projects/demo/diagnosis", /AI 引导梳理/],
     ["/projects/demo/outline", /确认论文目录/],
     ["/projects/demo/editor", /AI 工作台/],
     ["/projects/demo/export", /Word 导出检查/],
@@ -104,7 +104,7 @@ test("keeps approved creation-card colors and DOCX-only export", async () => {
 });
 
 test("freezes M2 workflow states, evidence boundaries, and backup-model choice", async () => {
-  const [workspaceSource, editorSource, diagnosisSource, outlineSource] = await Promise.all([
+  const [workspaceSource, editorSource, diagnosisSource, legacyDiagnosisSource, outlineSource] = await Promise.all([
     readFile(new URL("../app/lib/MockWorkspaceContext.tsx", import.meta.url), "utf8"),
     readFile(
       new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
@@ -112,6 +112,10 @@ test("freezes M2 workflow states, evidence boundaries, and backup-model choice",
     ),
     readFile(
       new URL("../app/projects/[projectId]/diagnosis/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/projects/[projectId]/diagnosis/LegacyDiagnosisPage.tsx", import.meta.url),
       "utf8",
     ),
     readFile(
@@ -125,7 +129,7 @@ test("freezes M2 workflow states, evidence boundaries, and backup-model choice",
   }
 
   assert.match(workspaceSource, /confirmedDiagnosis/);
-  assert.match(diagnosisSource, /待重新确认/);
+  assert.match(`${diagnosisSource}\n${legacyDiagnosisSource}`, /待重新确认/);
   assert.match(outlineSource, /确认目录并进入编辑器/);
   assert.match(editorSource, /DeepSeek 备用模型/);
   assert.match(editorSource, /恢复为新版本/);
@@ -236,4 +240,67 @@ test("renders the gated dual-model review mock inside the M2 editor", async () =
   assert.match(contractSource, /PASSED_WITH_WARNINGS/);
   assert.match(editorSource, /appendMockVersion/);
   assert.doesNotMatch(`${flagSource}\n${contractSource}`, /drizzle|schema\.ts|app\/api\//);
+});
+
+test("renders the progressive diagnosis entry without adding a seventh skill", async () => {
+  const { response, html } = await render("/projects/demo/diagnosis");
+  assert.equal(response.status, 200);
+
+  for (const landmark of [
+    "AI 引导梳理",
+    "快速开始",
+    "从材料自动提取",
+    "完整专业填写",
+    "创建项目只需要 3 个答案",
+  ]) {
+    assert.match(html, new RegExp(landmark));
+  }
+
+  const [flagSource, pageSource, mockSource] = await Promise.all([
+    readFile(new URL("../app/lib/progressive-diagnosis-features.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL(
+        "../app/projects/[projectId]/diagnosis/ProgressiveDiagnosisPage.tsx",
+        import.meta.url,
+      ),
+      "utf8",
+    ),
+    readFile(new URL("../app/lib/m1-mock.ts", import.meta.url), "utf8"),
+  ]);
+
+  assert.match(flagSource, /NEXT_PUBLIC_PROGRESSIVE_DIAGNOSIS_MOCK/);
+  assert.match(pageSource, /不调用真实动态模型/);
+  assert.match(pageSource, /前端仍只展示六个产品级 Skill/);
+  assert.equal((mockSource.match(/\bindex: "0[1-6]"/g) ?? []).length >= 6, true);
+});
+
+test("renders bounded model orchestration and user credential mock", async () => {
+  const { response, html } = await render("/settings/models");
+  assert.equal(response.status, 200);
+
+  for (const landmark of [
+    "模型与 API",
+    "平台提供模型",
+    "使用自己的 API Key",
+    "标准模式",
+    "严格模式",
+    "自定义模式",
+    "不要粘贴真实 Key",
+  ]) {
+    assert.match(html, new RegExp(landmark));
+  }
+
+  const [flagSource, shellSource, editorSource] = await Promise.all([
+    readFile(new URL("../app/lib/model-orchestration-features.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/components/AppShell.tsx", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(flagSource, /NEXT_PUBLIC_MODEL_ORCHESTRATION_MOCK/);
+  assert.match(shellSource, /模型与 API/);
+  assert.match(editorSource, /配置模型与 API/);
+  assert.match(editorSource, /验证模型/);
 });

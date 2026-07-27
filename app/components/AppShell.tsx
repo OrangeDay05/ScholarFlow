@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { MODEL_ORCHESTRATION_MOCK_ENABLED } from "../lib/model-orchestration-features";
 import { V042_INCREMENTAL_MOCK_ENABLED } from "../lib/v042-features";
 import styles from "./AppShell.module.css";
 
@@ -45,6 +46,11 @@ export function AppShell({
           {V042_INCREMENTAL_MOCK_ENABLED ? (
             <Link className={styles.extensionNav} href="/extensions">
               研究扩展 <small>V0.4.2</small>
+            </Link>
+          ) : null}
+          {MODEL_ORCHESTRATION_MOCK_ENABLED ? (
+            <Link className={styles.extensionNav} href="/settings/models">
+              模型与 API <small>M3</small>
             </Link>
           ) : null}
           <Link href="/admin/users">管理演示</Link>

@@ -6,6 +6,7 @@ import type {
   FileQueueItem,
   FileQueueStatus,
 } from "@/app/lib/MockWorkspaceContext";
+import { PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED } from "@/app/lib/progressive-diagnosis-features";
 import styles from "./forms.module.css";
 
 type FormScaffoldProps = {
@@ -79,7 +80,9 @@ export function FormScaffold({
       <div className={styles.mockNotice}>
         <MockBadge />
         <span>
-          本页是 M2 前端演示流程。文件不会上传或解析，项目不会写入数据库。
+          {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
+            ? "本页是 M3 增量前端 Mock。只需提供当前知道的部分，文件不会真实上传或解析。"
+            : "本页是 M2 前端演示流程。文件不会上传或解析，项目不会写入数据库。"}
         </span>
       </div>
 
@@ -106,7 +109,9 @@ export function FormScaffold({
           <div className={styles.sideRule}>
             <strong>接下来</strong>
             <span>
-              创建后只会生成可修改的诊断卡草稿。确认诊断卡后才进入提纲与章节工作流。
+              {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
+                ? "创建后可选择快速开始、AI 引导梳理、材料提取或完整填写；诊断不完整不会锁死整个项目。"
+                : "创建后只会生成可修改的诊断卡草稿。确认诊断卡后才进入提纲与章节工作流。"}
             </span>
           </div>
         </aside>
