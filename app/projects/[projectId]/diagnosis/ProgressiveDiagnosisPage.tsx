@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AppShell, MockBadge } from "@/app/components/AppShell";
+import {
+  loadM4Diagnosis,
+  mutateM4Diagnosis,
+} from "@/app/lib/m4-diagnosis-client";
+import type { M4DiagnosisWorkspace } from "@/app/lib/m4-diagnosis-contracts";
 import {
   diagnosisAuditItems,
   diagnosisEntryModes,
@@ -20,6 +25,7 @@ import {
   type DiagnosisVersionStatus,
   type GuidanceDepth,
   type GuidanceQuestion,
+  type TaskReadinessItem,
 } from "@/app/lib/progressive-diagnosis-mock";
 import styles from "./progressive-diagnosis.module.css";
 
@@ -72,7 +78,13 @@ function fieldTone(status: DiagnosisFieldStatus) {
   return styles.toneNeutral;
 }
 
-export default function ProgressiveDiagnosisPage() {
+export default function ProgressiveDiagnosisPage({
+  projectId,
+  persistenceEnabled,
+}: {
+  projectId: string;
+  persistenceEnabled: boolean;
+}) {
   const [view, setView] = useState<DiagnosisView>("home");
   const [entryMode, setEntryMode] = useState<DiagnosisEntryMode>("guided");
   const [depth, setDepth] = useState<GuidanceDepth>("standard");
@@ -91,14 +103,49 @@ export default function ProgressiveDiagnosisPage() {
   );
   const [notice, setNotice] = useState("");
   const [confirmed, setConfirmed] = useState(false);
+  const [persistedQuestions, setPersistedQuestions] = useState<GuidanceQuestion[]>(
+    [],
+  );
+  const [sessionId, setSessionId] = useState<string | null>(null);
+  const [sessionStatus, setSessionStatus] =
+    useState<"active" | "completed" | "cancelled" | null>(null);
+  const [latestCardId, setLatestCardId] = useState<string | null>(null);
+  const [readiness, setReadiness] =
+    useState<TaskReadinessItem[]>(taskReadinessItems);
+  const [auditItems, setAuditItems] = useState<string[]>([
+    ...diagnosisAuditItems,
+  ]);
+  const [persistenceBusy, setPersistenceBusy] = useState(false);
+
+  useEffect(() => {
+    if (!persistenceEnabled) return;
+    let cancelled = false;
+    loadM4Diagnosis(projectId)
+      .then((workspace) => {
+        if (!cancelled) applyWorkspace(workspace);
+      })
+      .catch((error: unknown) => {
+        if (!cancelled) {
+          setNotice(
+            error instanceof Error
+              ? `M4 数据读取失败：${error.message}`
+              : "M4 数据读取失败。",
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [persistenceEnabled, projectId]);
 
   const activeQuestions = useMemo(() => {
+    if (persistedQuestions.length) return persistedQuestions;
     if (entryMode === "quick") return quickQuestions;
     const available = guidedQuestions.filter(
       (question) => depth === "deep" || !question.deep_only,
     );
     return available.slice(0, depth === "standard" ? 6 : 10);
-  }, [depth, entryMode]);
+  }, [depth, entryMode, persistedQuestions]);
 
   const currentQuestion =
     activeQuestions[Math.min(questionIndex, activeQuestions.length - 1)];
@@ -118,14 +165,112 @@ export default function ProgressiveDiagnosisPage() {
     [fields],
   );
 
-  const readyTasks = taskReadinessItems.filter((item) =>
+  const readyTasks = readiness.filter((item) =>
     ["READY", "READY_WITH_WARNINGS"].includes(item.status),
   );
-  const unavailableTasks = taskReadinessItems.filter(
+  const unavailableTasks = readiness.filter(
     (item) => !["READY", "READY_WITH_WARNINGS"].includes(item.status),
   );
 
-  function resetGuidance(mode: DiagnosisEntryMode, selectedDepth: GuidanceDepth = depth) {
+  function applyWorkspace(workspace: M4DiagnosisWorkspace) {
+    setLatestCardId(workspace.latest_diagnosis_card_id);
+    if (workspace.session) {
+      setSessionId(workspace.session.id);
+      setSessionStatus(workspace.session.status);
+      setEntryMode(workspace.session.mode);
+      setDepth(workspace.session.depth);
+      setPersistedQuestions(workspace.session.questions);
+      setQuestionIndex(
+        Math.max(
+          0,
+          workspace.session.questions.findIndex(
+            (question) =>
+              question.question_id === workspace.session?.current_question_id,
+          ),
+        ),
+      );
+      if (workspace.session.fields.length) {
+        setFields(
+          workspace.session.fields.map((field) => {
+            const { id, confirmed_at: confirmedAt, ...editableField } = field;
+            void id;
+            void confirmedAt;
+            return editableField;
+          }),
+        );
+      }
+      if (workspace.session.stop_reason) {
+        setFinishReason(workspace.session.stop_reason);
+      }
+    }
+    if (workspace.readiness.length) {
+      setReadiness(
+        workspace.readiness.map((item) => ({
+          id: item.task_key,
+          task: item.task_name,
+          status: item.status,
+          reason: item.reason,
+          nextAction: item.missing_field_keys.length
+            ? `待补充：${item.missing_field_keys.join("、")}`
+            : "当前最低条件已满足。",
+        })),
+      );
+    }
+    setVersions(
+      workspace.versions.map((version) => ({
+        id: version.id,
+        label: `D${version.version_number}`,
+        status: version.status.toUpperCase() as DiagnosisVersionStatus,
+        source: "M4 D1 持久化",
+        detail: version.confirmed_at
+          ? `用户确认于 ${version.confirmed_at}`
+          : `创建于 ${version.created_at}`,
+      })),
+    );
+    setConfirmed(
+      workspace.versions[0]?.status === "confirmed",
+    );
+    setAuditItems(
+      workspace.audit.length
+        ? workspace.audit.map(
+            (item) =>
+              `${item.action} · ${item.actor_type}${
+                item.field_key ? ` · ${item.field_key}` : ""
+              }`,
+          )
+        : [...diagnosisAuditItems],
+    );
+  }
+
+  async function startPersistentSession(
+    mode: DiagnosisEntryMode,
+    selectedDepth: GuidanceDepth,
+  ) {
+    if (!persistenceEnabled) return null;
+    setPersistenceBusy(true);
+    try {
+      const workspace = await mutateM4Diagnosis(projectId, {
+        action: "start",
+        mode,
+        depth: selectedDepth,
+      });
+      applyWorkspace(workspace);
+      setNotice("M4 诊断会话已保存到 D1。");
+      return workspace.session?.id ?? null;
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? `保存失败：${error.message}` : "保存失败。",
+      );
+      return null;
+    } finally {
+      setPersistenceBusy(false);
+    }
+  }
+
+  async function resetGuidance(
+    mode: DiagnosisEntryMode,
+    selectedDepth: GuidanceDepth = depth,
+  ) {
     setEntryMode(mode);
     setDepth(selectedDepth);
     setQuestionIndex(0);
@@ -134,6 +279,8 @@ export default function ProgressiveDiagnosisPage() {
     setConsecutiveUnknown(0);
     setNotice("");
     setView("guide");
+    setPersistedQuestions([]);
+    await startPersistentSession(mode, selectedDepth);
   }
 
   function updateField(
@@ -172,10 +319,66 @@ export default function ProgressiveDiagnosisPage() {
   function finishGuidance(reason: string) {
     setFinishReason(reason);
     setView("summary");
-    setNotice("已生成新的暂定诊断草稿 D2 · Mock；没有覆盖 D1。");
+    setNotice(
+      persistenceEnabled
+        ? "正在创建新的持久化诊断草稿；历史版本不会被覆盖。"
+        : "已生成新的暂定诊断草稿 D2 · Mock；没有覆盖 D1。",
+    );
+    if (persistenceEnabled && sessionId) {
+      void finishPersistentSession(sessionId, reason);
+    }
   }
 
-  function submitAnswer(
+  async function finishPersistentSession(activeSessionId: string, reason: string) {
+    setPersistenceBusy(true);
+    try {
+      const workspace = await mutateM4Diagnosis(projectId, {
+        action: "finish",
+        session_id: activeSessionId,
+        stop_reason: reason,
+      });
+      applyWorkspace(workspace);
+      setNotice("已创建新的 D1 诊断草稿版本；旧版本和审计记录均已保留。");
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? `草稿保存失败：${error.message}` : "草稿保存失败。",
+      );
+    } finally {
+      setPersistenceBusy(false);
+    }
+  }
+
+  async function persistAnswer(
+    question: GuidanceQuestion,
+    result: {
+      status: DiagnosisFieldStatus;
+      source: DiagnosisSourceType;
+      value: string;
+    },
+  ) {
+    if (!persistenceEnabled || !sessionId) return;
+    setPersistenceBusy(true);
+    try {
+      const workspace = await mutateM4Diagnosis(projectId, {
+        action: "answer",
+        session_id: sessionId,
+        question_id: question.question_id,
+        answer: result.value,
+        answer_status: result.status,
+        answer_source_type: result.source,
+        confidence: question.confidence,
+      });
+      applyWorkspace(workspace);
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? `答案保存失败：${error.message}` : "答案保存失败。",
+      );
+    } finally {
+      setPersistenceBusy(false);
+    }
+  }
+
+  async function submitAnswer(
     action:
       | "user"
       | "unknown"
@@ -223,6 +426,7 @@ export default function ProgressiveDiagnosisPage() {
       },
     };
     const result = mapped[action];
+    await persistAnswer(currentQuestion, result);
     setAnswers((current) => ({
       ...current,
       [currentQuestion.question_id]: {
@@ -273,9 +477,70 @@ export default function ProgressiveDiagnosisPage() {
     );
   }
 
-  function confirmCurrentDiagnosis() {
+  async function saveCurrentFieldsAndFinish(reason: string) {
+    if (!persistenceEnabled) {
+      finishGuidance(reason);
+      return;
+    }
+    let activeSessionId = sessionId;
+    if (!activeSessionId || sessionStatus !== "active") {
+      activeSessionId = await startPersistentSession(entryMode, depth);
+    }
+    if (!activeSessionId) return;
+    setPersistenceBusy(true);
+    try {
+      await mutateM4Diagnosis(projectId, {
+        action: "save_fields",
+        session_id: activeSessionId,
+        fields: fields.map((field) => ({
+          ...field,
+        })),
+      });
+      const workspace = await mutateM4Diagnosis(projectId, {
+        action: "finish",
+        session_id: activeSessionId,
+        stop_reason: reason,
+      });
+      applyWorkspace(workspace);
+      setFinishReason(reason);
+      setView("summary");
+      setNotice("字段、就绪状态、草稿版本和审计记录已保存到 D1。");
+    } catch (error) {
+      setNotice(
+        error instanceof Error ? `保存失败：${error.message}` : "保存失败。",
+      );
+    } finally {
+      setPersistenceBusy(false);
+    }
+  }
+
+  async function confirmCurrentDiagnosis() {
     if (confirmed) {
       setNotice("当前确认版本 D3 已保留；再次修改会创建新草稿。");
+      return;
+    }
+    if (persistenceEnabled) {
+      if (!latestCardId) {
+        setNotice("请先保存当前诊断草稿，再执行确认。");
+        return;
+      }
+      setPersistenceBusy(true);
+      try {
+        const workspace = await mutateM4Diagnosis(projectId, {
+          action: "confirm",
+          diagnosis_card_id: latestCardId,
+        });
+        applyWorkspace(workspace);
+        setNotice(
+          "已创建新的确认版本；未确认字段仍保留原状态，没有被改写为用户事实。",
+        );
+      } catch (error) {
+        setNotice(
+          error instanceof Error ? `确认失败：${error.message}` : "确认失败。",
+        );
+      } finally {
+        setPersistenceBusy(false);
+      }
       return;
     }
     setConfirmed(true);
@@ -382,9 +647,18 @@ export default function ProgressiveDiagnosisPage() {
                     type="button"
                     onClick={() => {
                       if (mode.id === "quick") resetGuidance("quick", "standard");
-                      if (mode.id === "material") setView("material");
-                      if (mode.id === "professional") setView("professional");
+                      if (mode.id === "material") {
+                        setEntryMode("material");
+                        setView("material");
+                        void startPersistentSession("material", "standard");
+                      }
+                      if (mode.id === "professional") {
+                        setEntryMode("professional");
+                        setView("professional");
+                        void startPersistentSession("professional", "standard");
+                      }
                     }}
+                    disabled={persistenceBusy}
                   >
                     选择这种方式 →
                   </button>
@@ -683,7 +957,13 @@ export default function ProgressiveDiagnosisPage() {
           })}
         </div>
         <div className={styles.pageActions}>
-          <button type="button" onClick={() => setView("summary")}>
+          <button
+            type="button"
+            disabled={persistenceBusy}
+            onClick={() =>
+              void saveCurrentFieldsAndFinish("材料提取字段已形成待确认诊断草稿。")
+            }
+          >
             生成暂定诊断摘要 →
           </button>
         </div>
@@ -752,7 +1032,13 @@ export default function ProgressiveDiagnosisPage() {
           ))}
         </div>
         <div className={styles.pageActions}>
-          <button type="button" onClick={() => setView("summary")}>
+          <button
+            type="button"
+            disabled={persistenceBusy}
+            onClick={() =>
+              void saveCurrentFieldsAndFinish("完整专业填写已保存为新诊断草稿。")
+            }
+          >
             保存为新草稿并查看就绪状态 →
           </button>
         </div>
@@ -938,7 +1224,7 @@ export default function ProgressiveDiagnosisPage() {
               ))}
             </div>
             <div className={styles.auditList}>
-              {diagnosisAuditItems.map((item, index) => (
+              {auditItems.map((item, index) => (
                 <div key={item}>
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <p>{item}</p>
@@ -954,14 +1240,25 @@ export default function ProgressiveDiagnosisPage() {
             <span>确认只确认当前用户认可的边界，不会把 AI 推测自动变成事实。</span>
           </div>
           <div>
-            <button type="button" onClick={() => setNotice("草稿 D2 已保存 · Mock。")}>
+            <button
+              type="button"
+              disabled={persistenceBusy}
+              onClick={() =>
+                void saveCurrentFieldsAndFinish("用户手动保存当前诊断草稿。")
+              }
+            >
               暂时保存草稿
             </button>
             <button type="button" onClick={() => setView("professional")}>
               修改单个字段
             </button>
             <Link href="/extensions/external-literature">进入可开展任务</Link>
-            <button className={styles.confirmButton} type="button" onClick={confirmCurrentDiagnosis}>
+            <button
+              className={styles.confirmButton}
+              type="button"
+              disabled={persistenceBusy}
+              onClick={() => void confirmCurrentDiagnosis()}
+            >
               {confirmed ? "已确认 D3" : "确认当前诊断卡"}
             </button>
           </div>
@@ -983,9 +1280,13 @@ export default function ProgressiveDiagnosisPage() {
       }
     >
       <div className={styles.mockNotice}>
-        <MockBadge>M3 前端 Mock</MockBadge>
+        <MockBadge>
+          {persistenceEnabled ? "M4 D1 持久化" : "M3 前端 Mock"}
+        </MockBadge>
         <span>
-          不调用真实动态模型，不安装第三方 Skill，不写入正式数据库；前端仍只展示六个产品级 Skill。
+          {persistenceEnabled
+            ? "会话、回答、字段来源、版本、任务就绪和审计写入 D1；AI 推荐仍为 Mock，不调用真实模型。"
+            : "不调用真实动态模型，不安装第三方 Skill，不写入正式数据库；前端仍只展示六个产品级 Skill。"}
         </span>
       </div>
       {view === "home" ? renderHome() : null}
@@ -1003,7 +1304,9 @@ export default function ProgressiveDiagnosisPage() {
             ))}
           </ul>
           <p>
-            问题、字段状态、来源、材料位置、置信度、回答、版本和审计均为前端数据契约展示；刷新后会重置。
+            {persistenceEnabled
+              ? "问题、字段状态、来源、置信度、回答、版本和审计由 D1 保存；刷新或重启后仍可恢复。"
+              : "问题、字段状态、来源、材料位置、置信度、回答、版本和审计均为前端数据契约展示；刷新后会重置。"}
           </p>
         </div>
       </details>

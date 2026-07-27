@@ -117,7 +117,15 @@ export const diagnosisCards = sqliteTable(
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
     versionNumber: integer("version_number").notNull(),
-    status: text("status", { enum: ["draft", "confirmed", "superseded"] })
+    status: text("status", {
+      enum: [
+        "draft",
+        "pending_confirmation",
+        "confirmed",
+        "superseded",
+        "archived",
+      ],
+    })
       .notNull()
       .default("draft"),
     title: text("title").notNull(),
@@ -136,6 +144,264 @@ export const diagnosisCards = sqliteTable(
       table.ownerUserId,
       table.projectId,
       table.status,
+    ),
+  ],
+);
+
+export const diagnosisSessions = sqliteTable(
+  "diagnosis_sessions",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    mode: text("mode", {
+      enum: ["quick", "guided", "material", "professional"],
+    }).notNull(),
+    depth: text("depth", { enum: ["standard", "deep"] }).notNull().default("standard"),
+    status: text("status", {
+      enum: ["active", "completed", "cancelled"],
+    })
+      .notNull()
+      .default("active"),
+    currentQuestionId: text("current_question_id"),
+    answeredCount: integer("answered_count").notNull().default(0),
+    consecutiveUnknownCount: integer("consecutive_unknown_count").notNull().default(0),
+    maxQuestions: integer("max_questions").notNull(),
+    stopReason: text("stop_reason"),
+    baseDiagnosisCardId: text("base_diagnosis_card_id").references(
+      () => diagnosisCards.id,
+      { onDelete: "set null" },
+    ),
+    outputDiagnosisCardId: text("output_diagnosis_card_id").references(
+      () => diagnosisCards.id,
+      { onDelete: "set null" },
+    ),
+    completedAt: text("completed_at"),
+    ...timestamps(),
+  },
+  (table) => [
+    index("diagnosis_sessions_owner_project_status_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.status,
+    ),
+  ],
+);
+
+export const diagnosisSessionQuestions = sqliteTable(
+  "diagnosis_session_questions",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sessionId: text("session_id")
+      .notNull()
+      .references(() => diagnosisSessions.id, { onDelete: "cascade" }),
+    questionKey: text("question_key").notNull(),
+    position: integer("position").notNull(),
+    topic: text("topic").notNull(),
+    fieldKey: text("field_key").notNull(),
+    parentQuestionKey: text("parent_question_key"),
+    dependsOnAnswer: text("depends_on_answer"),
+    question: text("question").notNull(),
+    whyThisMatters: text("why_this_matters").notNull(),
+    decisionImpact: text("decision_impact").notNull(),
+    recommendedAnswer: text("recommended_answer").notNull(),
+    recommendationReason: text("recommendation_reason").notNull(),
+    optionsJson: text("options_json").notNull().default("[]"),
+    allowCustomAnswer: integer("allow_custom_answer", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    allowUnknown: integer("allow_unknown", { mode: "boolean" }).notNull().default(true),
+    allowSkip: integer("allow_skip", { mode: "boolean" }).notNull().default(true),
+    allowAiInference: integer("allow_ai_inference", { mode: "boolean" })
+      .notNull()
+      .default(true),
+    blockingLevel: text("blocking_level", {
+      enum: ["NONE", "CURRENT_TASK", "PROJECT_STAGE", "HIGH_RISK_TASK", "GLOBAL"],
+    })
+      .notNull()
+      .default("NONE"),
+    sourceMaterialIdsJson: text("source_material_ids_json").notNull().default("[]"),
+    sourceLocationsJson: text("source_locations_json").notNull().default("[]"),
+    answer: text("answer"),
+    answerStatus: text("answer_status", {
+      enum: [
+        "USER_CONFIRMED",
+        "AI_INFERRED",
+        "PENDING_CONFIRMATION",
+        "UNKNOWN",
+        "SKIPPED",
+        "MISSING_MATERIAL",
+        "NOT_APPLICABLE",
+      ],
+    }),
+    answerSourceType: text("answer_source_type", {
+      enum: [
+        "USER_INPUT",
+        "MATERIAL_EXTRACTED",
+        "AI_RECOMMENDED",
+        "SYSTEM_DERIVED",
+        "IMPORTED",
+      ],
+    }),
+    confidence: text("confidence", { enum: ["LOW", "MEDIUM", "HIGH"] }),
+    askedAt: text("asked_at"),
+    answeredAt: text("answered_at"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("diagnosis_session_question_uq").on(table.sessionId, table.questionKey),
+    index("diagnosis_questions_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.sessionId,
+    ),
+  ],
+);
+
+export const diagnosisFieldValues = sqliteTable(
+  "diagnosis_field_values",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").references(() => diagnosisSessions.id, {
+      onDelete: "set null",
+    }),
+    diagnosisCardId: text("diagnosis_card_id").references(() => diagnosisCards.id, {
+      onDelete: "cascade",
+    }),
+    fieldKey: text("field_key").notNull(),
+    label: text("label").notNull(),
+    value: text("value").notNull().default(""),
+    status: text("status", {
+      enum: [
+        "USER_CONFIRMED",
+        "AI_INFERRED",
+        "PENDING_CONFIRMATION",
+        "UNKNOWN",
+        "SKIPPED",
+        "MISSING_MATERIAL",
+        "NOT_APPLICABLE",
+      ],
+    }).notNull(),
+    sourceType: text("source_type", {
+      enum: [
+        "USER_INPUT",
+        "MATERIAL_EXTRACTED",
+        "AI_RECOMMENDED",
+        "SYSTEM_DERIVED",
+        "IMPORTED",
+      ],
+    }).notNull(),
+    sourceMaterialIdsJson: text("source_material_ids_json").notNull().default("[]"),
+    sourceLocationsJson: text("source_locations_json").notNull().default("[]"),
+    confidence: text("confidence", { enum: ["LOW", "MEDIUM", "HIGH"] })
+      .notNull()
+      .default("MEDIUM"),
+    requiresConfirmation: integer("requires_confirmation", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    rationale: text("rationale").notNull().default(""),
+    confirmedAt: text("confirmed_at"),
+    ...timestamps(),
+  },
+  (table) => [
+    index("diagnosis_fields_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.sessionId,
+    ),
+    index("diagnosis_fields_card_idx").on(table.diagnosisCardId, table.fieldKey),
+  ],
+);
+
+export const diagnosisTaskReadiness = sqliteTable(
+  "diagnosis_task_readiness",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").references(() => diagnosisSessions.id, {
+      onDelete: "set null",
+    }),
+    diagnosisCardId: text("diagnosis_card_id").references(() => diagnosisCards.id, {
+      onDelete: "cascade",
+    }),
+    taskKey: text("task_key").notNull(),
+    taskName: text("task_name").notNull(),
+    status: text("status", {
+      enum: [
+        "READY",
+        "READY_WITH_WARNINGS",
+        "NEEDS_CONFIRMATION",
+        "NEEDS_MATERIAL",
+        "BLOCKED",
+      ],
+    }).notNull(),
+    reason: text("reason").notNull(),
+    missingFieldKeysJson: text("missing_field_keys_json").notNull().default("[]"),
+    checkedAt: text("checked_at").notNull(),
+    ...timestamps(),
+  },
+  (table) => [
+    index("diagnosis_readiness_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.sessionId,
+    ),
+    index("diagnosis_readiness_card_idx").on(table.diagnosisCardId, table.taskKey),
+  ],
+);
+
+export const diagnosisAuditEvents = sqliteTable(
+  "diagnosis_audit_events",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sessionId: text("session_id").references(() => diagnosisSessions.id, {
+      onDelete: "set null",
+    }),
+    diagnosisCardId: text("diagnosis_card_id").references(() => diagnosisCards.id, {
+      onDelete: "set null",
+    }),
+    questionKey: text("question_key"),
+    fieldKey: text("field_key"),
+    action: text("action").notNull(),
+    actorType: text("actor_type", { enum: ["USER", "SYSTEM", "AI"] }).notNull(),
+    modelProvider: text("model_provider"),
+    modelName: text("model_name"),
+    modelVersion: text("model_version"),
+    detailJson: text("detail_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("diagnosis_audit_owner_project_created_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.createdAt,
     ),
   ],
 );

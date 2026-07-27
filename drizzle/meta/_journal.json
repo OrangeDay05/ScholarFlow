@@ -8,6 +8,13 @@
       "when": 1785118666617,
       "tag": "0000_swift_blue_shield",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1785168998876,
+      "tag": "0001_vengeful_tigra",
+      "breakpoints": true
     }
   ]
 }
