@@ -18,9 +18,12 @@ const statusClass: Record<string, string> = {
 export default function OutlinePage() {
   const router = useRouter();
   const {
+    dataSource,
     diagnosisStatus,
     outline,
     outlineConfirmed,
+    persistenceError,
+    persistenceStatus,
     updateOutlineTitle,
     moveOutline,
     confirmOutline,
@@ -36,9 +39,13 @@ export default function OutlinePage() {
     }, 650);
   }
 
-  function confirmAndContinue() {
-    confirmOutline();
-    router.push("/projects/demo/editor");
+  async function confirmAndContinue() {
+    try {
+      await confirmOutline();
+      router.push("/projects/demo/editor");
+    } catch {
+      // The context exposes the persistence error in the status row.
+    }
   }
 
   return (
@@ -93,10 +100,12 @@ export default function OutlinePage() {
       ) : (
         <>
           <div className={styles.metaRow}>
-            <MockBadge />
+            <MockBadge>{dataSource === "d1" ? "M3 · D1 基础数据" : undefined}</MockBadge>
             <span>共 {outline.length} 个一级章节</span>
             <strong>{outline.reduce((sum, section) => sum + section.words, 0)} 字已有内容</strong>
             <span>{outlineConfirmed ? "确认版本" : "可编辑草稿"}</span>
+            {persistenceStatus === "loading" ? <span>正在读取基础数据…</span> : null}
+            {persistenceError ? <span role="alert">{persistenceError}</span> : null}
           </div>
 
           <section className={styles.outlineCard}>

@@ -4,10 +4,23 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
 } from "react";
+import {
+  createM3Project,
+  loadM3Workspace,
+  saveM3Diagnosis,
+  saveM3Outline,
+  saveM3SectionVersion,
+} from "./m3-client";
+import type {
+  M3OutlineSection,
+  M3SectionVersion,
+} from "./m3-contracts";
+import { M3_PERSISTENCE_ENABLED } from "./m3-features";
 
 export type FileQueueStatus =
   | "queued"
@@ -54,6 +67,9 @@ export type VersionItem = {
 };
 
 type MockWorkspaceValue = {
+  dataSource: "mock" | "d1";
+  persistenceStatus: "disabled" | "loading" | "ready" | "error";
+  persistenceError: string;
   files: FileQueueItem[];
   setFileStatus: (id: string, status: FileQueueStatus) => void;
   retryFile: (id: string) => void;
@@ -63,13 +79,13 @@ type MockWorkspaceValue = {
   confirmedDiagnosis: DiagnosisDraft | null;
   diagnosisStatus: "draft" | "confirmed" | "updated";
   updateDiagnosis: (field: keyof DiagnosisDraft, value: string) => void;
-  confirmDiagnosis: () => void;
+  confirmDiagnosis: () => Promise<void>;
   reopenDiagnosis: () => void;
   outline: OutlineSection[];
   outlineConfirmed: boolean;
   updateOutlineTitle: (id: string, title: string) => void;
   moveOutline: (id: string, direction: -1 | 1) => void;
-  confirmOutline: () => void;
+  confirmOutline: () => Promise<void>;
   selectedSectionId: string;
   setSelectedSectionId: (id: string) => void;
   selectedSkillId: string;
@@ -82,7 +98,8 @@ type MockWorkspaceValue = {
   cancelMockTask: () => void;
   failMockTask: () => void;
   versions: VersionItem[];
-  restoreVersion: (id: string) => void;
+  restoreVersion: (id: string) => Promise<void>;
+  saveCurrentSection: (content: string) => Promise<void>;
   unsavedChanges: boolean;
   setUnsavedChanges: (value: boolean) => void;
 };
@@ -165,9 +182,36 @@ const initialVersions: VersionItem[] = [
   },
 ];
 
+const m3ToWorkspaceStatus: Record<
+  M3OutlineSection["status"],
+  OutlineSection["status"]
+> = {
+  not_started: "未开始",
+  editing: "编辑中",
+  checking: "待检查",
+  confirmed: "已确认",
+  missing_material: "缺少材料",
+};
+
+const workspaceToM3Status: Record<
+  OutlineSection["status"],
+  M3OutlineSection["status"]
+> = {
+  未开始: "not_started",
+  编辑中: "editing",
+  待检查: "checking",
+  已确认: "confirmed",
+  缺少材料: "missing_material",
+};
+
 const MockWorkspaceContext = createContext<MockWorkspaceValue | null>(null);
 
 export function MockWorkspaceProvider({ children }: { children: React.ReactNode }) {
+  const [dataSource, setDataSource] = useState<"mock" | "d1">("mock");
+  const [persistenceStatus, setPersistenceStatus] = useState<
+    "disabled" | "loading" | "ready" | "error"
+  >(M3_PERSISTENCE_ENABLED ? "loading" : "disabled");
+  const [persistenceError, setPersistenceError] = useState("");
   const [files, setFiles] = useState(initialFiles);
   const [draftSaved, setDraftSaved] = useState(false);
   const [diagnosis, setDiagnosis] = useState(initialDiagnosis);
@@ -185,6 +229,103 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
   const [versions, setVersions] = useState(initialVersions);
   const [unsavedChanges, setUnsavedChanges] = useState(true);
   const taskTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const persistenceProjectIdRef = useRef("demo");
+
+  useEffect(() => {
+    if (!M3_PERSISTENCE_ENABLED) return;
+
+    const match = window.location.pathname.match(
+      /^\/projects\/([^/]+)\/(?:diagnosis|outline|editor|export)/,
+    );
+    if (!match) return;
+
+    const requestedProjectId = decodeURIComponent(match[1]);
+    const section =
+      new URLSearchParams(window.location.search).get("section") ??
+      "introduction";
+    persistenceProjectIdRef.current = requestedProjectId;
+    const controller = new AbortController();
+
+    async function hydrate() {
+      setPersistenceStatus("loading");
+      setPersistenceError("");
+      try {
+        let snapshot;
+        try {
+          snapshot = await loadM3Workspace(requestedProjectId, section);
+        } catch (error) {
+          const maySeed =
+            requestedProjectId === "demo" &&
+            process.env.NEXT_PUBLIC_M3_AUTO_SEED_DEMO === "true";
+          if (!maySeed) throw error;
+          await createM3Project({
+            title: initialDiagnosis.title,
+            paperType: initialDiagnosis.paperType,
+            language: initialDiagnosis.language,
+            primaryCreationMethod: "requirements",
+            researchObject: initialDiagnosis.researchObject,
+            researchQuestion: initialDiagnosis.researchQuestion,
+            method: initialDiagnosis.method,
+            requirements: initialDiagnosis.requirements,
+          });
+          snapshot = await loadM3Workspace(requestedProjectId, section);
+        }
+        if (controller.signal.aborted) return;
+
+        if (snapshot.diagnosis) {
+          const nextDiagnosis: DiagnosisDraft = {
+            title: snapshot.diagnosis.title,
+            paperType: snapshot.diagnosis.paperType,
+            language: snapshot.diagnosis.language,
+            researchObject: snapshot.diagnosis.researchObject,
+            researchQuestion: snapshot.diagnosis.researchQuestion,
+            method: snapshot.diagnosis.method,
+            requirements: snapshot.diagnosis.requirements,
+          };
+          setDiagnosis(nextDiagnosis);
+          const confirmed = snapshot.diagnosis.status === "confirmed";
+          setConfirmedDiagnosis(confirmed ? nextDiagnosis : null);
+          setDiagnosisStatus(confirmed ? "confirmed" : "draft");
+        }
+        if (snapshot.outline) {
+          setOutline(
+            snapshot.outline.sections.map((item) => ({
+              id: item.slug,
+              index: String(item.position).padStart(2, "0"),
+              title: item.title,
+              status: m3ToWorkspaceStatus[item.status],
+              words: item.wordCount,
+            })),
+          );
+          setOutlineConfirmed(snapshot.outline.status === "confirmed");
+        }
+        setSelectedSectionId(snapshot.selectedSectionSlug);
+        setVersions(snapshot.versions.map(toWorkspaceVersion));
+        setFiles(
+          snapshot.materials.map((item) => ({
+            id: item.id,
+            name: item.filename,
+            kind: item.kind,
+            size: formatBytes(item.sizeBytes),
+            status: item.status,
+            detail: item.errorMessage ?? "材料元数据已保存 · M3",
+          })),
+        );
+        setUnsavedChanges(false);
+        setDataSource("d1");
+        setPersistenceStatus("ready");
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setPersistenceStatus("error");
+        setPersistenceError(
+          error instanceof Error ? error.message : "无法读取 M3 基础数据。",
+        );
+      }
+    }
+
+    void hydrate();
+    return () => controller.abort();
+  }, []);
 
   const setFileStatus = useCallback((id: string, status: FileQueueStatus) => {
     setFiles((items) =>
@@ -220,6 +361,27 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
     setDiagnosisStatus((current) => (current === "confirmed" ? "updated" : current));
   }, []);
 
+  const confirmDiagnosis = useCallback(async () => {
+    if (dataSource === "d1") {
+      try {
+        await saveM3Diagnosis(
+          persistenceProjectIdRef.current,
+          diagnosis,
+          true,
+        );
+        setPersistenceError("");
+      } catch (error) {
+        setPersistenceStatus("error");
+        setPersistenceError(
+          error instanceof Error ? error.message : "诊断卡保存失败。",
+        );
+        throw error;
+      }
+    }
+    setConfirmedDiagnosis({ ...diagnosis });
+    setDiagnosisStatus("confirmed");
+  }, [dataSource, diagnosis]);
+
   const moveOutline = useCallback((id: string, direction: -1 | 1) => {
     setOutline((items) => {
       const index = items.findIndex((item) => item.id === id);
@@ -234,6 +396,32 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
     });
     setOutlineConfirmed(false);
   }, []);
+
+  const confirmOutline = useCallback(async () => {
+    if (dataSource === "d1") {
+      try {
+        await saveM3Outline(
+          persistenceProjectIdRef.current,
+          outline.map((section, index) => ({
+            slug: section.id,
+            title: section.title,
+            position: index + 1,
+            status: workspaceToM3Status[section.status],
+            wordCount: section.words,
+          })),
+          true,
+        );
+        setPersistenceError("");
+      } catch (error) {
+        setPersistenceStatus("error");
+        setPersistenceError(
+          error instanceof Error ? error.message : "提纲保存失败。",
+        );
+        throw error;
+      }
+    }
+    setOutlineConfirmed(true);
+  }, [dataSource, outline]);
 
   const toggleMaterial = useCallback((id: string) => {
     setSelectedMaterialIds((items) =>
@@ -274,22 +462,79 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
     setTaskMessage("主模型响应失败；是否使用 DeepSeek 备用模型重试？· Mock");
   }, []);
 
-  const restoreVersion = useCallback((id: string) => {
-    const source = initialVersions.find((item) => item.id === id);
-    setVersions((items) => [
-      {
-        id: `restore-${Date.now()}`,
-        label: `v${items.length + 1}`,
-        source: `恢复 ${source?.label ?? id} · Mock`,
-        time: "刚刚",
-        summary: "恢复操作创建了新版本，原始版本与当前版本均未覆盖。",
-      },
-      ...items,
-    ]);
-  }, []);
+  const restoreVersion = useCallback(
+    async (id: string) => {
+      const source = versions.find((item) => item.id === id);
+      if (dataSource === "d1") {
+        try {
+          const created = await saveM3SectionVersion(
+            persistenceProjectIdRef.current,
+            selectedSectionId,
+            {
+              source: "restore",
+              sourceVersionId: id,
+              summary: `恢复 ${source?.label ?? id}`,
+            },
+          );
+          setVersions((items) => [toWorkspaceVersion(created), ...items]);
+          setPersistenceError("");
+          return;
+        } catch (error) {
+          setPersistenceStatus("error");
+          setPersistenceError(
+            error instanceof Error ? error.message : "历史版本恢复失败。",
+          );
+          throw error;
+        }
+      }
+
+      setVersions((items) => [
+        {
+          id: `restore-${Date.now()}`,
+          label: `v${items.length + 1}`,
+          source: `恢复 ${source?.label ?? id} · Mock`,
+          time: "刚刚",
+          summary: "恢复操作创建了新版本，原始版本与当前版本均未覆盖。",
+        },
+        ...items,
+      ]);
+    },
+    [dataSource, selectedSectionId, versions],
+  );
+
+  const saveCurrentSection = useCallback(
+    async (content: string) => {
+      if (dataSource === "d1") {
+        try {
+          const created = await saveM3SectionVersion(
+            persistenceProjectIdRef.current,
+            selectedSectionId,
+            {
+              source: "manual",
+              content,
+              summary: "人工保存当前章节",
+            },
+          );
+          setVersions((items) => [toWorkspaceVersion(created), ...items]);
+          setPersistenceError("");
+        } catch (error) {
+          setPersistenceStatus("error");
+          setPersistenceError(
+            error instanceof Error ? error.message : "章节保存失败。",
+          );
+          throw error;
+        }
+      }
+      setUnsavedChanges(false);
+    },
+    [dataSource, selectedSectionId],
+  );
 
   const value = useMemo<MockWorkspaceValue>(
     () => ({
+      dataSource,
+      persistenceStatus,
+      persistenceError,
       files,
       setFileStatus,
       retryFile,
@@ -299,10 +544,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       confirmedDiagnosis,
       diagnosisStatus,
       updateDiagnosis,
-      confirmDiagnosis: () => {
-        setConfirmedDiagnosis({ ...diagnosis });
-        setDiagnosisStatus("confirmed");
-      },
+      confirmDiagnosis,
       reopenDiagnosis: () => setDiagnosisStatus("updated"),
       outline,
       outlineConfirmed,
@@ -311,7 +553,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
         setOutlineConfirmed(false);
       },
       moveOutline,
-      confirmOutline: () => setOutlineConfirmed(true),
+      confirmOutline,
       selectedSectionId,
       setSelectedSectionId,
       selectedSkillId,
@@ -325,18 +567,24 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       failMockTask,
       versions,
       restoreVersion,
+      saveCurrentSection,
       unsavedChanges,
       setUnsavedChanges,
     }),
     [
       diagnosis,
+      dataSource,
       confirmedDiagnosis,
+      confirmDiagnosis,
+      confirmOutline,
       diagnosisStatus,
       draftSaved,
       files,
       moveOutline,
       outline,
       outlineConfirmed,
+      persistenceError,
+      persistenceStatus,
       retryFile,
       runMockTask,
       selectedMaterialIds,
@@ -352,6 +600,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       cancelMockTask,
       failMockTask,
       restoreVersion,
+      saveCurrentSection,
     ],
   );
 
@@ -364,4 +613,36 @@ export function useMockWorkspace() {
     throw new Error("useMockWorkspace must be used inside MockWorkspaceProvider");
   }
   return context;
+}
+
+function toWorkspaceVersion(version: M3SectionVersion): VersionItem {
+  const sourceLabels: Record<M3SectionVersion["source"], string> = {
+    original: "原始版本",
+    manual: "人工保存",
+    ai: "AI 生成",
+    restore: "历史恢复",
+    fallback_model: "备用模型",
+  };
+  const createdAt = new Date(version.createdAt);
+
+  return {
+    id: version.id,
+    label: `v${version.versionNumber}`,
+    source: sourceLabels[version.source],
+    time: Number.isNaN(createdAt.valueOf())
+      ? version.createdAt
+      : createdAt.toLocaleString("zh-CN", {
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
+    summary: version.summary,
+  };
+}
+
+function formatBytes(value: number): string {
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${Math.round(value / 1024)} KB`;
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
 }

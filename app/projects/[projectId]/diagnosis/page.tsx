@@ -67,8 +67,11 @@ const diagnosisFields: Array<{
 export default function DiagnosisPage() {
   const router = useRouter();
   const {
+    dataSource,
     diagnosis,
     diagnosisStatus,
+    persistenceError,
+    persistenceStatus,
     updateDiagnosis,
     confirmDiagnosis,
     reopenDiagnosis,
@@ -102,9 +105,13 @@ export default function DiagnosisPage() {
           sealLabel: "DRAFT",
         };
 
-  function confirmAndContinue() {
-    confirmDiagnosis();
-    router.push("/projects/demo/outline");
+  async function confirmAndContinue() {
+    try {
+      await confirmDiagnosis();
+      router.push("/projects/demo/outline");
+    } catch {
+      // The context exposes the persistence error in the status row.
+    }
   }
 
   return (
@@ -137,12 +144,14 @@ export default function DiagnosisPage() {
       </section>
 
       <div className={styles.metaRow}>
-        <MockBadge />
+        <MockBadge>{dataSource === "d1" ? "M3 · D1 基础数据" : undefined}</MockBadge>
         <span>诊断清晰度</span>
         <strong>
           {diagnosisFields.length - missingFields.length} / {diagnosisFields.length} 项明确
         </strong>
         <span>{confirmed ? "已确认版本 v1" : updated ? "修改草稿未确认" : "诊断草稿"}</span>
+        {persistenceStatus === "loading" ? <span>正在读取基础数据…</span> : null}
+        {persistenceError ? <span role="alert">{persistenceError}</span> : null}
       </div>
 
       <div className={styles.contentGrid}>

@@ -21,3 +21,7 @@
 | V042-1 | V0.4.2 Mock | 增量导航与功能开关 | Root Agent | `app/components/**`、`app/lib/v042-features.ts`、编辑器右栏增量入口 | M2 用户批准 | 用户九项增量要求 | 可关闭的新导航和入口 | 关闭后恢复完整 M2 体验 | DONE | 新入口污染 M2 | 主导航只增加一个聚合入口；编辑器右栏默认收起；关闭态 M2 原路由 200、新路由 404 |
 | V042-2 | V0.4.2 Mock | 六个独立业务页面 | Root Agent | `app/extensions/**`、`app/lib/v042-mock.ts` | V042-1 | 六项业务名称 | 总览和六个独立路由 | 页面可渲染、可点击且持续标 Mock | DONE | 将 Mock 误作真实服务 | Idea、外部文献、高级审稿、投稿返修、科研图件和 PPT 已独立页面化 |
 | V042-QA | V0.4.2 Mock | 增量审核包 | Root Agent | `docs/reviews/V0.4.2/**` | V042-1/2 | 增量原型 | 截图、测试、review | 开关、M2 回归、桌面/窄屏和日志通过 | DONE | 基线回归或范围扩张 | 9 张截图；6/6 自动化测试；开启/关闭态构建、浏览器与服务日志检查通过 |
+| M3-1 | M3 | 数据模型与首次迁移 | Root Agent | `db/schema.ts`、`drizzle/**`、`.openai/hosting.json` | M2 与 V0.4.2 用户批准 | 需求范围与 M2 契约 | 37 表 Schema、迁移和 D1 绑定 | 迁移可在空本地 D1 执行；R2 不提前启用 | DONE | 数据模型过度承诺真实能力 | 已生成并执行首次迁移；D1 绑定为 `DB`，R2 为 `null` |
+| M3-2 | M3 | 身份、隔离与 API 契约 | Root Agent | `app/api/m3/**`、`db/repositories/**`、`app/lib/m3-*.ts` | M3-1 | 平台身份头、项目所有权规则 | 项目/工作区/诊断/提纲/章节版本 API | 匿名拒绝、跨用户 404、写入均按 owner 限定 | DONE | 越权读取或本地演示身份误启用 | 匿名 401、平台头 200、双用户列表隔离和跨用户 404 已通过 |
+| M3-3 | M3 | 可关闭的前端基础数据 Adapter | Root Agent | `MockWorkspaceContext.tsx`、诊断/目录/编辑器页面 | M3-2 | M2 前端状态 | D1 基础数据水合与版本追加 | 默认关闭保持 M2；开启后只替换基础数据 | DONE | 覆盖 M2 或将 Mock 伪装为真实 AI | 项目、诊断、提纲和章节版本为 D1；材料解析、AI、证据和 DOCX 仍明确 Mock |
+| M3-QA | M3 | 验证、审计与审核包 | Root Agent | `tests/**`、`docs/audits/**`、`docs/reviews/M3/**` | M3-1/2/3 | 代码与本地 D1 | 测试结果、审计和审核报告 | 迁移、重启持久化、隔离、类型、Lint、构建通过并停在 M3 | DONE | 浏览器环境策略阻断部分视觉复测 | API/CLI 与自动化检查完成；浏览器策略限制如实记录，未绕过 |

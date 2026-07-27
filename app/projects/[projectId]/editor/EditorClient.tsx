@@ -216,9 +216,12 @@ function statusMessage(
 
 export default function EditorClient({ projectId }: EditorClientProps) {
   const {
+    dataSource,
     files,
     diagnosisStatus,
     outline,
+    persistenceError,
+    persistenceStatus,
     selectedSectionId,
     setSelectedSectionId,
     selectedSkillId,
@@ -232,6 +235,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     failMockTask,
     versions,
     restoreVersion,
+    saveCurrentSection,
     unsavedChanges,
     setUnsavedChanges,
   } = useMockWorkspace();
@@ -459,9 +463,17 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     });
   }
 
-  function handleRestore(id: string) {
-    restoreVersion(id);
-    setNotice("已从所选版本创建一个新的恢复版本；历史版本均未覆盖。· Mock");
+  async function handleRestore(id: string) {
+    try {
+      await restoreVersion(id);
+      setNotice(
+        dataSource === "d1"
+          ? "已从所选版本创建新的 D1 恢复版本；历史版本均未覆盖。"
+          : "已从所选版本创建一个新的恢复版本；历史版本均未覆盖。· Mock",
+      );
+    } catch {
+      setNotice("恢复失败，请查看基础数据状态提示。");
+    }
   }
 
   function renderOutlinePanel() {
@@ -472,7 +484,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             <p>STRUCTURE</p>
             <h2>论文目录</h2>
           </div>
-          <span className={styles.mockLabel}>MOCK</span>
+          <span className={styles.mockLabel}>{dataSource === "d1" ? "D1" : "MOCK"}</span>
         </div>
 
         <nav className={styles.outline} aria-label="论文章节">
@@ -882,9 +894,19 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           </span>
           <button
             className={styles.secondaryButton}
-            onClick={() => {
-              setUnsavedChanges(false);
-              setNotice("当前正文修改已标记保存 · Mock");
+            onClick={async () => {
+              try {
+                const content =
+                  sectionRefs.current[selectedSectionId]?.innerText ?? "";
+                await saveCurrentSection(content);
+                setNotice(
+                  dataSource === "d1"
+                    ? "已追加一个新的 D1 章节版本，旧版本未覆盖。"
+                    : "当前正文修改已标记保存 · Mock",
+                );
+              } catch {
+                setNotice("保存失败，请查看基础数据状态提示。");
+              }
             }}
             type="button"
           >
@@ -904,8 +926,19 @@ export default function EditorClient({ projectId }: EditorClientProps) {
       </header>
 
       <div className={styles.mockBanner}>
-        <span>演示模式 · Mock</span>
-        <p>所有任务、模型结果、材料解析、证据与版本均为内存演示，不会调用真实服务。</p>
+        <span>
+          {dataSource === "d1"
+            ? "M3 基础持久化 · D1"
+            : persistenceStatus === "loading"
+              ? "正在读取 M3 基础数据"
+              : "演示模式 · Mock"}
+        </span>
+        <p>
+          {dataSource === "d1"
+            ? "项目、诊断、提纲与章节版本使用真实基础数据；AI、材料解析、证据与 DOCX 仍为 Mock。"
+            : persistenceError ||
+              "所有任务、模型结果、材料解析、证据与版本均为内存演示，不会调用真实服务。"}
+        </p>
       </div>
 
       {diagnosisStatus !== "confirmed" ? (

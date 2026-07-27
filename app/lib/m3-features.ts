@@ -1,0 +1,2 @@
+export const M3_PERSISTENCE_ENABLED =
+  process.env.NEXT_PUBLIC_M3_PERSISTENCE_ENABLED === "true";
