@@ -464,6 +464,231 @@ export const materialParseResults = sqliteTable(
   ],
 );
 
+export const materialPrivacyProfiles = sqliteTable(
+  "material_privacy_profiles",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id, { onDelete: "cascade" }),
+    directIdentifiersJson: text("direct_identifiers_json").notNull().default("[]"),
+    indirectIdentifiersJson: text("indirect_identifiers_json").notNull().default("[]"),
+    sensitiveAttributesJson: text("sensitive_attributes_json").notNull().default("[]"),
+    researchNecessaryVariablesJson: text(
+      "research_necessary_variables_json",
+    )
+      .notNull()
+      .default("[]"),
+    ordinaryResearchContentJson: text("ordinary_research_content_json")
+      .notNull()
+      .default("[]"),
+    confidentialityRestrictionsJson: text(
+      "confidentiality_restrictions_json",
+    )
+      .notNull()
+      .default("[]"),
+    copyrightRestrictionsJson: text("copyright_restrictions_json")
+      .notNull()
+      .default("[]"),
+    recommendedMode: text("recommended_mode", {
+      enum: [
+        "RAW_ALLOWED",
+        "SELECTIVE_REDACTION",
+        "PSEUDONYMIZED",
+        "AGGREGATED_ONLY",
+        "LOCAL_ONLY",
+        "EXTERNAL_BLOCKED",
+      ],
+    }).notNull(),
+    status: text("status", {
+      enum: ["DRAFT", "CONFIRMED", "NEEDS_REVIEW"],
+    })
+      .notNull()
+      .default("DRAFT"),
+    confirmedAt: text("confirmed_at"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("material_privacy_profile_material_uq").on(table.materialId),
+    index("material_privacy_profile_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+    ),
+  ],
+);
+
+export const materialProcessingCopies = sqliteTable(
+  "material_processing_copies",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id, { onDelete: "cascade" }),
+    privacyProfileId: text("privacy_profile_id")
+      .notNull()
+      .references(() => materialPrivacyProfiles.id, { onDelete: "restrict" }),
+    mode: text("mode", {
+      enum: [
+        "RAW_ALLOWED",
+        "SELECTIVE_REDACTION",
+        "PSEUDONYMIZED",
+        "AGGREGATED_ONLY",
+        "LOCAL_ONLY",
+        "EXTERNAL_BLOCKED",
+      ],
+    }).notNull(),
+    status: text("status", {
+      enum: ["DRAFT", "READY", "BLOCKED"],
+    })
+      .notNull()
+      .default("DRAFT"),
+    storageReference: text("storage_reference"),
+    contentHash: text("content_hash"),
+    transformationSummaryJson: text("transformation_summary_json")
+      .notNull()
+      .default("[]"),
+    fidelityStatus: text("fidelity_status", {
+      enum: ["PASSED", "PASSED_WITH_WARNINGS", "FAILED"],
+    }).notNull(),
+    approvedByUser: integer("approved_by_user", { mode: "boolean" })
+      .notNull()
+      .default(false),
+    createdByTaskId: text("created_by_task_id").references(() => aiTasks.id, {
+      onDelete: "set null",
+    }),
+    ...timestamps(),
+  },
+  (table) => [
+    index("material_processing_copy_owner_material_idx").on(
+      table.ownerUserId,
+      table.materialId,
+    ),
+  ],
+);
+
+export const analysisFidelityChecks = sqliteTable(
+  "analysis_fidelity_checks",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    processingCopyId: text("processing_copy_id")
+      .notNull()
+      .references(() => materialProcessingCopies.id, { onDelete: "cascade" }),
+    checkType: text("check_type", {
+      enum: [
+        "EXPERIMENTAL_CONDITIONS",
+        "SAMPLE_COUNT",
+        "PARTICIPANT_SEPARATION",
+        "CHRONOLOGY",
+        "RESEARCH_NECESSARY_VARIABLES",
+        "NUMERIC_PRECISION",
+        "SPEAKER_RELATIONSHIPS",
+      ],
+    }).notNull(),
+    status: text("status", {
+      enum: ["PASSED", "WARNING", "FAILED"],
+    }).notNull(),
+    detail: text("detail").notNull(),
+    blocking: integer("blocking", { mode: "boolean" }).notNull().default(false),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("analysis_fidelity_copy_type_uq").on(
+      table.processingCopyId,
+      table.checkType,
+    ),
+    index("analysis_fidelity_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+    ),
+  ],
+);
+
+export const pseudonymizationMaps = sqliteTable(
+  "pseudonymization_maps",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    processingCopyId: text("processing_copy_id")
+      .notNull()
+      .references(() => materialProcessingCopies.id, { onDelete: "cascade" }),
+    secretReference: text("secret_reference").notNull(),
+    mappingCount: integer("mapping_count").notNull(),
+    reversible: integer("reversible", { mode: "boolean" }).notNull().default(true),
+    accessScope: text("access_scope", {
+      enum: ["OWNER_ONLY", "PROJECT_SERVICE"],
+    })
+      .notNull()
+      .default("OWNER_ONLY"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("pseudonymization_map_copy_uq").on(table.processingCopyId),
+    index("pseudonymization_map_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+    ),
+  ],
+);
+
+export const taskMaterialTransmissions = sqliteTable(
+  "task_material_transmissions",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    taskId: text("task_id")
+      .notNull()
+      .references(() => aiTasks.id, { onDelete: "cascade" }),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id, { onDelete: "restrict" }),
+    processingCopyId: text("processing_copy_id")
+      .notNull()
+      .references(() => materialProcessingCopies.id, { onDelete: "restrict" }),
+    providerKey: text("provider_key").notNull(),
+    purpose: text("purpose").notNull(),
+    status: text("status", {
+      enum: ["PLANNED", "BLOCKED", "RECORDED"],
+    }).notNull(),
+    blockReason: text("block_reason"),
+    transmittedAt: text("transmitted_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("task_material_transmission_owner_task_idx").on(
+      table.ownerUserId,
+      table.taskId,
+    ),
+  ],
+);
+
 export const literatureRecords = sqliteTable(
   "literature_records",
   {

@@ -42,7 +42,8 @@ export function m4RepositoryError(error: unknown): Response {
     error instanceof Error &&
     "code" in error &&
     (error.code === "INVALID_TRANSITION" ||
-      error.code === "CALL_LIMIT_REACHED")
+      error.code === "CALL_LIMIT_REACHED" ||
+      error.code === "INVALID_PRIVACY_OPERATION")
   ) {
     return apiError(409, String(error.code), error.message);
   }
