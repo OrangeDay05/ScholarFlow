@@ -2,6 +2,19 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  generationModel,
+  mockReviewIssues,
+  reviewDimensions,
+  reviewModes,
+  reviewModelOptions,
+  reviewWorkflowLabels,
+  type ReviewConclusion,
+  type ReviewDecision,
+  type ReviewMode,
+  type ReviewWorkflowStatus,
+} from "@/app/lib/dual-model-review-mock";
+import { DUAL_MODEL_REVIEW_MOCK_ENABLED } from "@/app/lib/dual-model-review-features";
 import { productSkills } from "@/app/lib/m1-mock";
 import {
   type TaskStatus,
@@ -15,7 +28,7 @@ type EditorClientProps = {
 };
 
 type VisibleTaskStatus = TaskStatus | "queued";
-type AssistantTab = "materials" | "evidence" | "tasks";
+type AssistantTab = "materials" | "evidence" | "review" | "tasks";
 
 const sectionCopy: Record<
   string,
@@ -166,6 +179,29 @@ const skillGroups = [
   { label: "检查与验证", skillIds: ["consistency", "evidence"] },
 ] as const;
 
+const assistantTabOptions: Array<{ id: AssistantTab; label: string }> = [
+  { id: "materials", label: "本次材料授权" },
+  { id: "evidence", label: "引用证据" },
+  ...(DUAL_MODEL_REVIEW_MOCK_ENABLED
+    ? [{ id: "review" as const, label: "AI 复核" }]
+    : []),
+  { id: "tasks", label: "任务记录" },
+];
+
+function nextVersionLabel(
+  versions: Array<{ label: string }>,
+): string {
+  const nextNumber =
+    Math.max(
+      0,
+      ...versions.map((version) => {
+        const match = version.label.match(/\d+/);
+        return match ? Number(match[0]) : 0;
+      }),
+    ) + 1;
+  return `v${nextNumber}`;
+}
+
 function contentForVersion(id: string, summary: string) {
   if (id.includes("1")) {
     return "平台是团队协作的重要工具。它能够帮助成员交流信息，并在一定程度上提高工作效率。";
@@ -234,6 +270,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     cancelMockTask,
     failMockTask,
     versions,
+    appendMockVersion,
     restoreVersion,
     saveCurrentSection,
     unsavedChanges,
@@ -251,8 +288,28 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
+  const [reviewMode, setReviewMode] = useState<ReviewMode>("standard");
+  const [reviewerId, setReviewerId] = useState("deepseek-reasoner");
+  const [reviewWorkflow, setReviewWorkflow] =
+    useState<ReviewWorkflowStatus>("idle");
+  const [reviewConclusion, setReviewConclusion] =
+    useState<ReviewConclusion | null>(null);
+  const [reviewDecision, setReviewDecision] =
+    useState<ReviewDecision>("pending");
+  const [selectedReviewIssueIds, setSelectedReviewIssueIds] = useState<string[]>(
+    () =>
+      mockReviewIssues
+        .filter((issue) => issue.severity !== "low")
+        .map((issue) => issue.id),
+  );
+  const [generatedVersion, setGeneratedVersion] = useState<string | null>(null);
+  const [revisionVersion, setRevisionVersion] = useState<string | null>(null);
+  const [finalVerification, setFinalVerification] = useState("未执行");
+  const [ignoreReason, setIgnoreReason] = useState("");
+  const [reviewRun, setReviewRun] = useState(1);
   const queueTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const documentScrollRef = useRef<HTMLElement | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
   const claimRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -270,6 +327,8 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const isReportOnly = selectedSkillId === "consistency" || selectedSkillId === "evidence";
   const createsVersion =
     selectedSkillId === "chapter-writing" || selectedSkillId === "revision";
+  const dualReviewApplies =
+    DUAL_MODEL_REVIEW_MOCK_ENABLED && createsVersion;
   const usesLocalTask = !createsVersion;
   const readableSelectedMaterials = files.filter(
     (file) => selectedMaterialIds.includes(file.id) && file.status === "success",
@@ -314,6 +373,39 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const compareVersions = compareIds
     .map((id) => versions.find((version) => version.id === id))
     .filter((version): version is (typeof versions)[number] => Boolean(version));
+  const selectedReviewMode =
+    reviewModes.find((mode) => mode.id === reviewMode) ?? reviewModes[1];
+  const selectedReviewer =
+    reviewModelOptions.find((model) => model.id === reviewerId) ??
+    reviewModelOptions[0];
+  const reviewBusy = [
+    "generating",
+    "reviewing",
+    "revising",
+    "verifying",
+  ].includes(reviewWorkflow);
+  const reviewTaskTone =
+    reviewWorkflow === "completed"
+      ? "success"
+      : reviewWorkflow === "review_failed"
+        ? "failed"
+        : reviewWorkflow === "report_ready"
+          ? "queued"
+          : reviewBusy
+            ? "running"
+            : "idle";
+  const reviewConclusionClass =
+    reviewConclusion === "REVIEW_FAILED" || reviewConclusion === "BLOCKED"
+      ? styles.reviewConclusionDanger
+      : reviewConclusion === "REVISION_REQUIRED"
+        ? styles.reviewConclusionWarning
+        : styles.reviewConclusionPassed;
+  const reviewDecisionLabel: Record<ReviewDecision, string> = {
+    pending: "等待用户决定",
+    accepted_original: "已接受原版本",
+    selected_for_revision: `已选择 ${selectedReviewIssueIds.length} 条问题修订`,
+    ignored: "已忽略问题并记录理由",
+  };
 
   useEffect(() => {
     if (initialSectionHandledRef.current) return;
@@ -361,6 +453,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     () => () => {
       if (queueTimerRef.current) clearTimeout(queueTimerRef.current);
       if (reportTimerRef.current) clearTimeout(reportTimerRef.current);
+      if (reviewTimerRef.current) clearTimeout(reviewTimerRef.current);
     },
     [],
   );
@@ -401,6 +494,10 @@ export default function EditorClient({ projectId }: EditorClientProps) {
 
   function runTask() {
     if (!selectedSkillAvailability.enabled) return;
+    if (dualReviewApplies) {
+      runDualModelTask();
+      return;
+    }
     if (queueTimerRef.current) clearTimeout(queueTimerRef.current);
     if (reportTimerRef.current) clearTimeout(reportTimerRef.current);
     setNotice("");
@@ -416,6 +513,153 @@ export default function EditorClient({ projectId }: EditorClientProps) {
         runMockTask();
       }
     }, 450);
+  }
+
+  function completeIndependentReview() {
+    setReviewConclusion("REVISION_REQUIRED");
+    setReviewWorkflow("report_ready");
+    setReviewDecision("pending");
+    setAssistantTab("review");
+    setNotice(
+      "独立审阅报告已生成；正文未被修改，请由你决定是否采纳。· Mock",
+    );
+  }
+
+  function runDualModelTask() {
+    if (!selectedSkillAvailability.enabled || reviewBusy) return;
+    if (reviewTimerRef.current) clearTimeout(reviewTimerRef.current);
+    const versionLabel = nextVersionLabel(versions);
+    setNotice("");
+    setReviewConclusion(null);
+    setReviewDecision("pending");
+    setGeneratedVersion(null);
+    setRevisionVersion(null);
+    setFinalVerification("未执行");
+    setIgnoreReason("");
+    setReviewRun(1);
+    setReviewWorkflow("generating");
+
+    reviewTimerRef.current = setTimeout(() => {
+      appendMockVersion({
+        id: `dual-generated-${Date.now()}`,
+        label: versionLabel,
+        source: `${selectedSkill.title} · ${generationModel.model} · Mock`,
+        summary:
+          "双模型流程的生成版本；后续审阅只创建报告，不覆盖本版本。",
+      });
+      setGeneratedVersion(versionLabel);
+
+      if (reviewMode === "none") {
+        setReviewWorkflow("completed");
+        setAssistantTab("tasks");
+        setNotice(`快速模式已创建 ${versionLabel}，未执行 AI 复核。· Mock`);
+        return;
+      }
+
+      setReviewWorkflow("reviewing");
+      reviewTimerRef.current = setTimeout(completeIndependentReview, 900);
+    }, 850);
+  }
+
+  function toggleReviewIssue(id: string) {
+    setSelectedReviewIssueIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  }
+
+  function acceptOriginalVersion() {
+    setReviewDecision("accepted_original");
+    setReviewWorkflow("completed");
+    setFinalVerification("不适用：用户接受原生成版本");
+    setNotice(
+      `${generatedVersion ?? "生成版本"} 已保留；审阅意见未改写正文。· Mock`,
+    );
+  }
+
+  function ignoreReviewIssues() {
+    if (!ignoreReason.trim()) {
+      setNotice("忽略审阅问题前，请填写理由。");
+      return;
+    }
+    setReviewDecision("ignored");
+    setReviewWorkflow("completed");
+    setFinalVerification("未执行：用户忽略问题并已记录理由");
+    setNotice("忽略理由已记录；原生成版本保留，未标记为审阅通过。· Mock");
+  }
+
+  function generateRevisionFromReview() {
+    if (
+      reviewMode !== "strict" ||
+      selectedReviewIssueIds.length === 0 ||
+      revisionVersion ||
+      reviewBusy
+    ) {
+      return;
+    }
+    if (reviewTimerRef.current) clearTimeout(reviewTimerRef.current);
+    const versionLabel = nextVersionLabel(versions);
+    setReviewDecision("selected_for_revision");
+    setReviewWorkflow("revising");
+    setNotice("");
+
+    reviewTimerRef.current = setTimeout(() => {
+      appendMockVersion({
+        id: `dual-revision-${Date.now()}`,
+        label: versionLabel,
+        source: `按审阅意见修订 · ${generationModel.model} · Mock`,
+        summary: `只处理用户选中的 ${selectedReviewIssueIds.length} 条问题；原生成版本未覆盖。`,
+      });
+      setRevisionVersion(versionLabel);
+      setReviewWorkflow("verifying");
+      reviewTimerRef.current = setTimeout(() => {
+        setReviewConclusion("PASSED_WITH_WARNINGS");
+        setFinalVerification(
+          `F${versionLabel.replace(/\D/g, "")} · PASSED_WITH_WARNINGS`,
+        );
+        setReviewWorkflow("completed");
+        setNotice(
+          `已创建 ${versionLabel} 并完成一次最终验证；流程不会继续自动循环。· Mock`,
+        );
+      }, 850);
+    }, 850);
+  }
+
+  function rerunIndependentReview() {
+    if (!generatedVersion || reviewBusy) return;
+    if (reviewTimerRef.current) clearTimeout(reviewTimerRef.current);
+    setReviewRun((current) => current + 1);
+    setReviewConclusion(null);
+    setReviewDecision("pending");
+    setReviewWorkflow("reviewing");
+    setFinalVerification("未执行");
+    setNotice("");
+    reviewTimerRef.current = setTimeout(completeIndependentReview, 900);
+  }
+
+  function simulateIndependentReviewFailure() {
+    if (reviewTimerRef.current) clearTimeout(reviewTimerRef.current);
+    setReviewConclusion("REVIEW_FAILED");
+    setReviewWorkflow("review_failed");
+    setReviewDecision("pending");
+    setFinalVerification("未执行");
+    setAssistantTab("review");
+    setNotice(
+      `审阅失败；${generatedVersion ?? "原生成版本"} 已保留，但不得标记为审阅通过。· Mock`,
+    );
+  }
+
+  function cancelDualModelFlow() {
+    if (reviewTimerRef.current) clearTimeout(reviewTimerRef.current);
+    const generated = Boolean(generatedVersion);
+    setReviewWorkflow(generated ? "review_failed" : "idle");
+    setReviewConclusion(generated ? "REVIEW_FAILED" : null);
+    setNotice(
+      generated
+        ? "已停止复核；原生成版本保留，当前不得标记为审阅通过。· Mock"
+        : "已取消生成，没有创建新版本。· Mock",
+    );
   }
 
   function simulateFailure() {
@@ -682,13 +926,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
         </section>
 
         <div className={styles.assistantTabs} role="tablist" aria-label="AI 工作台上下文">
-          {(
-            [
-              ["materials", "本次材料授权"],
-              ["evidence", "引用证据"],
-              ["tasks", "任务记录"],
-            ] as const
-          ).map(([tab, label]) => (
+          {assistantTabOptions.map(({ id: tab, label }) => (
             <button
               aria-selected={assistantTab === tab}
               className={assistantTab === tab ? styles.assistantTabActive : styles.assistantTab}
@@ -737,6 +975,101 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           <p className={styles.scopeNote}>
             当前只模拟用户上传材料；外部搜索和数据库均未接入。
           </p>
+          {DUAL_MODEL_REVIEW_MOCK_ENABLED ? (
+            <div className={styles.reviewConfiguration} data-review-configuration>
+              <div className={styles.sectionLabel}>
+                <span>AI 复核</span>
+                <span>双模型 · Mock</span>
+              </div>
+              <div
+                className={styles.reviewModeGrid}
+                role="radiogroup"
+                aria-label="AI 复核模式"
+              >
+                {reviewModes.map((mode) => (
+                  <button
+                    aria-checked={reviewMode === mode.id}
+                    className={
+                      reviewMode === mode.id
+                        ? styles.reviewModeActive
+                        : styles.reviewModeButton
+                    }
+                    key={mode.id}
+                    onClick={() => {
+                      if (reviewBusy) return;
+                      setReviewMode(mode.id);
+                      setReviewWorkflow("idle");
+                      setReviewConclusion(null);
+                      setGeneratedVersion(null);
+                      setRevisionVersion(null);
+                      setReviewDecision("pending");
+                      setFinalVerification("未执行");
+                    }}
+                    role="radio"
+                    type="button"
+                  >
+                    <strong>{mode.label}</strong>
+                    <small>{mode.productMode}</small>
+                  </button>
+                ))}
+              </div>
+              <p className={styles.reviewModeDescription}>
+                {selectedReviewMode.description}
+              </p>
+
+              <div className={styles.modelPlan}>
+                <article>
+                  <span>生成模型</span>
+                  <strong>
+                    {generationModel.provider} · {generationModel.model}
+                  </strong>
+                  <small>
+                    {generationModel.skill} · {generationModel.skillVersion}
+                  </small>
+                </article>
+                <article>
+                  <span>审阅模型</span>
+                  <strong>
+                    {reviewMode === "none"
+                      ? "不执行"
+                      : `${selectedReviewer.provider} · ${selectedReviewer.model}`}
+                  </strong>
+                  <small>
+                    {reviewMode === "none"
+                      ? "快速模式只生成"
+                      : `${selectedReviewer.skill} · ${selectedReviewer.skillVersion}`}
+                  </small>
+                </article>
+              </div>
+
+              <dl className={styles.executionEstimate}>
+                <div>
+                  <dt>预计调用</dt>
+                  <dd>{selectedReviewMode.calls}</dd>
+                </div>
+                <div>
+                  <dt>预计耗时</dt>
+                  <dd>{selectedReviewMode.duration}</dd>
+                </div>
+                <div>
+                  <dt>允许读取</dt>
+                  <dd>{readableSelectedMaterials.length} 份可读材料</dd>
+                </div>
+              </dl>
+
+              <div className={styles.reviewScope}>
+                <strong>审阅上下文</strong>
+                <span>✓ 用户原始要求</span>
+                <span>✓ 已确认诊断卡</span>
+                <span>✓ 本次授权材料</span>
+                <span>✓ 生成版本</span>
+                <span>✓ 已建立证据绑定</span>
+              </div>
+              <p className={styles.reviewBoundary}>
+                审阅只创建报告，不直接修改正文；不得只凭模型自身知识判断文献是否支持论断。
+              </p>
+            </div>
+          ) : null}
         </section>
         ) : null}
 
@@ -793,6 +1126,262 @@ export default function EditorClient({ projectId }: EditorClientProps) {
         </section>
         ) : null}
 
+        {assistantTab === "review" && DUAL_MODEL_REVIEW_MOCK_ENABLED ? (
+          <section className={styles.reviewPanel} role="tabpanel">
+            <div className={styles.sectionLabel}>
+              <span>双模型独立审阅</span>
+              <span>{reviewWorkflowLabels[reviewWorkflow]}</span>
+            </div>
+
+            {!generatedVersion && reviewWorkflow === "idle" ? (
+              <div className={styles.reviewEmpty}>
+                <strong>尚未生成可审阅版本</strong>
+                <p>
+                  请先在“本次材料授权”中选择复核模式并运行章节生成或通用修改任务。
+                </p>
+              </div>
+            ) : null}
+
+            {reviewWorkflow === "generating" ? (
+              <div className={styles.reviewProgress}>
+                <span className={styles.reviewSpinner} />
+                <div>
+                  <strong>生成中</strong>
+                  <p>
+                    {generationModel.provider} · {generationModel.model} 正在创建新版本。
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {reviewWorkflow === "reviewing" ? (
+              <div className={styles.reviewProgress}>
+                <span className={styles.reviewSpinner} />
+                <div>
+                  <strong>独立审阅中</strong>
+                  <p>
+                    {selectedReviewer.provider} · {selectedReviewer.model} 正在读取要求、诊断卡、授权材料、生成版本和证据绑定。
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {generatedVersion ? (
+              <div className={styles.reviewResultChain}>
+                <article>
+                  <span>生成版本</span>
+                  <strong>{generatedVersion}</strong>
+                  <small>
+                    {generationModel.provider} · {generationModel.model} ·{" "}
+                    {generationModel.skillVersion}
+                  </small>
+                </article>
+                <article>
+                  <span>审阅报告</span>
+                  <strong>
+                    {reviewMode === "none"
+                      ? "未执行"
+                      : `R${generatedVersion.replace(/\D/g, "")} · 第 ${reviewRun} 次`}
+                  </strong>
+                  <small>
+                    {reviewMode === "none"
+                      ? "快速模式"
+                      : `${selectedReviewer.provider} · ${selectedReviewer.model} · ${selectedReviewer.skillVersion}`}
+                  </small>
+                </article>
+                <article>
+                  <span>用户采纳状态</span>
+                  <strong>{reviewDecisionLabel[reviewDecision]}</strong>
+                  <small>所有处理决定均保留在任务记录中 · Mock</small>
+                </article>
+                <article>
+                  <span>修订版本</span>
+                  <strong>{revisionVersion ?? "未创建"}</strong>
+                  <small>修改只创建新版本，不覆盖生成版本</small>
+                </article>
+                <article>
+                  <span>最终验证</span>
+                  <strong>{finalVerification}</strong>
+                  <small>最多执行一次，不进入自动循环</small>
+                </article>
+              </div>
+            ) : null}
+
+            {generatedVersion && reviewMode === "none" ? (
+              <div className={styles.reviewQuickResult}>
+                <strong>快速模式已完成</strong>
+                <p>
+                  已创建 {generatedVersion}，没有调用审阅模型，也没有审阅通过结论。
+                </p>
+              </div>
+            ) : null}
+
+            {reviewWorkflow === "review_failed" ? (
+              <div className={styles.reviewFailure} role="alert">
+                <span>REVIEW_FAILED</span>
+                <strong>审阅任务失败，原生成结果已保留</strong>
+                <p>
+                  {generatedVersion ?? "生成版本"} 不会丢失，但不得标记为审阅通过。你可以更换审阅模型后重新审阅。
+                </p>
+              </div>
+            ) : null}
+
+            {reviewConclusion && reviewConclusion !== "REVIEW_FAILED" ? (
+              <>
+                <div
+                  className={`${styles.reviewConclusion} ${reviewConclusionClass}`}
+                >
+                  <span>统一审阅结论</span>
+                  <strong>{reviewConclusion}</strong>
+                  <small>
+                    {mockReviewIssues.length} 个问题 · 2 高 · 2 中 · 1 低
+                  </small>
+                </div>
+
+                <div className={styles.reviewContextAudit}>
+                  <strong>本次审阅实际读取</strong>
+                  <span>用户原始要求</span>
+                  <span>已确认诊断卡</span>
+                  <span>{readableSelectedMaterials.length} 份授权可读材料</span>
+                  <span>{generatedVersion} 生成版本</span>
+                  <span>3 条现有证据绑定</span>
+                </div>
+
+                <details className={styles.reviewDimensions}>
+                  <summary>查看 11 项审阅维度</summary>
+                  <div>
+                    {reviewDimensions.map((dimension) => (
+                      <span key={dimension}>✓ {dimension}</span>
+                    ))}
+                  </div>
+                </details>
+
+                <p className={styles.reviewEvidenceRule}>
+                  证据判断只依据本次授权材料和已建立绑定；审阅模型自身知识不能替代原文、页码或段落。
+                </p>
+
+                <div className={styles.reviewIssueList}>
+                  {mockReviewIssues.map((issue) => {
+                    const selected = selectedReviewIssueIds.includes(issue.id);
+                    return (
+                      <label
+                        className={
+                          selected
+                            ? styles.reviewIssueSelected
+                            : styles.reviewIssue
+                        }
+                        key={issue.id}
+                      >
+                        <input
+                          checked={selected}
+                          disabled={
+                            reviewDecision !== "pending" ||
+                            Boolean(revisionVersion)
+                          }
+                          onChange={() => toggleReviewIssue(issue.id)}
+                          type="checkbox"
+                        />
+                        <span className={styles[`severity_${issue.severity}`]}>
+                          {issue.severity === "high"
+                            ? "高"
+                            : issue.severity === "medium"
+                              ? "中"
+                              : "低"}
+                        </span>
+                        <span>
+                          <small>{issue.category}</small>
+                          <strong>{issue.title}</strong>
+                          <p>{issue.detail}</p>
+                          <em>建议：{issue.suggestion}</em>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+
+                <div className={styles.reviewActions}>
+                  <button
+                    disabled={reviewBusy || reviewDecision !== "pending"}
+                    onClick={acceptOriginalVersion}
+                    type="button"
+                  >
+                    接受原版本
+                  </button>
+                  <button
+                    disabled={
+                      reviewMode !== "strict" ||
+                      reviewBusy ||
+                      reviewDecision !== "pending" ||
+                      selectedReviewIssueIds.length === 0 ||
+                      Boolean(revisionVersion)
+                    }
+                    onClick={generateRevisionFromReview}
+                    type="button"
+                  >
+                    按所选 {selectedReviewIssueIds.length} 条意见生成新版本
+                  </button>
+                  {reviewMode !== "strict" ? (
+                    <p>标准复核只生成报告；切换严格复核后才允许一次修订和最终验证。</p>
+                  ) : null}
+                </div>
+
+                <div className={styles.ignoreReview}>
+                  <label htmlFor="review-ignore-reason">忽略问题的理由</label>
+                  <textarea
+                    disabled={reviewBusy || reviewDecision !== "pending"}
+                    id="review-ignore-reason"
+                    onChange={(event) => setIgnoreReason(event.target.value)}
+                    placeholder="例如：该判断将在导师审阅后另行处理。"
+                    value={ignoreReason}
+                  />
+                  <button
+                    disabled={reviewBusy || reviewDecision !== "pending"}
+                    onClick={ignoreReviewIssues}
+                    type="button"
+                  >
+                    忽略问题并记录理由
+                  </button>
+                </div>
+              </>
+            ) : null}
+
+            {generatedVersion && reviewMode !== "none" ? (
+              <div className={styles.reviewerControls}>
+                <label htmlFor="review-model">审阅模型</label>
+                <select
+                  disabled={reviewBusy}
+                  id="review-model"
+                  onChange={(event) => setReviewerId(event.target.value)}
+                  value={reviewerId}
+                >
+                  {reviewModelOptions.map((model) => (
+                    <option key={model.id} value={model.id}>
+                      {model.provider} · {model.model}
+                    </option>
+                  ))}
+                </select>
+                <small>{selectedReviewer.note}</small>
+                <div>
+                  <button
+                    disabled={reviewBusy}
+                    onClick={rerunIndependentReview}
+                    type="button"
+                  >
+                    更换后重新审阅
+                  </button>
+                  <button
+                    disabled={reviewBusy}
+                    onClick={simulateIndependentReviewFailure}
+                    type="button"
+                  >
+                    模拟审阅失败
+                  </button>
+                </div>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
         {assistantTab === "tasks" ? (
           <section className={styles.taskHistory} role="tabpanel">
             <div className={styles.sectionLabel}>
@@ -804,6 +1393,19 @@ export default function EditorClient({ projectId }: EditorClientProps) {
               <span>{taskLabels[visibleTaskStatus]}</span>
               <small>{displayedTaskMessage}</small>
             </article>
+            {DUAL_MODEL_REVIEW_MOCK_ENABLED && generatedVersion ? (
+              <article>
+                <strong>双模型生成与独立审阅</strong>
+                <span>{reviewWorkflowLabels[reviewWorkflow]}</span>
+                <small>
+                  {generatedVersion} →{" "}
+                  {reviewMode === "none"
+                    ? "未复核"
+                    : `R${generatedVersion.replace(/\D/g, "")} · ${reviewConclusion ?? "处理中"}`}
+                  {revisionVersion ? ` → ${revisionVersion} → ${finalVerification}` : ""}
+                </small>
+              </article>
+            ) : null}
             <article>
               <strong>引用与证据检查</strong>
               <span>任务成功</span>
@@ -819,6 +1421,77 @@ export default function EditorClient({ projectId }: EditorClientProps) {
         </div>
 
         <div className={styles.taskDock}>
+        {dualReviewApplies ? (
+        <section
+          className={`${styles.taskCard} ${styles[`task_${reviewTaskTone}`]}`}
+          aria-live="polite"
+          data-dual-model-task
+        >
+          <div>
+            <span className={styles.taskPulse} />
+            <span>
+              <strong>
+                双模型任务 · {reviewWorkflowLabels[reviewWorkflow]}
+              </strong>
+              <small>
+                {reviewWorkflow === "idle"
+                  ? `${selectedReviewMode.productMode} · ${selectedReviewMode.calls} · ${selectedReviewMode.duration}`
+                  : reviewWorkflow === "generating"
+                    ? `${generationModel.provider} · ${generationModel.model} 正在生成新版本 · Mock`
+                    : reviewWorkflow === "reviewing"
+                      ? `${selectedReviewer.provider} · ${selectedReviewer.model} 正在独立审阅 · Mock`
+                      : reviewWorkflow === "report_ready"
+                        ? `${reviewConclusion} · 正文未修改，等待用户决定`
+                        : reviewWorkflow === "revising"
+                          ? `只处理已选择的 ${selectedReviewIssueIds.length} 条问题 · Mock`
+                          : reviewWorkflow === "verifying"
+                            ? "正在执行唯一一次最终验证 · Mock"
+                            : reviewWorkflow === "review_failed"
+                              ? `${generatedVersion ?? "原生成版本"} 已保留，不得标记审阅通过`
+                              : `${revisionVersion ?? generatedVersion ?? "版本"} 已保留 · ${finalVerification}`}
+              </small>
+            </span>
+          </div>
+          <button
+            disabled={!selectedSkillAvailability.enabled || reviewBusy}
+            onClick={() => {
+              if (reviewWorkflow === "report_ready") {
+                setAssistantTab("review");
+                return;
+              }
+              runDualModelTask();
+            }}
+            type="button"
+          >
+            {!selectedSkillAvailability.enabled
+              ? selectedSkillAvailability.reason
+              : reviewBusy
+                ? reviewWorkflowLabels[reviewWorkflow]
+                : reviewWorkflow === "report_ready"
+                  ? "查看审阅报告"
+                  : reviewWorkflow === "completed"
+                    ? "重新运行双模型流程"
+                    : reviewWorkflow === "review_failed"
+                      ? "重新生成完整流程"
+                      : `${primaryLabel} · ${selectedReviewMode.label}`}
+          </button>
+          <div className={styles.taskActions}>
+            {reviewBusy ? (
+              <button onClick={cancelDualModelFlow} type="button">
+                停止当前 Mock 流程
+              </button>
+            ) : generatedVersion && reviewMode !== "none" ? (
+              <button onClick={() => setAssistantTab("review")} type="button">
+                查看复核详情
+              </button>
+            ) : (
+              <button onClick={() => setAssistantTab("materials")} type="button">
+                检查模型与材料配置
+              </button>
+            )}
+          </div>
+        </section>
+        ) : (
         <section
           className={`${styles.taskCard} ${styles[`task_${taskTone[visibleTaskStatus]}`]}`}
           aria-live="polite"
@@ -861,6 +1534,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             )}
           </div>
         </section>
+        )}
         </div>
       </div>
     );

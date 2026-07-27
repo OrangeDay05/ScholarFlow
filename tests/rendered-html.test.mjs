@@ -208,3 +208,32 @@ test("renders the gated V0.4.2 incremental mock pages without replacing M2", asy
   assert.match(editorSource, /V042_INCREMENTAL_MOCK_ENABLED/);
   assert.match(editorSource, /研究扩展/);
 });
+
+test("renders the gated dual-model review mock inside the M2 editor", async () => {
+  const { response, html } = await render("/projects/demo/editor?section=introduction");
+  assert.equal(response.status, 200);
+
+  for (const landmark of [
+    "AI 复核",
+    "严格复核",
+    "DeepSeek Reasoner",
+    "审阅只创建报告",
+  ]) {
+    assert.match(html, new RegExp(landmark));
+  }
+
+  const [flagSource, contractSource, editorSource] = await Promise.all([
+    readFile(new URL("../app/lib/dual-model-review-features.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/lib/dual-model-review-mock.ts", import.meta.url), "utf8"),
+    readFile(
+      new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.match(flagSource, /NEXT_PUBLIC_DUAL_MODEL_REVIEW_MOCK/);
+  assert.match(contractSource, /REVIEW_FAILED/);
+  assert.match(contractSource, /PASSED_WITH_WARNINGS/);
+  assert.match(editorSource, /appendMockVersion/);
+  assert.doesNotMatch(`${flagSource}\n${contractSource}`, /drizzle|schema\.ts|app\/api\//);
+});

@@ -25,3 +25,6 @@
 | M3-2 | M3 | 身份、隔离与 API 契约 | Root Agent | `app/api/m3/**`、`db/repositories/**`、`app/lib/m3-*.ts` | M3-1 | 平台身份头、项目所有权规则 | 项目/工作区/诊断/提纲/章节版本 API | 匿名拒绝、跨用户 404、写入均按 owner 限定 | DONE | 越权读取或本地演示身份误启用 | 匿名 401、平台头 200、双用户列表隔离和跨用户 404 已通过 |
 | M3-3 | M3 | 可关闭的前端基础数据 Adapter | Root Agent | `MockWorkspaceContext.tsx`、诊断/目录/编辑器页面 | M3-2 | M2 前端状态 | D1 基础数据水合与版本追加 | 默认关闭保持 M2；开启后只替换基础数据 | DONE | 覆盖 M2 或将 Mock 伪装为真实 AI | 项目、诊断、提纲和章节版本为 D1；材料解析、AI、证据和 DOCX 仍明确 Mock |
 | M3-QA | M3 | 验证、审计与审核包 | Root Agent | `tests/**`、`docs/audits/**`、`docs/reviews/M3/**` | M3-1/2/3 | 代码与本地 D1 | 测试结果、审计和审核报告 | 迁移、重启持久化、隔离、类型、Lint、构建通过并停在 M3 | DONE | 浏览器环境策略阻断部分视觉复测 | API/CLI 与自动化检查完成；浏览器策略限制如实记录，未绕过 |
+| V043-1 | V0.4.3 Mock | 双模型复核契约与功能开关 | Root Agent | `app/lib/dual-model-review-*.ts` | M2 基线、M3 提交 | 用户双模型规则 | 三种模式、五种结论、模型/问题/流程 Mock 契约 | 关闭开关恢复 M2；无 Schema、迁移或真实模型调用 | DONE | Mock 被误认真实服务 | 模式、结论、模型记录、证据边界和无循环规则已固化 |
+| V043-2 | V0.4.3 Mock | 配置、审阅、修订与验证 UI | Root Agent | `editor/**`、`MockWorkspaceContext.tsx` | V043-1 | 双模型契约 | AI 复核标签页和追加版本流程 | 可演示 V4→R4→V5→F5，审阅不覆盖正文，用户选择问题 | DONE | 自动覆盖正文或无限循环 | 5 类用户决定、REVIEW_FAILED 保留原版和一次修订/验证已实现 |
+| V043-QA | V0.4.3 Mock | 自动化、浏览器与审核包 | Root Agent | `tests/**`、`docs/reviews/V0.4.3-dual-model-review/**` | V043-1/2 | 完整 Mock 前端 | 测试、截图和 review | 桌面/390px、控制台、构建和专项测试通过并停在审核门 | DONE | M2 响应式回归 | 5 张截图、严格复核点击链路和审核报告已完成 |

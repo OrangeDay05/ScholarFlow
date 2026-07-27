@@ -98,6 +98,7 @@ type MockWorkspaceValue = {
   cancelMockTask: () => void;
   failMockTask: () => void;
   versions: VersionItem[];
+  appendMockVersion: (version: Omit<VersionItem, "time">) => void;
   restoreVersion: (id: string) => Promise<void>;
   saveCurrentSection: (content: string) => Promise<void>;
   unsavedChanges: boolean;
@@ -462,6 +463,17 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
     setTaskMessage("主模型响应失败；是否使用 DeepSeek 备用模型重试？· Mock");
   }, []);
 
+  const appendMockVersion = useCallback(
+    (version: Omit<VersionItem, "time">) => {
+      setVersions((items) => [
+        { ...version, time: "刚刚" },
+        ...items.filter((item) => item.id !== version.id),
+      ]);
+      setUnsavedChanges(false);
+    },
+    [],
+  );
+
   const restoreVersion = useCallback(
     async (id: string) => {
       const source = versions.find((item) => item.id === id);
@@ -566,6 +578,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       cancelMockTask,
       failMockTask,
       versions,
+      appendMockVersion,
       restoreVersion,
       saveCurrentSection,
       unsavedChanges,
@@ -599,6 +612,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       versions,
       cancelMockTask,
       failMockTask,
+      appendMockVersion,
       restoreVersion,
       saveCurrentSection,
     ],
