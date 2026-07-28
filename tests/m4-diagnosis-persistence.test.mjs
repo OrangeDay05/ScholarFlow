@@ -28,7 +28,6 @@ test("persists field state and source separately without adding model credential
     source("../db/schema.ts"),
     source("../drizzle/0001_vengeful_tigra.sql"),
   ]);
-  const contract = `${schema}\n${migration}`;
   for (const value of [
     "USER_CONFIRMED",
     "AI_INFERRED",
@@ -43,7 +42,7 @@ test("persists field state and source separately without adding model credential
   ]) {
     assert.match(schema, new RegExp(value));
   }
-  assert.doesNotMatch(contract, /api_key|credential_secret|encrypted_key/i);
+  assert.doesNotMatch(migration, /api_key|credential_secret|encrypted_key/i);
 });
 
 test("keeps every M4 diagnosis read and write owner-scoped", async () => {

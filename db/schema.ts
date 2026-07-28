@@ -133,12 +133,12 @@ export const credentialMetadata = sqliteTable(
     allowedProjectIdsJson: text("allowed_project_ids_json").notNull().default("[]"),
     allowedRolesJson: text("allowed_roles_json").notNull().default("[]"),
     status: text("status", {
-      enum: ["NOT_CONFIGURED", "MOCK_ONLY", "DISABLED", "DELETED"],
+      enum: ["NOT_CONFIGURED", "MOCK_ONLY", "ACTIVE", "INVALID", "DISABLED", "DELETED"],
     })
       .notNull()
       .default("NOT_CONFIGURED"),
     lastTestStatus: text("last_test_status", {
-      enum: ["NOT_TESTED", "MOCK_NOT_EXECUTED"],
+      enum: ["NOT_TESTED", "MOCK_NOT_EXECUTED", "PASSED", "FAILED"],
     })
       .notNull()
       .default("NOT_TESTED"),
@@ -151,6 +151,29 @@ export const credentialMetadata = sqliteTable(
       table.ownerUserId,
       table.providerId,
     ),
+  ],
+);
+
+export const credentialSecrets = sqliteTable(
+  "credential_secrets",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    credentialMetadataId: text("credential_metadata_id")
+      .notNull()
+      .references(() => credentialMetadata.id, { onDelete: "cascade" }),
+    ciphertext: text("ciphertext").notNull(),
+    initializationVector: text("initialization_vector").notNull(),
+    keyVersion: text("key_version").notNull(),
+    algorithm: text("algorithm").notNull().default("AES-GCM-256"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    rotatedAt: text("rotated_at"),
+  },
+  (table) => [
+    uniqueIndex("credential_secrets_metadata_uq").on(table.credentialMetadataId),
+    index("credential_secrets_owner_idx").on(table.ownerUserId),
   ],
 );
 
