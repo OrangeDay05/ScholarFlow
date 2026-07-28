@@ -50,6 +50,17 @@
 - 风险：OCR/复杂布局准确率、文件炸弹、对象存储配置。
 - 停止条件：供应商或存储未确定、解析破坏原文件。
 
+拆分执行：
+
+- M5-B2A（DONE）：Storage Adapter、本地持久化 R2、上传安全、0006 对象记录、Session 隔离、补偿与最小 UI；文件只到 `AWAITING_PARSE`。
+- M5-B2B（PENDING）：TXT、CSV、BibTeX、RIS 解析版本与来源位置。
+- M5-B2C（PENDING）：DOCX 与文本型 PDF；扫描 PDF/OCR 明确不冒充支持。
+- M5-B2D（PENDING）：XLSX 结构与图片资产登记，不执行公式、宏或复杂图像理解。
+- M5-B2E（PENDING）：ParseRun、Chunk、来源定位和项目知识库检索。
+- M5-B2F（PENDING）：权限、隔离、失败恢复、孤立对象维护与完整回归。
+
+M5-B1 follow-up：M5-FU-01 必须在 B4 Runner 前解决；M5-FU-02 必须在 B3 Provider Adapter 前解决。B2A 只登记，未扩大实现范围。
+
 ### M5-B3：加密凭据与 Provider Adapter
 
 - 目标：平台凭据、用户 Key 服务端加密、连接测试、OpenAI 主模型和 DeepSeek 备用 Adapter。

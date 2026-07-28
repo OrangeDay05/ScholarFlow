@@ -10,5 +10,12 @@
       "database_id": "00000000-0000-4000-8000-000000000000",
       "migrations_dir": "drizzle"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "MATERIALS",
+      "bucket_name": "scholarflow-materials-local",
+      "remote": false
+    }
   ]
 }

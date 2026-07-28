@@ -1,5 +1,14 @@
 # 变更日志
 
+## 2026-07-28 · M5-B2A Storage Adapter 与上传安全基础
+
+- 新增与业务解耦的 `StorageAdapter`、内存实现和本地 Miniflare R2 实现；本地对象存储只在显式开发开关下启用，不创建远程 Bucket，也不暴露 `.wrangler` 路径。
+- 新增 25 MB 硬限制、文件名/扩展名/MIME/Magic Bytes 联合探测，支持 PDF、DOCX、TXT、CSV、XLSX、JPG/JPEG、PNG、BibTeX、RIS，拒绝旧 DOC/XLS、路径穿越和可执行文件。
+- 新增 0006 增量迁移，记录不可覆盖的 `material_objects` 与 `material_storage_events`；上传以 `PENDING_UPLOAD → STORED` 和材料 `AWAITING_PARSE` 收尾。
+- 上传 API 使用真实 Session 和 owner-scoped 项目校验；对象键仅由服务端 ID 组成，跨用户返回 404，幂等请求不重复创建成功对象，最终数据库失败会删除刚写入对象或保留补偿记录。
+- 现有上传创建页接入真实上传、取消、失败和等待解析状态；不展示解析进度，也不声称进入知识库。
+- 登记 M5-FU-01 与 M5-FU-02；本批未实现 Parser、真实模型、真实 Key、自动脱敏、PPTX 或部署。
+
 ## 2026-07-28 · M5-B1 真实执行共享契约
 
 - 用户批准进入 M5；建立 `m5/real-services-foundation` 分支并冻结 B1—B7 小批次、依赖和停止条件。

@@ -578,7 +578,17 @@ export const materials = sqliteTable(
     sizeBytes: integer("size_bytes").notNull().default(0),
     objectKey: text("object_key"),
     status: text("status", {
-      enum: ["queued", "parsing", "success", "failed", "cancelled"],
+      enum: [
+        "queued",
+        "uploaded",
+        "stored",
+        "awaiting_parse",
+        "parsing",
+        "success",
+        "failed",
+        "cancelled",
+        "soft_deleted",
+      ],
     })
       .notNull()
       .default("queued"),
@@ -589,6 +599,110 @@ export const materials = sqliteTable(
   (table) => [
     index("materials_owner_project_idx").on(table.ownerUserId, table.projectId),
     index("materials_project_status_idx").on(table.projectId, table.status),
+  ],
+);
+
+export const materialObjects = sqliteTable(
+  "material_objects",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id, { onDelete: "restrict" }),
+    objectKey: text("object_key").notNull(),
+    storageProvider: text("storage_provider").notNull(),
+    originalFilename: text("original_filename").notNull(),
+    normalizedFilename: text("normalized_filename").notNull(),
+    detectedExtension: text("detected_extension").notNull(),
+    clientContentType: text("client_content_type"),
+    detectedContentType: text("detected_content_type").notNull(),
+    sizeBytes: integer("size_bytes").notNull(),
+    contentHash: text("content_hash"),
+    etag: text("etag"),
+    status: text("status", {
+      enum: [
+        "PENDING_UPLOAD",
+        "STORED",
+        "UPLOAD_FAILED",
+        "QUARANTINED",
+        "SOFT_DELETED",
+      ],
+    })
+      .notNull()
+      .default("PENDING_UPLOAD"),
+    idempotencyKey: text("idempotency_key"),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    retentionStatus: text("retention_status", {
+      enum: ["ACTIVE", "RETAINED_FOR_EVIDENCE", "DELETION_PENDING"],
+    })
+      .notNull()
+      .default("ACTIVE"),
+    deletedAt: text("deleted_at"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("material_objects_object_key_uq").on(table.objectKey),
+    uniqueIndex("material_objects_owner_idempotency_uq").on(
+      table.ownerUserId,
+      table.idempotencyKey,
+    ),
+    index("material_objects_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+    ),
+    index("material_objects_material_created_idx").on(
+      table.materialId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const materialStorageEvents = sqliteTable(
+  "material_storage_events",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id, { onDelete: "restrict" }),
+    materialObjectId: text("material_object_id")
+      .notNull()
+      .references(() => materialObjects.id, { onDelete: "restrict" }),
+    eventType: text("event_type", {
+      enum: [
+        "UPLOAD_STARTED",
+        "OBJECT_STORED",
+        "UPLOAD_FAILED",
+        "COMPENSATION_SUCCEEDED",
+        "COMPENSATION_REQUIRED",
+        "SOFT_DELETED",
+      ],
+    }).notNull(),
+    detailJson: text("detail_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("material_storage_events_owner_project_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.createdAt,
+    ),
+    index("material_storage_events_object_idx").on(
+      table.materialObjectId,
+      table.createdAt,
+    ),
   ],
 );
 

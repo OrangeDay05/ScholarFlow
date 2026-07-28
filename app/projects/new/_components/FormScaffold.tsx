@@ -16,6 +16,7 @@ type FormScaffoldProps = {
   noteTitle: string;
   note: string;
   step: 1 | 2 | 3;
+  realUpload?: boolean;
   children: React.ReactNode;
 };
 
@@ -63,6 +64,7 @@ export function FormScaffold({
   noteTitle,
   note,
   step,
+  realUpload = false,
   children,
 }: FormScaffoldProps) {
   return (
@@ -80,7 +82,9 @@ export function FormScaffold({
       <div className={styles.mockNotice}>
         <MockBadge />
         <span>
-          {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
+          {realUpload
+            ? "原文件将真实保存到本地开发对象存储，但本批次不会解析正文；其余诊断交互仍保留 Mock 边界。"
+            : PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
             ? "本页是 M3 增量前端 Mock。只需提供当前知道的部分，文件不会真实上传或解析。"
             : "本页是 M2 前端演示流程。文件不会上传或解析，项目不会写入数据库。"}
         </span>
@@ -94,7 +98,9 @@ export function FormScaffold({
           return (
             <div className={`${styles.step} ${state}`} key={item.index}>
               <span>{itemStep < step ? "✓" : item.index}</span>
-              <strong>{item.label}</strong>
+              <strong>
+                {realUpload && item.index === "02" ? "核对上传状态" : item.label}
+              </strong>
             </div>
           );
         })}
@@ -355,16 +361,20 @@ export function CreationReview({
   pathLabel,
   title,
   materialSummary,
+  persisted = false,
 }: {
   pathLabel: string;
   title: string;
   materialSummary: string;
+  persisted?: boolean;
 }) {
   return (
     <section className={styles.reviewPanel}>
       <div className={styles.reviewStamp}>确认</div>
       <div>
-        <span className={styles.reviewKicker}>创建前最后核对 · Mock</span>
+        <span className={styles.reviewKicker}>
+          {persisted ? "创建前最后核对 · 原文件已存储" : "创建前最后核对 · Mock"}
+        </span>
         <h2>{title || "未命名论文项目"}</h2>
         <dl>
           <div>
@@ -381,7 +391,11 @@ export function CreationReview({
           </div>
           <div>
             <dt>数据范围</dt>
-            <dd>仅保存在当前页面内存；刷新后恢复演示数据</dd>
+            <dd>
+              {persisted
+                ? "原文件已保存到本地开发对象存储，正文尚未解析"
+                : "仅保存在当前页面内存；刷新后恢复演示数据"}
+            </dd>
           </div>
         </dl>
         <p className={styles.reviewWarning}>

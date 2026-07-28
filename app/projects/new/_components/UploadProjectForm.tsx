@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useMockWorkspace } from "@/app/lib/MockWorkspaceContext";
 import {
@@ -9,11 +9,20 @@ import {
   FormActions,
   FormScaffold,
   FormSection,
-  UploadQueue,
   formStyles,
 } from "./FormScaffold";
 
 type UploadKind = "draft" | "requirements" | "literature" | "data";
+
+type UploadState = "idle" | "uploading" | "stored" | "failed" | "cancelled";
+
+type StoredMaterial = {
+  originalFilename: string;
+  detectedContentType: string;
+  sizeBytes: number;
+  objectStatus: string;
+  materialStatus: string;
+};
 
 const copy = {
   draft: {
@@ -64,7 +73,7 @@ const copy = {
     note: "M2 不分析任何真实数据。后续也只在明确范围内读取材料，不会自动运行文件中的宏、脚本或外部代码。",
     pathLabel: "上传数据与研究材料",
     uploadTitle: "加入数据或研究材料",
-    uploadHint: "支持 XLSX、XLS、CSV、TXT、JPG、JPEG、PNG",
+    uploadHint: "支持 XLSX、CSV、TXT、JPG、JPEG、PNG",
     fileId: "data",
     defaultTitle: "远程协作访谈研究",
   },
@@ -86,44 +95,100 @@ const copy = {
 
 export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }) {
   const router = useRouter();
-  const {
-    files,
-    draftSaved,
-    saveCreationDraft,
-    setFileStatus,
-    retryFile,
-  } = useMockWorkspace();
+  const { draftSaved, saveCreationDraft } = useMockWorkspace();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [projectTitle, setProjectTitle] = useState(copy[kind].defaultTitle);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadState, setUploadState] = useState<UploadState>("idle");
+  const [uploadError, setUploadError] = useState("");
+  const [storedMaterial, setStoredMaterial] = useState<StoredMaterial | null>(null);
+  const [projectId, setProjectId] = useState<string | null>(null);
+  const abortController = useRef<AbortController | null>(null);
   const page = copy[kind];
-
-  const selectedFiles = useMemo(
-    () => files.filter((file) => file.id === page.fileId),
-    [files, page.fileId],
-  );
-  const blockingFiles = selectedFiles.filter((file) =>
-    ["queued", "parsing", "failed"].includes(file.status),
-  );
-  const successfulFiles = selectedFiles.filter((file) => file.status === "success");
-  const cancelledFiles = selectedFiles.filter((file) => file.status === "cancelled");
   const materialSummary =
-    successfulFiles.length > 0
-      ? `${successfulFiles.length} 个材料已就绪 · Mock`
-      : cancelledFiles.length > 0
+    uploadState === "stored"
+      ? "1 个原始材料已安全存储 · 等待解析"
+      : uploadState === "cancelled"
         ? "材料已取消，可先创建项目后再补充"
-        : "仍有材料等待处理";
+        : "尚未完成材料上传";
 
   function goBack() {
     setStep((current) => (current === 3 ? 2 : 1));
   }
 
   function goNext() {
-    setStep((current) => (current === 1 ? 2 : 3));
+    if (step === 1) {
+      setStep(2);
+      if (selectedFile) void uploadSelectedFile();
+      return;
+    }
+    setStep(3);
   }
 
   function createProject() {
-    if (blockingFiles.length === 0) {
-      router.push("/projects/demo/diagnosis");
+    if (uploadState !== "uploading") {
+      router.push(`/projects/${projectId ?? "demo"}/diagnosis`);
+    }
+  }
+
+  async function ensureProject(signal: AbortSignal): Promise<string> {
+    if (projectId) return projectId;
+    const response = await fetch("/api/m4/projects", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Idempotency-Key": `upload-project:${crypto.randomUUID()}`,
+      },
+      body: JSON.stringify({
+        primaryCreationMethod: creationMethod(kind),
+        goal: projectTitle.trim() || page.defaultTitle,
+        materialsSummary: "用户选择了需要安全保存的本机材料。",
+        firstAiHelp: "先保存原始材料，稍后通过诊断卡确认下一步。",
+      }),
+      signal,
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(apiMessage(payload, "无法创建项目草稿。"));
+    const id = payload?.data?.project?.id;
+    if (typeof id !== "string") throw new Error("项目接口没有返回有效 ID。");
+    setProjectId(id);
+    return id;
+  }
+
+  async function uploadSelectedFile() {
+    if (!selectedFile || uploadState === "uploading") return;
+    const controller = new AbortController();
+    abortController.current = controller;
+    setUploadState("uploading");
+    setUploadError("");
+    try {
+      const targetProjectId = await ensureProject(controller.signal);
+      const form = new FormData();
+      form.set("file", selectedFile);
+      form.set("kind", materialKind(kind, selectedFile.name));
+      const response = await fetch(
+        `/api/m5/projects/${targetProjectId}/materials`,
+        {
+          method: "POST",
+          headers: { "Idempotency-Key": `upload:${crypto.randomUUID()}` },
+          body: form,
+          signal: controller.signal,
+        },
+      );
+      const payload = await response.json();
+      if (!response.ok) throw new Error(apiMessage(payload, "文件上传失败。"));
+      setStoredMaterial(payload.data.snapshot as StoredMaterial);
+      setUploadState("stored");
+    } catch (error) {
+      if (controller.signal.aborted) {
+        setUploadState("cancelled");
+        setUploadError("上传已取消，原文件未标记为已存储。");
+      } else {
+        setUploadState("failed");
+        setUploadError(error instanceof Error ? error.message : "文件上传失败。");
+      }
+    } finally {
+      abortController.current = null;
     }
   }
 
@@ -135,13 +200,14 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
       noteTitle={page.noteTitle}
       note={page.note}
       step={step}
+      realUpload
     >
       {step === 1 ? (
         <>
           <FormSection
             index="01"
             title={kind === "draft" ? "初稿与基础信息" : "材料用途"}
-            description="先说明这批材料的用途，再进入 Mock 处理队列。"
+            description="先说明这批材料的用途，再进入真实上传与状态核对。"
           >
             <div className={formStyles.fieldGrid}>
               <Field label="项目暂定名称 *" full>
@@ -231,24 +297,33 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
           <FormSection
             index="02"
             title={page.uploadTitle}
-            description={`${page.uploadHint} · 文件类型仅作前端演示提示`}
+            description={`${page.uploadHint} · 原文件安全存储后进入等待解析状态`}
           >
             <label className={formStyles.uploadBox}>
               <input
                 accept={
                   kind === "data"
-                    ? ".xlsx,.xls,.csv,.txt,.jpg,.jpeg,.png"
+                    ? ".xlsx,.csv,.txt,.jpg,.jpeg,.png"
                     : kind === "requirements"
                       ? ".pdf,.docx,.txt,.jpg,.jpeg,.png"
-                      : ".docx,.pdf,.txt"
+                      : kind === "literature"
+                        ? ".docx,.pdf,.txt,.bib,.bibtex,.ris"
+                        : ".docx,.pdf,.txt"
                 }
                 type="file"
+                onChange={(event) => {
+                  setSelectedFile(event.target.files?.[0] ?? null);
+                  setUploadState("idle");
+                  setUploadError("");
+                  setStoredMaterial(null);
+                }}
               />
               <div>
                 <strong>＋ 选择本机材料</strong>
                 <span>
-                  选择器只用于展示文件类型范围，不读取内容、不上传、不保存。下一步显示预置
-                  Mock 队列。
+                  {selectedFile
+                    ? `${selectedFile.name} · ${formatBytes(selectedFile.size)}`
+                    : "单个文件不超过 25 MB；旧 DOC、XLS 和可执行文件不支持。"}
                 </span>
               </div>
             </label>
@@ -259,14 +334,31 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
       {step === 2 ? (
         <FormSection
           index="02"
-          title="核对 Mock 处理队列"
-          description="你可以完成模拟解析、取消材料，或在失败后重试。"
+          title="真实上传状态"
+          description="本批次只安全保存原始对象，不读取正文，也不启动解析。"
         >
-          <UploadQueue
-            files={selectedFiles}
-            onSetStatus={setFileStatus}
-            onRetry={retryFile}
-          />
+          <div className={formStyles.warningBox} aria-live="polite">
+            <span className={formStyles.warningIcon} aria-hidden="true">
+              {uploadState === "stored" ? "✓" : uploadState === "failed" ? "!" : "↑"}
+            </span>
+            <div>
+              <strong>{uploadStatusTitle(uploadState)}</strong>
+              <span>
+                {storedMaterial
+                  ? `${storedMaterial.originalFilename} · ${formatBytes(storedMaterial.sizeBytes)} · ${storedMaterial.detectedContentType} · ${storedMaterial.objectStatus} / AWAITING_PARSE`
+                  : uploadError || selectedFile?.name || "尚未选择文件。"}
+              </span>
+            </div>
+          </div>
+          {uploadState === "uploading" ? (
+            <button type="button" onClick={() => abortController.current?.abort()}>
+              取消上传
+            </button>
+          ) : uploadState === "failed" || uploadState === "cancelled" ? (
+            <button type="button" onClick={() => void uploadSelectedFile()}>
+              重新上传
+            </button>
+          ) : null}
           <div className={kind === "draft" ? formStyles.protectionBox : formStyles.warningBox}>
             <span className={formStyles.warningIcon} aria-hidden="true">
               {kind === "draft" ? "原" : "!"}
@@ -298,13 +390,18 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
           pathLabel={page.pathLabel}
           title={projectTitle}
           materialSummary={materialSummary}
+          persisted={uploadState === "stored"}
         />
       ) : null}
 
       <FormActions
         step={step}
         draftSaved={draftSaved}
-        createDisabled={step === 3 && blockingFiles.length > 0}
+        createDisabled={
+          (step === 1 && !selectedFile) ||
+          uploadState === "uploading" ||
+          (step === 3 && uploadState !== "stored" && uploadState !== "cancelled")
+        }
         onBack={goBack}
         onNext={goNext}
         onSave={saveCreationDraft}
@@ -312,4 +409,45 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
       />
     </FormScaffold>
   );
+}
+
+function creationMethod(kind: UploadKind) {
+  return kind === "draft" ? "existing_draft" : kind;
+}
+
+function materialKind(kind: UploadKind, filename: string) {
+  if (kind === "requirements") return "requirement";
+  if (kind === "draft") return "manuscript";
+  if (kind === "literature") return "literature";
+  const extension = filename.split(".").pop()?.toLowerCase();
+  return ["jpg", "jpeg", "png"].includes(extension ?? "") ? "image" : "data";
+}
+
+function uploadStatusTitle(state: UploadState) {
+  if (state === "uploading") return "正在安全上传原始文件";
+  if (state === "stored") return "原始文件已存储，等待解析";
+  if (state === "failed") return "上传失败，未标记为已存储";
+  if (state === "cancelled") return "上传已取消";
+  return "等待开始上传";
+}
+
+function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function apiMessage(payload: unknown, fallback: string): string {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "error" in payload &&
+    payload.error &&
+    typeof payload.error === "object" &&
+    "message" in payload.error &&
+    typeof payload.error.message === "string"
+  ) {
+    return payload.error.message;
+  }
+  return fallback;
 }

@@ -221,7 +221,7 @@ export async function listM4MaterialsForActor(
     .prepare(
       `SELECT id, kind, filename, content_type, size_bytes, status, error_message
        FROM materials
-       WHERE owner_user_id = ? AND project_id = ?
+       WHERE owner_user_id = ? AND project_id = ? AND status != 'soft_deleted'
        ORDER BY created_at DESC`,
     )
     .bind(ownerUserId, project.id)

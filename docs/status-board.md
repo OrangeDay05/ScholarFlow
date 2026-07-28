@@ -5,14 +5,14 @@
 ## 当前
 
 - 当前里程碑：M5 真实文件、AI、BYOK 与任务恢复
-- 当前状态：WAITING_FOR_REVIEW（M5-B1）
+- 当前状态：WAITING_FOR_REVIEW（M5-B2A）
 - 活动工程：`site/`（唯一活动工程）
 - 当前分支：`m5/real-services-foundation`
 - M0/M1/M2/M3：已完成
 - M2 审核状态：用户已批准，作为核心写作工作台和视觉基线
 - 当前有效需求：`docs/requirements/论文AI科研全流程平台需求说明_V0.5.1_M4修订版.txt`
 - M4 起点 HEAD：`6344af03bcc8ed58e3f849c7cd92c6b7184aa509`
-- 当前批次：M5-B1 真实执行共享契约已完成，等待审核
+- 当前批次：M5-B2A Storage Adapter 与上传安全基础已完成，等待审核
 - M4 审计与批次计划：`docs/audits/m4-v051-gap-and-batches.md`
 - M5 批次计划：`docs/audits/m5-v051-batches.md`
 - 生产部署：未授权、未执行
@@ -32,7 +32,8 @@
 ## M5 批次
 
 - M5-B1：DONE — 六 Skill 输入输出、Provider Adapter、凭据解析、预算、超时和恢复契约。
-- M5-B2：PENDING — 真实文件与项目知识库。
+- M5-B2A：DONE — Storage Adapter、本地 R2、真实上传、安全探测、0006、隔离与补偿。
+- M5-B2B—B2F：PENDING — 文本/结构解析、来源定位、知识库与完整恢复回归。
 - M5-B3：PENDING — 加密凭据与 Provider Adapter。
 - M5-B4：PENDING — 任务 Runner、预算与恢复。
 - M5-B5：PENDING — 动态诊断、Idea 与合法文献发现。
@@ -49,4 +50,4 @@
 
 ## 下一步
 
-完成并审核 M5-B1 后，按依赖顺序进入真实文件或凭据批次；没有对象存储和凭据决策时不伪造真实服务。
+审核 M5-B2A 后再进入 M5-B2B；当前文件只到 `AWAITING_PARSE`，不伪装已解析或已进入知识库。
