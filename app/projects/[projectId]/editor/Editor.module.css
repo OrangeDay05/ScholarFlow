@@ -203,7 +203,7 @@
 }
 
 .workspaceWithoutLeft {
-  grid-template-columns: 0 minmax(430px, 1fr) 350px;
+  grid-template-columns: 0 minmax(430px, 1fr) clamp(350px, 32vw, 460px);
 }
 
 .workspaceWithoutRight {
@@ -2363,7 +2363,20 @@
 
 @media (max-width: 1120px) {
   .workspace {
-    grid-template-columns: 220px minmax(390px, 1fr) 300px;
+    grid-template-columns: 200px minmax(0, 1fr) 280px;
+  }
+
+  .workspace.workspaceWithoutLeft {
+    grid-template-columns: 0 minmax(0, 1fr) clamp(300px, 36vw, 380px);
+  }
+
+  .workspace.workspaceWithoutRight {
+    grid-template-columns: 200px minmax(0, 1fr) 0;
+  }
+
+  .workspace.workspaceWithoutLeft.workspaceWithoutRight,
+  .workspace.workspaceFocus {
+    grid-template-columns: 0 minmax(0, 1fr) 0;
   }
 
   .leftPanel {
