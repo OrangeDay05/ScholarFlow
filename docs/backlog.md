@@ -2,7 +2,9 @@
 
 ## READY
 
-- M5-B3B：TXT、CSV、BibTeX、RIS 解析版本与来源位置。
+- M5-B3C：DOCX 与文本型 PDF 解析、结构与页码来源位置。
+- M5-B3D：XLSX 结构解析与图片资产登记。
+- M5-B3E：项目知识库检索、解析恢复与完整隔离回归。
 - M5-B4：确认平台凭据来源和用户 Key 提交流程。
 
 ## IN_PROGRESS

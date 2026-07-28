@@ -966,6 +966,91 @@ export const materialParseResults = sqliteTable(
   ],
 );
 
+export const materialParseRuns = sqliteTable(
+  "material_parse_runs",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id, { onDelete: "cascade" }),
+    materialObjectId: text("material_object_id")
+      .notNull()
+      .references(() => materialObjects.id, { onDelete: "restrict" }),
+    parserKey: text("parser_key").notNull(),
+    parserVersion: text("parser_version").notNull(),
+    format: text("format", { enum: ["TXT", "CSV", "BIBTEX", "RIS"] }).notNull(),
+    contentHash: text("content_hash").notNull(),
+    status: text("status", {
+      enum: ["RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"],
+    })
+      .notNull()
+      .default("RUNNING"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    recordCount: integer("record_count").notNull().default(0),
+    chunkCount: integer("chunk_count").notNull().default(0),
+    errorCode: text("error_code"),
+    errorMessage: text("error_message"),
+    startedAt: text("started_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    finishedAt: text("finished_at"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("material_parse_runs_owner_project_idempotency_uq").on(
+      table.ownerUserId,
+      table.projectId,
+      table.idempotencyKey,
+    ),
+    index("material_parse_runs_material_created_idx").on(
+      table.materialId,
+      table.createdAt,
+    ),
+    index("material_parse_runs_owner_project_status_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.status,
+    ),
+  ],
+);
+
+export const materialChunks = sqliteTable(
+  "material_chunks",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    materialId: text("material_id")
+      .notNull()
+      .references(() => materials.id, { onDelete: "cascade" }),
+    parseRunId: text("parse_run_id")
+      .notNull()
+      .references(() => materialParseRuns.id, { onDelete: "cascade" }),
+    ordinal: integer("ordinal").notNull(),
+    text: text("text").notNull(),
+    locationJson: text("location_json").notNull(),
+    metadataJson: text("metadata_json").notNull().default("{}"),
+    contentHash: text("content_hash").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("material_chunks_run_ordinal_uq").on(table.parseRunId, table.ordinal),
+    index("material_chunks_owner_project_material_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.materialId,
+    ),
+  ],
+);
+
 export const materialPrivacyProfiles = sqliteTable(
   "material_privacy_profiles",
   {
