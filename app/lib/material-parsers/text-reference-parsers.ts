@@ -3,7 +3,7 @@ export const MAX_TEXT_PARSE_BYTES = 5 * 1024 * 1024;
 export const MAX_PARSE_RECORDS = 10_000;
 
 export type TextReferenceFormat = "TXT" | "CSV" | "BIBTEX" | "RIS";
-export type MaterialParseFormat = TextReferenceFormat | "DOCX" | "PDF";
+export type MaterialParseFormat = TextReferenceFormat | "DOCX" | "PDF" | "XLSX" | "IMAGE";
 
 export type MaterialChunkDraft = {
   ordinal: number;
@@ -54,7 +54,9 @@ export function formatFromExtension(extension: string): MaterialParseFormat {
   if (normalized === "ris") return "RIS";
   if (normalized === "docx") return "DOCX";
   if (normalized === "pdf") return "PDF";
-  throw new MaterialParseError("UNSUPPORTED_FORMAT", "当前仅支持 TXT、CSV、BibTeX、RIS、DOCX 和文本型 PDF。" );
+  if (normalized === "xlsx") return "XLSX";
+  if (["png", "jpg", "jpeg"].includes(normalized)) return "IMAGE";
+  throw new MaterialParseError("UNSUPPORTED_FORMAT", "当前文件格式没有可用解析器。" );
 }
 
 export function parseTextReferenceMaterial(

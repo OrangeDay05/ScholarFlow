@@ -985,7 +985,7 @@ export const materialParseRuns = sqliteTable(
     parserKey: text("parser_key").notNull(),
     parserVersion: text("parser_version").notNull(),
     format: text("format", {
-      enum: ["TXT", "CSV", "BIBTEX", "RIS", "DOCX", "PDF"],
+      enum: ["TXT", "CSV", "BIBTEX", "RIS", "DOCX", "PDF", "XLSX", "IMAGE"],
     }).notNull(),
     contentHash: text("content_hash").notNull(),
     status: text("status", {

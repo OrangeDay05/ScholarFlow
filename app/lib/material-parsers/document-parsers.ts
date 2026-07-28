@@ -84,7 +84,7 @@ function assertDocumentSize(input: Uint8Array) {
   if (input.byteLength > MAX_DOCUMENT_PARSE_BYTES) throw new DocumentParseError("DOCUMENT_TOO_LARGE", "DOCX/PDF 解析输入不得超过 15 MB。" );
 }
 
-function assertZipExpansionBounds(input: Uint8Array) {
+export function assertZipExpansionBounds(input: Uint8Array) {
   const view = new DataView(input.buffer, input.byteOffset, input.byteLength);
   let entries = 0;
   let totalCompressed = 0;

@@ -9,6 +9,10 @@ import {
   parseDocx,
   parseTextPdf,
 } from "@/app/lib/material-parsers/document-parsers";
+import {
+  parseXlsx,
+  registerImageAsset,
+} from "@/app/lib/material-parsers/spreadsheet-image-parsers";
 import type { StorageAdapter } from "@/app/lib/storage/storage-adapter";
 import { getD1 } from "../index";
 
@@ -105,7 +109,11 @@ export async function parseM5MaterialForActor(
     catch { throw new M5MaterialParseRepositoryError("UNSUPPORTED_FORMAT", "当前批次仅支持 TXT、CSV、BibTeX 和 RIS。" ); }
   })();
   const runId = crypto.randomUUID();
-  const parserKey = format === "PDF" ? "unpdf-text" : `builtin-${format.toLowerCase()}`;
+  const parserKey = format === "PDF"
+    ? "unpdf-text"
+    : format === "IMAGE"
+      ? "builtin-image-asset"
+      : `builtin-${format.toLowerCase()}`;
   const parserVersion = "1.0.0";
   try {
     await db.batch([
@@ -133,7 +141,11 @@ export async function parseM5MaterialForActor(
       ? parseDocx(body)
       : format === "PDF"
         ? await parseTextPdf(body)
-        : parseTextReferenceMaterial(body, format);
+        : format === "XLSX"
+          ? parseXlsx(body)
+          : format === "IMAGE"
+            ? registerImageAsset(body, source.detected_extension)
+            : parseTextReferenceMaterial(body, format);
     const chunkStatements: D1PreparedStatement[] = [];
     for (const chunk of parsed.chunks) {
       chunkStatements.push(db.prepare(`INSERT INTO material_chunks (
