@@ -4,16 +4,17 @@
 
 ## 当前
 
-- 当前里程碑：M4 业务持久化与安全契约
-- 当前状态：WAITING_FOR_REVIEW（M4_PASS）
+- 当前里程碑：M5 真实文件、AI、BYOK 与任务恢复
+- 当前状态：WAITING_FOR_REVIEW（M5-B1）
 - 活动工程：`site/`（唯一活动工程）
-- 当前分支：`m4/progressive-diagnosis-persistence`
+- 当前分支：`m5/real-services-foundation`
 - M0/M1/M2/M3：已完成
 - M2 审核状态：用户已批准，作为核心写作工作台和视觉基线
 - 当前有效需求：`docs/requirements/论文AI科研全流程平台需求说明_V0.5.1_M4修订版.txt`
 - M4 起点 HEAD：`6344af03bcc8ed58e3f849c7cd92c6b7184aa509`
-- 当前批次：M4-H2 已完成；CORE-01 真实认证已实现，等待用户审核
+- 当前批次：M5-B1 真实执行共享契约已完成，等待审核
 - M4 审计与批次计划：`docs/audits/m4-v051-gap-and-batches.md`
+- M5 批次计划：`docs/audits/m5-v051-batches.md`
 - 生产部署：未授权、未执行
 
 ## M4 批次
@@ -28,14 +29,24 @@
 - M4-H1：DONE — 按方案 A 完整归档旧本地 D1，创建新持久化 D1，验证 0000→0004、58 表、5 条台账、运行时连接、重启持久化和权限隔离。
 - M4-H2：DONE — 真实邮箱/手机号注册、密码哈希、登录、服务器端 Session、退出撤销、游客拦截和基于 Session 的项目所有者隔离；增量迁移 0005 已应用。
 
+## M5 批次
+
+- M5-B1：DONE — 六 Skill 输入输出、Provider Adapter、凭据解析、预算、超时和恢复契约。
+- M5-B2：PENDING — 真实文件与项目知识库。
+- M5-B3：PENDING — 加密凭据与 Provider Adapter。
+- M5-B4：PENDING — 任务 Runner、预算与恢复。
+- M5-B5：PENDING — 动态诊断、Idea 与合法文献发现。
+- M5-B6：PENDING — 六 Skill、多模型与隐私外传。
+- M5-B7：PENDING — 全量 QA 与审核门。
+
 ## 阶段边界
 
-- 允许 M4 所需的增量 Schema、Repository、API、可回滚迁移和测试。
-- 不收集或保存真实 API Key；只实现凭据元数据和服务端密文存储抽象。
-- 不接入真实模型、供应商、动态追问、真实自动脱敏或新增 Skill。
-- 不生成真实 PPTX，不创建生产密钥，不部署。
+- 允许 M5 所需的真实文件解析、服务端密钥加密、Provider/Skill Adapter、任务执行恢复、预算和失败降级。
+- 真实 Key 只能在用户明确提交后由服务端加密，不得进入前端持久状态、日志、错误或普通字段。
+- 无凭据时不得发起供应商调用或伪装成功；所有外传必须通过材料授权、隐私模式和处理副本门。
+- 不进入 M6 的正式 Evidence/DOCX，不生成真实 PPTX，不部署。
 - 不重做已完成的 M2/M3 前端；关闭新增开关后保留完整 M2 体验。
 
 ## 下一步
 
-审核 `docs/reviews/M4/review.md`。I-015 与 CORE-01 均已解除，M4 功能与本地数据库基线结论为 `M4_PASS`；当前仍停在 M4 审核门，用户明确批准前不进入 M5。
+完成并审核 M5-B1 后，按依赖顺序进入真实文件或凭据批次；没有对象存储和凭据决策时不伪造真实服务。
