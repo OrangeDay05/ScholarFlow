@@ -1,5 +1,12 @@
 # 变更日志
 
+## 2026-07-28 · M5-B2A 对话优先 AI 工作台与 Conversation Agent 基础
+
+- 按用户确认的新路线将已完成的 Storage Adapter 与上传安全基础重分类为 M5-B3A，代码和原提交不重做。
+- AI 工作台新增“对话 Agent / Skill 任务”顶层双页签；原六个产品 Skill、材料授权、证据、复核和任务记录完整保留。
+- 新增六 Skill 默认 Prompt、ToolIntent、有限会话摘要、Action Proposal 和显式用户确认状态；确认只记录决定，不执行真实任务。
+- 当前未新增 Schema/migration、会话持久化、真实 Provider/Key、文件解析、真实模型调用、DOCX 或部署。
+
 ## 2026-07-28 · M5-B2A Storage Adapter 与上传安全基础
 
 - 新增与业务解耦的 `StorageAdapter`、内存实现和本地 Miniflare R2 实现；本地对象存储只在显式开发开关下启用，不创建远程 Bucket，也不暴露 `.wrangler` 路径。

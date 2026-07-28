@@ -2,12 +2,13 @@
 
 ## READY
 
-- M5-B2B：TXT、CSV、BibTeX、RIS 解析版本与来源位置。
-- M5-B3：确认平台凭据来源和用户 Key 提交流程。
+- M5-B2B：长期会话、消息与摘要 Repository/API 持久化和所有者隔离。
+- M5-B3B：TXT、CSV、BibTeX、RIS 解析版本与来源位置。
+- M5-B4：确认平台凭据来源和用户 Key 提交流程。
 
 ## IN_PROGRESS
 
-- 无。M5-B2A 已完成并停在小批次审核点。
+- 无。Conversation Agent M5-B2A 已完成并停在小批次审核点。
 
 ## DONE
 
@@ -21,7 +22,8 @@
 - M4-B1—B7：V0.5.1 基线、五起点、渐进式诊断、任务/审阅、隐私保真、PPT、模型/BYOK 元数据、隔离测试与审核包。
 - M4-H1/H2：本地 D1 基线与 CORE-01 真实认证。
 - M5-B1：六 Skill 统一上下文/结果、Provider Adapter、凭据解析、预算、超时和任务恢复边界。
-- M5-B2A：Storage Adapter、本地 Miniflare R2、真实上传、安全文件探测、不可覆盖对象记录、0006、隔离与失败补偿。
+- M5-B2A：双页签、Conversation Agent 前端基础、六 Skill 默认 Prompt、ToolIntent、摘要、Action Proposal 和用户确认门。
+- M5-B3A：Storage Adapter、本地 Miniflare R2、真实上传、安全文件探测、不可覆盖对象记录、0006、隔离与失败补偿。
 
 ## M6 以后
 

@@ -19,6 +19,17 @@ import { MODEL_ORCHESTRATION_MOCK_ENABLED } from "@/app/lib/model-orchestration-
 import { strictAssignment } from "@/app/lib/model-orchestration-mock";
 import { productSkills } from "@/app/lib/m1-mock";
 import {
+  createActionProposal,
+  createToolIntent,
+  decideActionProposal,
+  M5_CONVERSATION_SKILL_PROMPTS,
+  summarizeConversation,
+  type M5ActionProposal,
+  type M5ConversationMessage,
+  type M5ConversationSummary,
+  type M5ToolIntent,
+} from "@/app/lib/m5-conversation-agent";
+import {
   type TaskStatus,
   useMockWorkspace,
 } from "@/app/lib/MockWorkspaceContext";
@@ -32,6 +43,7 @@ type EditorClientProps = {
 
 type VisibleTaskStatus = TaskStatus | "queued";
 type AssistantTab = "materials" | "evidence" | "review" | "tasks";
+type WorkspaceMode = "conversation" | "skills";
 
 const sectionCopy: Record<
   string,
@@ -286,7 +298,27 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [compareIds, setCompareIds] = useState<string[]>(["v3", "v2"]);
   const [notice, setNotice] = useState("");
+  const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("conversation");
   const [assistantTab, setAssistantTab] = useState<AssistantTab>("materials");
+  const [conversationPromptId, setConversationPromptId] = useState<string>(
+    M5_CONVERSATION_SKILL_PROMPTS[0].uiSkillId,
+  );
+  const [conversationDraft, setConversationDraft] = useState("");
+  const [conversationMessages, setConversationMessages] = useState<
+    M5ConversationMessage[]
+  >([
+    {
+      id: "message-agent-welcome",
+      role: "AGENT",
+      content: "告诉我你现在想推进什么。我会先梳理意图并提出操作建议，未经确认不会执行。",
+      createdAt: "2026-07-28T00:00:00.000Z",
+    },
+  ]);
+  const [conversationSummary, setConversationSummary] =
+    useState<M5ConversationSummary | null>(null);
+  const [toolIntent, setToolIntent] = useState<M5ToolIntent | null>(null);
+  const [actionProposal, setActionProposal] =
+    useState<M5ActionProposal | null>(null);
   const [activeEvidenceId, setActiveEvidenceId] = useState<string | null>(null);
   const [leftCollapsed, setLeftCollapsed] = useState(false);
   const [rightCollapsed, setRightCollapsed] = useState(false);
@@ -325,7 +357,14 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     [selectedSkillId],
   );
   const selectedSection =
-    outline.find((section) => section.id === selectedSectionId) ?? outline[1];
+    outline.find((section) => section.id === selectedSectionId) ??
+    outline[1] ?? {
+      id: selectedSectionId || "introduction",
+      index: "--",
+      title: "正在读取章节",
+      status: "未开始" as const,
+      words: 0,
+    };
   const leftHidden = focusMode || leftCollapsed;
   const rightHidden = focusMode || rightCollapsed;
   const isReportOnly = selectedSkillId === "consistency" || selectedSkillId === "evidence";
@@ -441,6 +480,10 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     selected_for_revision: `已选择 ${selectedReviewIssueIds.length} 条问题修订`,
     ignored: "已忽略问题并记录理由",
   };
+  const selectedConversationPrompt =
+    M5_CONVERSATION_SKILL_PROMPTS.find(
+      (prompt) => prompt.uiSkillId === conversationPromptId,
+    ) ?? M5_CONVERSATION_SKILL_PROMPTS[0];
 
   useEffect(() => {
     if (initialSectionHandledRef.current) return;
@@ -816,6 +859,197 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     );
   }
 
+  function prepareConversationProposal() {
+    const content = conversationDraft.trim();
+    if (!content) return;
+    const now = new Date().toISOString();
+    const userMessage: M5ConversationMessage = {
+      id: `message-user-${now}`,
+      role: "USER",
+      content,
+      createdAt: now,
+    };
+    const agentMessage: M5ConversationMessage = {
+      id: `message-agent-${now}`,
+      role: "AGENT",
+      content: `我理解你希望使用“${selectedConversationPrompt.title}”。我已整理为 ToolIntent；请先核对操作范围，再决定是否确认。`,
+      createdAt: now,
+    };
+    const nextMessages = [...conversationMessages, userMessage, agentMessage];
+    const nextIntent = createToolIntent({
+      conversationId: `conversation-${projectId}`,
+      productSkill: selectedConversationPrompt.productSkill,
+      operation: content,
+      rationale: `根据用户本轮表达，建议交由“${selectedConversationPrompt.title}”处理。`,
+      authorizedMaterialIds: readableSelectedMaterials.map((material) => material.id),
+      now,
+    });
+    setSelectedSkillId(selectedConversationPrompt.uiSkillId);
+    setConversationMessages(nextMessages);
+    setConversationSummary(summarizeConversation(nextMessages, now));
+    setToolIntent(nextIntent);
+    setActionProposal(
+      createActionProposal(nextIntent, `准备${selectedConversationPrompt.title}任务`),
+    );
+    setConversationDraft("");
+  }
+
+  function resetConversation() {
+    setConversationMessages([
+      {
+        id: "message-agent-welcome",
+        role: "AGENT",
+        content: "告诉我你现在想推进什么。我会先梳理意图并提出操作建议，未经确认不会执行。",
+        createdAt: "2026-07-28T00:00:00.000Z",
+      },
+    ]);
+    setConversationSummary(null);
+    setToolIntent(null);
+    setActionProposal(null);
+    setConversationDraft("");
+  }
+
+  function renderConversationPanel() {
+    return (
+      <section className={styles.conversationAgent} aria-label="Conversation Agent">
+        <div className={styles.conversationHeader}>
+          <div>
+            <strong>Conversation Agent</strong>
+            <span>长期会话基础 · 当前仅生成意图与提案</span>
+          </div>
+          <button onClick={resetConversation} type="button">
+            新会话
+          </button>
+        </div>
+
+        <div className={styles.conversationMessages} aria-live="polite">
+          {conversationMessages.map((message) => (
+            <article
+              className={
+                message.role === "USER"
+                  ? styles.conversationMessageUser
+                  : styles.conversationMessageAgent
+              }
+              key={message.id}
+            >
+              <span>{message.role === "USER" ? "你" : "AI"}</span>
+              <p>{message.content}</p>
+            </article>
+          ))}
+        </div>
+
+        <div className={styles.promptPicker}>
+          <div className={styles.sectionLabel}>
+            <span>六个 Skill 默认 Prompt</span>
+            <span>选择一个起点</span>
+          </div>
+          <div>
+            {M5_CONVERSATION_SKILL_PROMPTS.map((prompt) => (
+              <button
+                aria-pressed={conversationPromptId === prompt.uiSkillId}
+                key={prompt.uiSkillId}
+                onClick={() => {
+                  setConversationPromptId(prompt.uiSkillId);
+                  setConversationDraft(prompt.prompt);
+                }}
+                type="button"
+              >
+                {prompt.title}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className={styles.conversationComposer}>
+          <label htmlFor="conversation-agent-input">告诉 AI 你想推进什么</label>
+          <textarea
+            id="conversation-agent-input"
+            onChange={(event) => setConversationDraft(event.target.value)}
+            placeholder={selectedConversationPrompt.prompt}
+            rows={3}
+            value={conversationDraft}
+          />
+          <button
+            disabled={!conversationDraft.trim()}
+            onClick={prepareConversationProposal}
+            type="button"
+          >
+            整理为操作提案
+          </button>
+        </div>
+
+        {conversationSummary ? (
+          <details className={styles.conversationSummary}>
+            <summary>长期会话摘要</summary>
+            <p>{conversationSummary.text}</p>
+            <small>系统派生摘要，尚未作为用户确认事实。</small>
+          </details>
+        ) : null}
+
+        {toolIntent && actionProposal ? (
+          <article className={styles.actionProposal} data-action-proposal>
+            <div className={styles.sectionLabel}>
+              <span>Action Proposal</span>
+              <span>{actionProposal.status}</span>
+            </div>
+            <strong>{actionProposal.title}</strong>
+            <dl>
+              <div>
+                <dt>ToolIntent</dt>
+                <dd>{toolIntent.productSkill}</dd>
+              </div>
+              <div>
+                <dt>拟执行</dt>
+                <dd>{toolIntent.operation}</dd>
+              </div>
+              <div>
+                <dt>允许材料</dt>
+                <dd>{toolIntent.authorizedMaterialIds.length} 份</dd>
+              </div>
+            </dl>
+            <p>{actionProposal.effect}</p>
+            {actionProposal.warnings.map((warning) => (
+              <small className={styles.proposalWarning} key={warning}>
+                {warning}
+              </small>
+            ))}
+            {actionProposal.status === "AWAITING_USER_CONFIRMATION" ? (
+              <div className={styles.proposalActions}>
+                <button
+                  onClick={() => {
+                    setActionProposal(
+                      decideActionProposal(actionProposal, "CONFIRM", new Date().toISOString()),
+                    );
+                    setNotice("操作提案已确认；等待后续任务执行器，本批次未调用真实模型。");
+                  }}
+                  type="button"
+                >
+                  确认提案
+                </button>
+                <button
+                  onClick={() =>
+                    setActionProposal(
+                      decideActionProposal(actionProposal, "REJECT", new Date().toISOString()),
+                    )
+                  }
+                  type="button"
+                >
+                  暂不执行
+                </button>
+              </div>
+            ) : (
+              <p className={styles.proposalDecision}>
+                {actionProposal.status === "CONFIRMED"
+                  ? "已由用户确认；尚未执行真实任务。"
+                  : "用户已拒绝，本提案不会执行。"}
+              </p>
+            )}
+          </article>
+        ) : null}
+      </section>
+    );
+  }
+
   function renderAssistantPanel() {
     const canCancel = visibleTaskStatus === "queued" || visibleTaskStatus === "running";
     const taskFailed = visibleTaskStatus === "failed";
@@ -837,6 +1071,30 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           </div>
           <span className={styles.mockLabel}>MOCK</span>
         </div>
+
+        <div className={styles.workspaceModeTabs} role="tablist" aria-label="AI 工作台模式">
+          <button
+            aria-selected={workspaceMode === "conversation"}
+            className={workspaceMode === "conversation" ? styles.workspaceModeActive : ""}
+            onClick={() => setWorkspaceMode("conversation")}
+            role="tab"
+            type="button"
+          >
+            对话 Agent
+          </button>
+          <button
+            aria-selected={workspaceMode === "skills"}
+            className={workspaceMode === "skills" ? styles.workspaceModeActive : ""}
+            onClick={() => setWorkspaceMode("skills")}
+            role="tab"
+            type="button"
+          >
+            Skill 任务
+          </button>
+        </div>
+
+        {workspaceMode === "skills" ? (
+        <>
 
         <div className={styles.assistantIntro}>
           <strong>你想让 AI 完成什么？</strong>
@@ -1484,8 +1742,11 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             </article>
           </section>
         ) : null}
+        </>
+        ) : renderConversationPanel()}
         </div>
 
+        {workspaceMode === "skills" ? (
         <div className={styles.taskDock}>
         {dualReviewApplies ? (
         <section
@@ -1602,6 +1863,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
         </section>
         )}
         </div>
+        ) : null}
       </div>
     );
   }
