@@ -523,20 +523,15 @@
 
 .preflightGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  border: 1px solid var(--line);
-  background: var(--paper-strong);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  border-top: 1px solid var(--line);
 }
 
 .preflightGrid article {
-  min-height: 135px;
-  padding: 17px;
-  border-right: 1px solid var(--line);
+  min-height: 0;
+  padding: 11px 0 10px;
   border-bottom: 1px solid var(--line);
-}
-
-.preflightGrid article:nth-child(4n) {
-  border-right: 0;
 }
 
 .preflightGrid span,
@@ -554,17 +549,17 @@
 }
 
 .preflightGrid strong {
-  margin-top: 14px;
+  margin-top: 5px;
   color: var(--forest);
   font-size: 10px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .preflightGrid small {
-  margin-top: 8px;
+  margin-top: 3px;
   color: var(--muted);
   font-size: 7px;
-  line-height: 1.55;
+  line-height: 1.4;
 }
 
 .stopConditions {
@@ -680,15 +675,15 @@
 
 .failureGrid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 9px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 28px;
+  border-top: 1px solid var(--line);
 }
 
 .failureGrid article {
-  min-height: 175px;
-  padding: 16px;
-  border: 1px solid var(--line);
-  background: var(--paper-strong);
+  min-height: 0;
+  padding: 11px 0 10px;
+  border-bottom: 1px solid var(--line);
 }
 
 .failureGrid code,
@@ -704,22 +699,22 @@
 }
 
 .failureGrid strong {
-  margin-top: 13px;
+  margin-top: 4px;
   font-size: 10px;
 }
 
 .failureGrid p {
-  margin: 10px 0 0;
+  margin: 5px 0 0;
   color: var(--muted-strong);
   font-size: 8px;
-  line-height: 1.55;
+  line-height: 1.4;
 }
 
 .failureGrid small {
-  margin-top: 8px;
+  margin-top: 3px;
   color: var(--muted);
   font-size: 7px;
-  line-height: 1.5;
+  line-height: 1.4;
 }
 
 .rulesPanel {
@@ -770,14 +765,6 @@
   .failureGrid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-
-  .preflightGrid article:nth-child(4n) {
-    border-right: 1px solid var(--line);
-  }
-
-  .preflightGrid article:nth-child(2n) {
-    border-right: 0;
-  }
 }
 
 @media (max-width: 680px) {
@@ -800,12 +787,6 @@
 
   .sectionHeading > p {
     text-align: left;
-  }
-
-  .preflightGrid article,
-  .preflightGrid article:nth-child(4n),
-  .preflightGrid article:nth-child(2n) {
-    border-right: 0;
   }
 
   .keyActions {
