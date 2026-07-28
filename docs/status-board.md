@@ -5,14 +5,14 @@
 ## 当前
 
 - 当前里程碑：M5 真实文件、AI、BYOK 与任务恢复
-- 当前状态：WAITING_FOR_REVIEW（M5-B2A Conversation Agent 基础）
+- 当前状态：WAITING_FOR_REVIEW（M5-B2B 长期会话持久化）
 - 活动工程：`site/`（唯一活动工程）
 - 当前分支：`m5/real-services-foundation`
 - M0/M1/M2/M3：已完成
 - M2 审核状态：用户已批准，作为核心写作工作台和视觉基线
 - 当前有效需求：`docs/requirements/论文AI科研全流程平台需求说明_V0.5.1_M4修订版.txt`
 - M4 起点 HEAD：`6344af03bcc8ed58e3f849c7cd92c6b7184aa509`
-- 当前批次：M5-B2A 对话优先 AI 工作台与 Conversation Agent 基础已完成，等待审核
+- 当前批次：M5-B2B 长期会话、消息与派生摘要持久化已完成，等待审核
 - M4 审计与批次计划：`docs/audits/m4-v051-gap-and-batches.md`
 - M5 批次计划：`docs/audits/m5-v051-batches.md`
 - 生产部署：未授权、未执行
@@ -33,7 +33,8 @@
 
 - M5-B1：DONE — 六 Skill 输入输出、Provider Adapter、凭据解析、预算、超时和恢复契约。
 - M5-B2A：DONE — 双页签、Conversation Agent、六 Skill 默认 Prompt、ToolIntent、摘要、Action Proposal 与用户确认门。
-- M5-B2B—B2D：PENDING — 会话/摘要/提案持久化、所有者隔离、压缩与恢复回归。
+- M5-B2B：DONE — 会话、消息与派生摘要 Repository/API、幂等、归档和所有者隔离；0007 仅生成未执行。
+- M5-B2C—B2D：PENDING — Action Proposal/用户决定持久化、会话压缩与恢复回归。
 - M5-B3A：DONE — Storage Adapter、本地 R2、真实上传、安全探测、0006、隔离与补偿。
 - M5-B3B 以后：PENDING — 文本/结构解析、来源定位、项目知识库与恢复回归。
 - M5-B4：PENDING — 真实 Provider、凭据与六 Skill Adapter。
@@ -49,4 +50,4 @@
 
 ## 下一步
 
-审核 M5-B2A 后再进入会话持久化小批次；当前 Action Proposal 只确认、不执行，文件仍只到 `AWAITING_PARSE`。
+审核 M5-B2B 后再进入 Action Proposal 与用户决定持久化；当前 Action Proposal 只确认、不执行，文件仍只到 `AWAITING_PARSE`。

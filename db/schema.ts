@@ -706,6 +706,118 @@ export const materialStorageEvents = sqliteTable(
   ],
 );
 
+export const conversationSessions = sqliteTable(
+  "conversation_sessions",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    status: text("status", {
+      enum: ["ACTIVE", "SUMMARIZED", "ARCHIVED"],
+    })
+      .notNull()
+      .default("ACTIVE"),
+    activeProductSkill: text("active_product_skill"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    messageCount: integer("message_count").notNull().default(0),
+    summaryCount: integer("summary_count").notNull().default(0),
+    lastMessageAt: text("last_message_at"),
+    archivedAt: text("archived_at"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("conversation_sessions_owner_project_idempotency_uq").on(
+      table.ownerUserId,
+      table.projectId,
+      table.idempotencyKey,
+    ),
+    index("conversation_sessions_owner_project_updated_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.updatedAt,
+    ),
+  ],
+);
+
+export const conversationMessages = sqliteTable(
+  "conversation_messages",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    conversationSessionId: text("conversation_session_id")
+      .notNull()
+      .references(() => conversationSessions.id, { onDelete: "cascade" }),
+    clientMessageId: text("client_message_id").notNull(),
+    ordinal: integer("ordinal").notNull(),
+    role: text("role", { enum: ["USER", "AGENT"] }).notNull(),
+    content: text("content").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("conversation_messages_session_client_uq").on(
+      table.conversationSessionId,
+      table.clientMessageId,
+    ),
+    uniqueIndex("conversation_messages_session_ordinal_uq").on(
+      table.conversationSessionId,
+      table.ordinal,
+    ),
+    index("conversation_messages_owner_project_created_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const conversationSummaries = sqliteTable(
+  "conversation_summaries",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    conversationSessionId: text("conversation_session_id")
+      .notNull()
+      .references(() => conversationSessions.id, { onDelete: "cascade" }),
+    clientSummaryId: text("client_summary_id").notNull(),
+    text: text("text").notNull(),
+    sourceFromOrdinal: integer("source_from_ordinal").notNull(),
+    sourceToOrdinal: integer("source_to_ordinal").notNull(),
+    sourceMessageIdsJson: text("source_message_ids_json").notNull(),
+    status: text("status", {
+      enum: ["DERIVED_NOT_USER_CONFIRMED"],
+    })
+      .notNull()
+      .default("DERIVED_NOT_USER_CONFIRMED"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("conversation_summaries_session_client_uq").on(
+      table.conversationSessionId,
+      table.clientSummaryId,
+    ),
+    index("conversation_summaries_owner_project_created_idx").on(
+      table.ownerUserId,
+      table.projectId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const materialParseResults = sqliteTable(
   "material_parse_results",
   {

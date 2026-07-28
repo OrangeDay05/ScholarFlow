@@ -52,7 +52,7 @@
 拆分执行：
 
 - M5-B2A（DONE）：顶层双页签、Conversation Agent 前端基础、六 Skill 默认 Prompt、ToolIntent、会话摘要、Action Proposal 和显式确认门；当前不持久化、不执行真实任务。
-- M5-B2B（PENDING）：长期会话、消息和摘要 Repository/API 持久化与所有者隔离。
+- M5-B2B（DONE）：长期会话、消息和派生摘要 Repository/API 持久化、幂等、归档与所有者隔离；0007 仅生成未执行。
 - M5-B2C（PENDING）：Action Proposal、用户决定和恢复状态持久化。
 - M5-B2D（PENDING）：会话压缩边界、失败恢复、权限与完整回归。
 
@@ -81,4 +81,4 @@
 
 ## 4. 当前决定
 
-当前 M5-B1 与重分类后的 M5-B3A 已完成，M5-B2A 已完成并等待审核。当前不调用外部模型、不接收真实 Key、不执行真实解析、不生成 DOCX、不部署。
+当前 M5-B1、M5-B2A、M5-B2B 与重分类后的 M5-B3A 已完成，M5-B2B 等待审核。当前不调用外部模型、不接收真实 Key、不执行真实解析、不生成 DOCX、不部署。

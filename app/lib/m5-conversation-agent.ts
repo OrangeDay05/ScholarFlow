@@ -58,6 +58,48 @@ export type M5ConversationSummary = {
   status: "DERIVED_NOT_USER_CONFIRMED";
 };
 
+export type M5ConversationSessionStatus =
+  | "ACTIVE"
+  | "SUMMARIZED"
+  | "ARCHIVED";
+
+export type M5ConversationSessionRecord = {
+  id: string;
+  projectId: string;
+  title: string;
+  status: M5ConversationSessionStatus;
+  activeProductSkill: M5ProductSkill | null;
+  messageCount: number;
+  summaryCount: number;
+  lastMessageAt: string | null;
+  archivedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type M5ConversationMessageRecord = M5ConversationMessage & {
+  conversationSessionId: string;
+  projectId: string;
+  clientMessageId: string;
+  ordinal: number;
+};
+
+export type M5ConversationSummaryRecord = M5ConversationSummary & {
+  id: string;
+  conversationSessionId: string;
+  projectId: string;
+  clientSummaryId: string;
+  sourceFromOrdinal: number;
+  sourceToOrdinal: number;
+};
+
+export type M5ConversationWorkspace = {
+  sessions: M5ConversationSessionRecord[];
+  selectedSession: M5ConversationSessionRecord | null;
+  messages: M5ConversationMessageRecord[];
+  summaries: M5ConversationSummaryRecord[];
+};
+
 export type M5ToolIntent = {
   id: string;
   conversationId: string;

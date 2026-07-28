@@ -50,6 +50,13 @@
       "when": 1785213883026,
       "tag": "0006_hot_professor_monster",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1785245827149,
+      "tag": "0007_silky_power_man",
+      "breakpoints": true
     }
   ]
 }
