@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import {
+  actionProposalRecoverySnapshot,
   createActionProposal,
   createToolIntent,
   decideActionProposal,
@@ -77,6 +78,34 @@ test("summaries retain bounded source references and are not user-confirmed fact
   ]);
   assert.equal(summary.status, "DERIVED_NOT_USER_CONFIRMED");
   assert.ok(summary.text.length <= 240);
+});
+
+test("recovery snapshots never execute confirmed proposals directly", () => {
+  const base = {
+    id: "proposal-1",
+    projectId: "project-1",
+    conversationSessionId: "conversation-1",
+    toolIntentId: "intent-1",
+    title: "提案",
+    effect: "确认后待入队",
+    warnings: [],
+    status: "CONFIRMED",
+    idempotencyKey: "proposal-key-1",
+    createdAt: "2026-07-28T00:00:00.000Z",
+    updatedAt: "2026-07-28T00:01:00.000Z",
+    decidedAt: "2026-07-28T00:01:00.000Z",
+  };
+  const ready = actionProposalRecoverySnapshot([
+    { ...base, recoveryStatus: "READY_TO_QUEUE" },
+  ]);
+  assert.equal(ready.action, "READY_TO_QUEUE");
+  assert.equal(ready.retryPolicy, "REUSE_IDEMPOTENCY_KEY");
+  assert.doesNotMatch(JSON.stringify(ready), /EXECUTE|CALLING_MODEL/u);
+
+  const terminal = actionProposalRecoverySnapshot([
+    { ...base, status: "REJECTED", recoveryStatus: "TERMINAL" },
+  ]);
+  assert.equal(terminal.action, "TERMINAL");
 });
 
 test("editor exposes dual workspace tabs without replacing existing skill task tabs", () => {

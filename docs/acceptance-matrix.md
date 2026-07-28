@@ -248,3 +248,14 @@
 | M4-PERSIST-01 | 持久化运行时 | 实际应用连接新本地文件 D1；写入跨重启保留；匿名拒绝且跨用户隔离 | `scripts/m4-persistent-d1-acceptance.mjs`、`scripts/m4-persistent-d1-inspect.mjs`、唯一标记 `I015_PERSISTENCE_20260728_1052` | 通过 |
 | M4-QA-01 | 工程质量 | diff、局部/全仓 lint、类型、自动化测试和 build 通过 | `docs/reviews/M4/review.md` | 通过 |
 | M4-GATE-01 | 阶段边界 | 无真实模型、真实 Key、真实脱敏、真实 PPTX、M5 或部署 | 源码扫描、Git diff、审核报告 | 通过 |
+
+## 15. M5-B2 对话优先 Agent 基础审核门
+
+| ID | 检查项 | 可测试验收条件 | 目标证据 | 当前状态 |
+|---|---|---|---|---|
+| M5-B2-01 | 六 Skill 对话入口 | Skill 点击后进入 Conversation Agent 并预填对应 Prompt，不重复展示 Prompt 选择器 | `tests/m5-conversation-agent.test.mjs` | 通过 |
+| M5-B2-02 | 长期会话持久化 | 会话、消息和派生摘要按用户/项目隔离，写入幂等，归档后不可继续修改 | `tests/m5-conversation-persistence.test.mjs` | 通过 |
+| M5-B2-03 | 摘要与压缩边界 | 摘要不冒充用户事实；来源连续可追溯；压缩只追加、保留最近消息且不删除原消息 | `tests/m5-conversation-persistence.test.mjs` | 通过 |
+| M5-B2-04 | 用户确认门 | 未确认等待用户；确认只到待入队；拒绝终止；决定不可覆盖且不直接创建 AI Task | `tests/m5-action-proposal-persistence.test.mjs` | 通过 |
+| M5-B2-05 | 恢复与重试 | 重载后可派生恢复动作；安全重试复用幂等键；恢复状态不包含模型执行 | B2 专项与全量回归 | 通过 |
+| M5-B2-06 | 阶段边界 | 不调用真实模型、不接收真实 Key、不执行 Skill、不执行新增迁移、不部署 | 源码扫描、Git diff、构建 | 通过 |

@@ -1,9 +1,11 @@
 import type {
+  M5ConversationCompressionPlan,
   M5ConversationMessageRecord,
   M5ConversationSessionRecord,
   M5ConversationSummaryRecord,
   M5ConversationWorkspace,
 } from "@/app/lib/m5-conversation-agent";
+import { M5_CONVERSATION_CONTEXT_LIMITS } from "@/app/lib/m5-conversation-agent";
 import type { M5ProductSkill } from "@/app/lib/m5-execution-contracts";
 import type { M3Actor } from "@/app/lib/m3-server-identity";
 import { getD1 } from "../index";
@@ -120,6 +122,7 @@ export async function loadM5ConversationWorkspace(
   actor: M3Actor,
   requestedProjectId: string,
   selectedSessionId?: string,
+  options: { messageLimit?: number; beforeOrdinal?: number } = {},
 ): Promise<M5ConversationWorkspace> {
   const db = getD1();
   const projectId = await ownedProjectId(db, actor.userId, requestedProjectId);
@@ -141,29 +144,79 @@ export async function loadM5ConversationWorkspace(
     );
   }
   if (!selectedSession) {
-    return { sessions, selectedSession: null, messages: [], summaries: [] };
+    return {
+      sessions,
+      selectedSession: null,
+      messages: [],
+      summaries: [],
+      messagePage: {
+        limit: normalizedMessageLimit(options.messageLimit),
+        hasEarlierMessages: false,
+        oldestLoadedOrdinal: null,
+        newestLoadedOrdinal: null,
+      },
+      compressionPlan: emptyCompressionPlan(),
+    };
   }
-  const [messageRows, summaryRows] = await Promise.all([
+  const messageLimit = normalizedMessageLimit(options.messageLimit);
+  const beforeOrdinal = options.beforeOrdinal ?? null;
+  const [messageRows, summaryRows, compressionPlan] = await Promise.all([
     db
       .prepare(
         `${messageSelect} WHERE owner_user_id = ? AND project_id = ?
-         AND conversation_session_id = ? ORDER BY ordinal ASC`,
+         AND conversation_session_id = ? AND (? IS NULL OR ordinal < ?)
+         ORDER BY ordinal DESC LIMIT ?`,
       )
-      .bind(actor.userId, projectId, selectedSession.id)
+      .bind(
+        actor.userId,
+        projectId,
+        selectedSession.id,
+        beforeOrdinal,
+        beforeOrdinal,
+        messageLimit,
+      )
       .all<MessageRow>(),
     db
       .prepare(
         `${summarySelect} WHERE owner_user_id = ? AND project_id = ?
-         AND conversation_session_id = ? ORDER BY created_at ASC`,
+         AND conversation_session_id = ? ORDER BY created_at DESC LIMIT ?`,
       )
-      .bind(actor.userId, projectId, selectedSession.id)
+      .bind(
+        actor.userId,
+        projectId,
+        selectedSession.id,
+        M5_CONVERSATION_CONTEXT_LIMITS.maxLoadedSummaries,
+      )
       .all<SummaryRow>(),
+    loadCompressionPlan(db, actor.userId, projectId, selectedSession.id),
   ]);
+  const messages = (messageRows.results ?? []).map(toMessage).reverse();
+  const summaries = (summaryRows.results ?? []).map(toSummary).reverse();
+  const oldestLoadedOrdinal = messages[0]?.ordinal ?? null;
+  const hasEarlierMessages = oldestLoadedOrdinal
+    ? Boolean(
+        await db
+          .prepare(
+            `SELECT 1 AS found FROM conversation_messages
+             WHERE owner_user_id = ? AND project_id = ?
+               AND conversation_session_id = ? AND ordinal < ? LIMIT 1`,
+          )
+          .bind(actor.userId, projectId, selectedSession.id, oldestLoadedOrdinal)
+          .first<{ found: number }>(),
+      )
+    : false;
   return {
     sessions,
     selectedSession,
-    messages: (messageRows.results ?? []).map(toMessage),
-    summaries: (summaryRows.results ?? []).map(toSummary),
+    messages,
+    summaries,
+    messagePage: {
+      limit: messageLimit,
+      hasEarlierMessages,
+      oldestLoadedOrdinal,
+      newestLoadedOrdinal: messages.at(-1)?.ordinal ?? null,
+    },
+    compressionPlan,
   };
 }
 
@@ -300,17 +353,47 @@ export async function createM5ConversationSummary(
       "摘要来源消息必须全部属于当前会话。",
     );
   }
-  const ordinals = sources.map((source) => source.ordinal);
+  const orderedSources = [...sources].sort(
+    (left, right) => left.ordinal - right.ordinal,
+  );
+  const ordinals = orderedSources.map((source) => source.ordinal);
+  if (Math.max(...ordinals) - Math.min(...ordinals) + 1 !== ordinals.length) {
+    throw new M5ConversationRepositoryError(
+      "INVALID_SUMMARY_SOURCE",
+      "摘要来源消息必须构成连续范围，不能跳过中间消息。",
+    );
+  }
+  const orderedSourceIds = orderedSources.map((source) => source.id);
+  const coverage = await db
+    .prepare(
+      `SELECT COALESCE(MAX(source_to_ordinal), 0) AS covered_ordinal
+       FROM conversation_summaries
+       WHERE owner_user_id = ? AND project_id = ? AND conversation_session_id = ?`,
+    )
+    .bind(actor.userId, projectId, conversationSessionId)
+    .first<{ covered_ordinal: number }>();
+  const expectedCoveredOrdinal = coverage?.covered_ordinal ?? 0;
+  if (Math.min(...ordinals) !== expectedCoveredOrdinal + 1) {
+    throw new M5ConversationRepositoryError(
+      "INVALID_SUMMARY_SOURCE",
+      "新摘要必须紧接已有摘要覆盖位置，不能跳过未摘要消息。",
+    );
+  }
   const id = crypto.randomUUID();
   try {
-    await db.batch([
+    const results = await db.batch([
       db
         .prepare(
           `INSERT INTO conversation_summaries (
             id, owner_user_id, project_id, conversation_session_id,
             client_summary_id, text, source_from_ordinal, source_to_ordinal,
             source_message_ids_json, status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'DERIVED_NOT_USER_CONFIRMED')`,
+          ) SELECT ?, ?, ?, ?, ?, ?, ?, ?, ?, 'DERIVED_NOT_USER_CONFIRMED'
+            WHERE COALESCE((
+              SELECT MAX(source_to_ordinal) FROM conversation_summaries
+              WHERE owner_user_id = ? AND project_id = ?
+                AND conversation_session_id = ?
+            ), 0) = ?`,
         )
         .bind(
           id,
@@ -321,18 +404,31 @@ export async function createM5ConversationSummary(
           input.text,
           Math.min(...ordinals),
           Math.max(...ordinals),
-          JSON.stringify(sourceIds),
+          JSON.stringify(orderedSourceIds),
+          actor.userId,
+          projectId,
+          conversationSessionId,
+          expectedCoveredOrdinal,
         ),
       db
         .prepare(
           `UPDATE conversation_sessions
            SET summary_count = summary_count + 1, status = 'SUMMARIZED',
                updated_at = CURRENT_TIMESTAMP
-           WHERE id = ? AND owner_user_id = ? AND project_id = ? AND status != 'ARCHIVED'`,
+           WHERE id = ? AND owner_user_id = ? AND project_id = ?
+             AND status != 'ARCHIVED'
+             AND EXISTS (SELECT 1 FROM conversation_summaries WHERE id = ?)`,
         )
-        .bind(conversationSessionId, actor.userId, projectId),
+        .bind(conversationSessionId, actor.userId, projectId, id),
     ]);
-  } catch {
+    if (!results.at(0)?.meta?.changes) {
+      throw new M5ConversationRepositoryError(
+        "INVALID_SUMMARY_SOURCE",
+        "摘要覆盖位置已变化，请重新读取压缩计划后重试。",
+      );
+    }
+  } catch (error) {
+    if (error instanceof M5ConversationRepositoryError) throw error;
     const raced = await findSummaryByClientId(
       db,
       actor.userId,
@@ -556,4 +652,91 @@ function toSummary(row: SummaryRow): M5ConversationSummaryRecord {
 
 function databaseFailure(message: string): M5ConversationRepositoryError {
   return new M5ConversationRepositoryError("DATABASE_WRITE_FAILED", message);
+}
+
+function normalizedMessageLimit(value?: number): number {
+  if (!value || !Number.isInteger(value) || value < 1) {
+    return M5_CONVERSATION_CONTEXT_LIMITS.defaultMessagePageSize;
+  }
+  return Math.min(value, M5_CONVERSATION_CONTEXT_LIMITS.maxMessagePageSize);
+}
+
+async function loadCompressionPlan(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string,
+  sessionId: string,
+): Promise<M5ConversationCompressionPlan> {
+  const coverage = await db
+    .prepare(
+      `SELECT COALESCE(MAX(source_to_ordinal), 0) AS covered_ordinal
+       FROM conversation_summaries
+       WHERE owner_user_id = ? AND project_id = ? AND conversation_session_id = ?`,
+    )
+    .bind(ownerUserId, projectId, sessionId)
+    .first<{ covered_ordinal: number }>();
+  const coveredOrdinal = coverage?.covered_ordinal ?? 0;
+  const remaining = await db
+    .prepare(
+      `SELECT COUNT(*) AS total, COALESCE(MAX(ordinal), 0) AS max_ordinal
+       FROM conversation_messages
+       WHERE owner_user_id = ? AND project_id = ?
+         AND conversation_session_id = ? AND ordinal > ?`,
+    )
+    .bind(ownerUserId, projectId, sessionId, coveredOrdinal)
+    .first<{ total: number; max_ordinal: number }>();
+  const unsummarizedMessageCount = remaining?.total ?? 0;
+  if (
+    unsummarizedMessageCount <=
+    M5_CONVERSATION_CONTEXT_LIMITS.compressionThreshold
+  ) {
+    return {
+      ...emptyCompressionPlan(),
+      unsummarizedMessageCount,
+      retainedRecentMessageCount: Math.min(
+        unsummarizedMessageCount,
+        M5_CONVERSATION_CONTEXT_LIMITS.retainedRecentMessages,
+      ),
+    };
+  }
+  const sourceRows = await db
+    .prepare(
+      `SELECT id, ordinal FROM conversation_messages
+       WHERE owner_user_id = ? AND project_id = ?
+         AND conversation_session_id = ? AND ordinal > ? AND ordinal <= ?
+       ORDER BY ordinal ASC LIMIT ?`,
+    )
+    .bind(
+      ownerUserId,
+      projectId,
+      sessionId,
+      coveredOrdinal,
+      (remaining?.max_ordinal ?? 0) -
+        M5_CONVERSATION_CONTEXT_LIMITS.retainedRecentMessages,
+      M5_CONVERSATION_CONTEXT_LIMITS.maxSummarySourceMessages,
+    )
+    .all<{ id: string; ordinal: number }>();
+  const sources = sourceRows.results ?? [];
+  return {
+    status: "NEEDS_SUMMARY",
+    unsummarizedMessageCount,
+    sourceMessageIds: sources.map((source) => source.id),
+    sourceFromOrdinal: sources[0]?.ordinal ?? null,
+    sourceToOrdinal: sources.at(-1)?.ordinal ?? null,
+    retainedRecentMessageCount:
+      M5_CONVERSATION_CONTEXT_LIMITS.retainedRecentMessages,
+    appendOnly: true,
+  };
+}
+
+function emptyCompressionPlan(): M5ConversationCompressionPlan {
+  return {
+    status: "NOT_NEEDED",
+    unsummarizedMessageCount: 0,
+    sourceMessageIds: [],
+    sourceFromOrdinal: null,
+    sourceToOrdinal: null,
+    retainedRecentMessageCount: 0,
+    appendOnly: true,
+  };
 }

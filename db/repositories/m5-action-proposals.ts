@@ -4,6 +4,7 @@ import type {
   M5PersistedActionProposal,
   M5PersistedToolIntent,
 } from "@/app/lib/m5-conversation-agent";
+import { actionProposalRecoverySnapshot } from "@/app/lib/m5-conversation-agent";
 import type { M5ProductSkill } from "@/app/lib/m5-execution-contracts";
 import type { M3Actor } from "@/app/lib/m3-server-identity";
 import { getD1 } from "../index";
@@ -360,10 +361,12 @@ export async function loadM5ActionProposalWorkspace(
       .bind(actor.userId, projectId, conversationSessionId)
       .all<DecisionRow>(),
   ]);
+  const persistedProposals = (proposals.results ?? []).map(toProposal);
   return {
     intents: (intents.results ?? []).map(toIntent),
-    proposals: (proposals.results ?? []).map(toProposal),
+    proposals: persistedProposals,
     decisions: (decisions.results ?? []).map(toDecision),
+    recovery: actionProposalRecoverySnapshot(persistedProposals),
   };
 }
 

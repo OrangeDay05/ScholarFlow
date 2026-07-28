@@ -10,6 +10,7 @@ import {
   createM5ConversationSummary,
   loadM5ConversationWorkspace,
 } from "../db/repositories/m5-conversations.ts";
+import { M5_CONVERSATION_CONTEXT_LIMITS } from "../app/lib/m5-conversation-agent.ts";
 
 const migrations = [
   "0000_swift_blue_shield.sql",
@@ -142,6 +143,97 @@ test("conversation repository preserves idempotency, provenance and owner isolat
   assert.equal(
     db.prepare("SELECT count(*) AS total FROM conversation_messages").get().total,
     2,
+  );
+  db.close();
+});
+
+test("conversation context is paged and compression remains append-only", async () => {
+  const db = await migratedDatabase();
+  workerEnv.DB = new D1DatabaseAdapter(db);
+  seed(db);
+  const owner = { userId: "user-a", sessionId: "session-a" };
+  const created = await createM5ConversationForActor(owner, "project-a", {
+    title: "长会话",
+    activeProductSkill: "literature_summary_matrix",
+    idempotencyKey: "compression-session-1",
+  });
+  for (let index = 1; index <= 30; index += 1) {
+    await appendM5ConversationMessage(owner, "project-a", created.session.id, {
+      clientMessageId: `compression-message-${index}`,
+      role: index % 2 === 0 ? "AGENT" : "USER",
+      content: `第 ${index} 条消息`,
+    });
+  }
+
+  const latest = await loadM5ConversationWorkspace(
+    owner,
+    "project-a",
+    created.session.id,
+    { messageLimit: 10 },
+  );
+  assert.deepEqual(latest.messages.map((message) => message.ordinal), [
+    21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+  ]);
+  assert.equal(latest.messagePage.hasEarlierMessages, true);
+  assert.equal(latest.compressionPlan.status, "NEEDS_SUMMARY");
+  assert.equal(
+    latest.compressionPlan.sourceMessageIds.length,
+    M5_CONVERSATION_CONTEXT_LIMITS.maxSummarySourceMessages,
+  );
+  assert.equal(latest.compressionPlan.sourceFromOrdinal, 1);
+  assert.equal(latest.compressionPlan.sourceToOrdinal, 16);
+  assert.equal(latest.compressionPlan.retainedRecentMessageCount, 8);
+  assert.equal(latest.compressionPlan.appendOnly, true);
+  await assert.rejects(
+    () =>
+      createM5ConversationSummary(owner, "project-a", created.session.id, {
+        clientSummaryId: "compression-summary-gap",
+        text: "不连续来源不应被接受。",
+        sourceMessageIds: [
+          latest.compressionPlan.sourceMessageIds[0],
+          latest.compressionPlan.sourceMessageIds[2],
+        ],
+      }),
+    (error) => error.code === "INVALID_SUMMARY_SOURCE",
+  );
+
+  const previous = await loadM5ConversationWorkspace(
+    owner,
+    "project-a",
+    created.session.id,
+    { messageLimit: 10, beforeOrdinal: 21 },
+  );
+  assert.deepEqual(previous.messages.map((message) => message.ordinal), [
+    11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
+  ]);
+
+  await createM5ConversationSummary(owner, "project-a", created.session.id, {
+    clientSummaryId: "compression-summary-1",
+    text: "前十六条消息的系统派生摘要。",
+    sourceMessageIds: latest.compressionPlan.sourceMessageIds,
+  });
+  await assert.rejects(
+    () =>
+      createM5ConversationSummary(owner, "project-a", created.session.id, {
+        clientSummaryId: "compression-summary-skips-next",
+        text: "不能跳过第十七条消息。",
+        sourceMessageIds: previous.messages
+          .filter((message) => message.ordinal === 18 || message.ordinal === 19)
+          .map((message) => message.id),
+      }),
+    (error) => error.code === "INVALID_SUMMARY_SOURCE",
+  );
+  const compressed = await loadM5ConversationWorkspace(
+    owner,
+    "project-a",
+    created.session.id,
+    { messageLimit: 10 },
+  );
+  assert.equal(compressed.compressionPlan.status, "NOT_NEEDED");
+  assert.equal(compressed.compressionPlan.unsummarizedMessageCount, 14);
+  assert.equal(
+    db.prepare("SELECT count(*) AS total FROM conversation_messages").get().total,
+    30,
   );
   db.close();
 });

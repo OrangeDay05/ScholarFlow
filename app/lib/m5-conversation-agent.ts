@@ -98,6 +98,34 @@ export type M5ConversationWorkspace = {
   selectedSession: M5ConversationSessionRecord | null;
   messages: M5ConversationMessageRecord[];
   summaries: M5ConversationSummaryRecord[];
+  messagePage: M5ConversationMessagePage;
+  compressionPlan: M5ConversationCompressionPlan;
+};
+
+export const M5_CONVERSATION_CONTEXT_LIMITS = {
+  compressionThreshold: 24,
+  retainedRecentMessages: 8,
+  maxSummarySourceMessages: 16,
+  defaultMessagePageSize: 50,
+  maxMessagePageSize: 100,
+  maxLoadedSummaries: 20,
+} as const;
+
+export type M5ConversationMessagePage = {
+  limit: number;
+  hasEarlierMessages: boolean;
+  oldestLoadedOrdinal: number | null;
+  newestLoadedOrdinal: number | null;
+};
+
+export type M5ConversationCompressionPlan = {
+  status: "NOT_NEEDED" | "NEEDS_SUMMARY";
+  unsummarizedMessageCount: number;
+  sourceMessageIds: string[];
+  sourceFromOrdinal: number | null;
+  sourceToOrdinal: number | null;
+  retainedRecentMessageCount: number;
+  appendOnly: true;
 };
 
 export type M5ToolIntent = {
@@ -161,7 +189,48 @@ export type M5ActionProposalWorkspace = {
   intents: M5PersistedToolIntent[];
   proposals: M5PersistedActionProposal[];
   decisions: M5PersistedActionDecision[];
+  recovery: M5ActionProposalRecoverySnapshot;
 };
+
+export type M5ActionProposalRecoverySnapshot = {
+  action:
+    | "CONTINUE_CONVERSATION"
+    | "WAIT_FOR_USER"
+    | "READY_TO_QUEUE"
+    | "TERMINAL";
+  pendingProposalIds: string[];
+  readyProposalIds: string[];
+  terminalProposalIds: string[];
+  retryPolicy: "REUSE_IDEMPOTENCY_KEY";
+};
+
+export function actionProposalRecoverySnapshot(
+  proposals: M5PersistedActionProposal[],
+): M5ActionProposalRecoverySnapshot {
+  const pendingProposalIds = proposals
+    .filter((proposal) => proposal.recoveryStatus === "WAITING_FOR_USER")
+    .map((proposal) => proposal.id);
+  const readyProposalIds = proposals
+    .filter((proposal) => proposal.recoveryStatus === "READY_TO_QUEUE")
+    .map((proposal) => proposal.id);
+  const terminalProposalIds = proposals
+    .filter((proposal) => proposal.recoveryStatus === "TERMINAL")
+    .map((proposal) => proposal.id);
+  const action = pendingProposalIds.length
+    ? "WAIT_FOR_USER"
+    : readyProposalIds.length
+      ? "READY_TO_QUEUE"
+      : proposals.length > 0 && terminalProposalIds.length === proposals.length
+        ? "TERMINAL"
+        : "CONTINUE_CONVERSATION";
+  return {
+    action,
+    pendingProposalIds,
+    readyProposalIds,
+    terminalProposalIds,
+    retryPolicy: "REUSE_IDEMPOTENCY_KEY",
+  };
+}
 
 export function createToolIntent(input: {
   conversationId: string;

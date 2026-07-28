@@ -76,6 +76,13 @@ test("proposal decisions are isolated, idempotent and never execute a task", asy
   assert.equal(created.proposal.recoveryStatus, "WAITING_FOR_USER");
   assert.deepEqual(created.intent.authorizedMaterialIds, ["material-a"]);
   assert.equal(db.prepare("SELECT count(*) AS total FROM ai_tasks").get().total, 0);
+  const waiting = await loadM5ActionProposalWorkspace(
+    ownerA,
+    "project-a",
+    session.session.id,
+  );
+  assert.equal(waiting.recovery.action, "WAIT_FOR_USER");
+  assert.equal(waiting.recovery.retryPolicy, "REUSE_IDEMPOTENCY_KEY");
 
   const replay = await createM5ActionProposalForActor(ownerA, "project-a", {
     conversationSessionId: session.session.id,
@@ -158,6 +165,7 @@ test("proposal decisions are isolated, idempotent and never execute a task", asy
   assert.equal(restored.intents.length, 1);
   assert.equal(restored.proposals[0].recoveryStatus, "READY_TO_QUEUE");
   assert.equal(restored.decisions[0].decision, "CONFIRM");
+  assert.equal(restored.recovery.action, "READY_TO_QUEUE");
 
   await archiveM5Conversation(ownerA, "project-a", session.session.id);
   await assert.rejects(

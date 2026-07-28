@@ -22,17 +22,33 @@ export async function GET(
   const auth = await requireM4Actor(request);
   if ("response" in auth) return auth.response;
   try {
-    const sessionId = new URL(request.url).searchParams.get("session_id")?.trim();
+    const search = new URL(request.url).searchParams;
+    const sessionId = search.get("session_id")?.trim();
+    const messageLimit = positiveInteger(search.get("message_limit"));
+    const beforeOrdinal = positiveInteger(search.get("before_ordinal"));
+    if (
+      (search.has("message_limit") && messageLimit === undefined) ||
+      (search.has("before_ordinal") && beforeOrdinal === undefined)
+    ) {
+      return apiError(400, "INVALID_PAGINATION", "会话分页参数必须为正整数。");
+    }
     return apiSuccess(
       await loadM5ConversationWorkspace(
         auth.actor,
         (await params).projectId,
         sessionId || undefined,
+        { messageLimit, beforeOrdinal },
       ),
     );
   } catch (error) {
     return conversationError(error);
   }
+}
+
+function positiveInteger(value: string | null): number | undefined {
+  if (value === null) return undefined;
+  const parsed = Number(value);
+  return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : undefined;
 }
 
 export async function POST(
