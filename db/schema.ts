@@ -1854,12 +1854,27 @@ export const evidenceBindings = sqliteTable(
     parseResultId: text("parse_result_id").references(() => materialParseResults.id, {
       onDelete: "restrict",
     }),
+    materialChunkId: text("material_chunk_id").references(() => materialChunks.id, {
+      onDelete: "restrict",
+    }),
     page: integer("page"),
     paragraph: text("paragraph"),
     quote: text("quote").notNull().default(""),
     supportLevel: text("support_level", {
       enum: ["direct", "indirect", "unverified"],
     }).notNull(),
+    verificationStatus: text("verification_status", {
+      enum: ["VERIFIED", "UNVERIFIED", "CONFLICTING"],
+    })
+      .notNull()
+      .default("UNVERIFIED"),
+    riskLevel: text("risk_level", {
+      enum: ["NORMAL", "HIGH_RISK"],
+    })
+      .notNull()
+      .default("NORMAL"),
+    verificationNote: text("verification_note"),
+    verifiedAt: text("verified_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
@@ -1870,6 +1885,7 @@ export const evidenceBindings = sqliteTable(
       table.paragraph,
     ),
     index("evidence_owner_project_idx").on(table.ownerUserId, table.projectId),
+    index("evidence_chunk_idx").on(table.materialChunkId),
   ],
 );
 
@@ -1891,6 +1907,8 @@ export const exportRecords = sqliteTable(
       .notNull()
       .default("queued"),
     errorMessage: text("error_message"),
+    readinessReportJson: text("readiness_report_json").notNull().default("{}"),
+    blockedReason: text("blocked_reason"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [index("export_records_owner_project_idx").on(table.ownerUserId, table.projectId)],
