@@ -2407,8 +2407,15 @@
   .topbar {
     position: static;
     display: grid;
+    grid-template-columns: minmax(0, 1fr);
     gap: 12px;
+    justify-content: stretch;
+    justify-items: center;
     padding: 12px 16px;
+  }
+
+  .projectIdentity {
+    justify-self: center;
   }
 
   .projectIdentity > div > p {
@@ -2434,7 +2441,7 @@
   .topActions {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: 100%;
+    width: min(100%, 380px);
   }
 
   .secondaryButton,
