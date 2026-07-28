@@ -1901,7 +1901,13 @@ export const exportRecords = sqliteTable(
       .references(() => projects.id, { onDelete: "cascade" }),
     taskId: text("task_id").references(() => aiTasks.id, { onDelete: "set null" }),
     format: text("format", { enum: ["docx"] }).notNull().default("docx"),
+    artifactType: text("artifact_type", {
+      enum: ["MANUSCRIPT", "RESPONSE_LETTER"],
+    })
+      .notNull()
+      .default("MANUSCRIPT"),
     sourceVersionIdsJson: text("source_version_ids_json").notNull().default("[]"),
+    sourceRevisionTaskIdsJson: text("source_revision_task_ids_json").notNull().default("[]"),
     objectKey: text("object_key"),
     status: text("status", { enum: ["queued", "ready", "failed"] })
       .notNull()
@@ -2148,6 +2154,13 @@ export const revisionTasks = sqliteTable(
       .notNull()
       .default("open"),
     plannedAction: text("planned_action").notNull().default(""),
+    verificationStatus: text("verification_status", {
+      enum: ["PENDING", "VERIFIED", "FAILED"],
+    })
+      .notNull()
+      .default("PENDING"),
+    verificationNote: text("verification_note"),
+    verifiedAt: text("verified_at"),
     ...timestamps(),
   },
   (table) => [index("revision_tasks_owner_project_idx").on(table.ownerUserId, table.projectId)],
