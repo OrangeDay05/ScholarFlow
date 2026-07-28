@@ -17,7 +17,7 @@ test("decision letter parser keeps reviewer and comment boundaries", () => {
 test("M7 preserves versions, requires user response confirmation, verifies change, and exports Response Letter DOCX", async () => {
   const database = await migratedDatabase(); workerEnv.DB = new D1DatabaseAdapter(database); seed(database);
   const imported = await importM7DecisionLetter(actor, "project-a", { text: "Reviewer 1\nComment 1: Clarify the method." });
-  const task = await createM7RevisionTask(actor, "project-a", { reviewerCommentId: imported.commentIds[0], sectionId: "section-a", baseVersionId: "version-a", plannedAction: "Explain sampling." });
+  const task = await createM7RevisionTask(actor, "project-a", { reviewerCommentId: imported.commentIds[0], sectionId: "section-a", baseVersionId: "version-a", plannedAction: "Explain sampling.", responseStrategy: "PARTIALLY_AGREE", decisionReason: "The requested experiment is outside the study scope.", incompleteExperimentWarning: "No new experiment was performed." });
   const response = await appendM7ResponseDraft(actor, "project-a", task.id, "We clarified the sampling procedure.");
   const version = await createM7RevisionVersion(actor, "project-a", task.id, "Original draft. Added sampling details.");
   const beforeConfirmation = await verifyM7RevisionTask(actor, "project-a", task.id); assert.equal(beforeConfirmation.verified, false);
@@ -27,7 +27,8 @@ test("M7 preserves versions, requires user response confirmation, verifies chang
   assert.equal(database.prepare("SELECT source_version_id FROM section_versions WHERE id = ?").get(version.id).source_version_id, "version-a");
   const storage = new InMemoryStorageAdapter(); const exported = await createM7ResponseLetterDocx(actor, "project-a", [task.id], storage);
   const body = strFromU8(unzipSync(new Uint8Array(await storage.get(exported.objectKey)))["word/document.xml"]);
-  assert.match(body, /Clarify the method/u); assert.match(body, /We clarified/u); assert.match(body, new RegExp(version.id, "u"));
+  assert.match(body, /Clarify the method/u); assert.match(body, /PARTIALLY_AGREE/u); assert.match(body, /No new experiment was performed/u); assert.match(body, /We clarified/u); assert.match(body, new RegExp(version.id, "u"));
+  assert.equal(database.prepare("SELECT status FROM reviewer_comments WHERE id = ?").get(imported.commentIds[0]).status, "RESOLVED");
   const record = database.prepare("SELECT artifact_type,source_revision_task_ids_json FROM export_records WHERE id = ?").get(exported.id); assert.equal(record.artifact_type, "RESPONSE_LETTER"); assert.deepEqual(JSON.parse(record.source_revision_task_ids_json), [task.id]);
 });
 

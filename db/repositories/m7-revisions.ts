@@ -20,12 +20,16 @@ export async function importM7DecisionLetter(actor: M3Actor, requestedProjectId:
   return { commentIds: ids, count: ids.length };
 }
 
-export async function createM7RevisionTask(actor: M3Actor, requestedProjectId: string, input: { reviewerCommentId: string; sectionId: string; baseVersionId: string; plannedAction: string }) {
+export async function createM7RevisionTask(actor: M3Actor, requestedProjectId: string, input: { reviewerCommentId: string; sectionId: string; baseVersionId: string; plannedAction: string; responseStrategy: "AGREE" | "PARTIALLY_AGREE" | "DISAGREE"; decisionReason?: string; incompleteExperimentWarning?: string }) {
   const db = getD1(); const context = await resolveContext(db, actor, requestedProjectId);
   const comment = await db.prepare("SELECT id FROM reviewer_comments WHERE id = ? AND owner_user_id = ? AND project_id = ?").bind(input.reviewerCommentId, context.userId, context.projectId).first<{ id: string }>(); if (!comment) throw new M7RevisionError("COMMENT_NOT_FOUND", "审稿意见不存在或不属于当前用户。");
   const version = await requireVersion(db, context, input.baseVersionId); if (version.section_id !== input.sectionId) throw new M7RevisionError("VERSION_NOT_FOUND", "基础版本不属于目标章节。");
   if (!input.plannedAction.trim()) throw new M7RevisionError("INVALID_INPUT", "返修计划不能为空。");
-  const id = crypto.randomUUID(); await db.prepare("INSERT INTO revision_tasks (id, owner_user_id, project_id, reviewer_comment_id, section_id, base_version_id, status, planned_action) VALUES (?, ?, ?, ?, ?, ?, 'open', ?)").bind(id, context.userId, context.projectId, input.reviewerCommentId, input.sectionId, input.baseVersionId, input.plannedAction.trim()).run(); return { id, status: "open" as const };
+  if (input.responseStrategy !== "AGREE" && !input.decisionReason?.trim()) throw new M7RevisionError("INVALID_INPUT", "部分同意或不同意时必须说明理由。");
+  const id = crypto.randomUUID(); await db.batch([
+    db.prepare("INSERT INTO revision_tasks (id, owner_user_id, project_id, reviewer_comment_id, section_id, base_version_id, status, planned_action, response_strategy, decision_reason, incomplete_experiment_warning) VALUES (?, ?, ?, ?, ?, ?, 'open', ?, ?, ?, ?)").bind(id, context.userId, context.projectId, input.reviewerCommentId, input.sectionId, input.baseVersionId, input.plannedAction.trim(), input.responseStrategy, input.decisionReason?.trim() || null, input.incompleteExperimentWarning?.trim() || null),
+    db.prepare("UPDATE reviewer_comments SET status = 'IN_PROGRESS' WHERE id = ? AND owner_user_id = ? AND project_id = ?").bind(input.reviewerCommentId, context.userId, context.projectId),
+  ]); return { id, status: "open" as const, responseStrategy: input.responseStrategy };
 }
 
 export async function appendM7ResponseDraft(actor: M3Actor, requestedProjectId: string, revisionTaskId: string, content: string) {
@@ -51,7 +55,10 @@ export async function verifyM7RevisionTask(actor: M3Actor, requestedProjectId: s
   const db = getD1(); const context = await resolveContext(db, actor, requestedProjectId); const task = await requireTask(db, context, revisionTaskId); if (!task.base_version_id || !task.result_version_id) throw new M7RevisionError("VERSION_NOT_FOUND", "返修任务缺少基础版本或结果版本。");
   const base = await requireVersion(db, context, task.base_version_id); const result = await requireVersion(db, context, task.result_version_id); const response = await db.prepare("SELECT id FROM response_drafts WHERE revision_task_id = ? AND owner_user_id = ? AND project_id = ? AND user_confirmed = 1 ORDER BY version_number DESC LIMIT 1").bind(revisionTaskId, context.userId, context.projectId).first<{ id: string }>();
   const verified = base.section_id === result.section_id && base.content_hash !== result.content_hash && Boolean(response); const note = !response ? "用户尚未确认回复草稿。" : base.content_hash === result.content_hash ? "返修版本与基础版本内容相同。" : base.section_id !== result.section_id ? "返修版本不属于同一章节。" : "返修版本、基础版本和用户确认回复已建立对应关系。";
-  await db.prepare("UPDATE revision_tasks SET verification_status = ?, verification_note = ?, verified_at = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ? AND project_id = ?").bind(verified ? "VERIFIED" : "FAILED", note, new Date().toISOString(), verified ? "resolved" : "ready_for_review", revisionTaskId, context.userId, context.projectId).run(); return { verified, status: verified ? "resolved" as const : "ready_for_review" as const, note };
+  await db.batch([
+    db.prepare("UPDATE revision_tasks SET verification_status = ?, verification_note = ?, verified_at = ?, status = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ? AND project_id = ?").bind(verified ? "VERIFIED" : "FAILED", note, new Date().toISOString(), verified ? "resolved" : "ready_for_review", revisionTaskId, context.userId, context.projectId),
+    db.prepare("UPDATE reviewer_comments SET status = ? WHERE id = (SELECT reviewer_comment_id FROM revision_tasks WHERE id = ? AND owner_user_id = ? AND project_id = ?) AND owner_user_id = ? AND project_id = ?").bind(verified ? "RESOLVED" : "IN_PROGRESS", revisionTaskId, context.userId, context.projectId, context.userId, context.projectId),
+  ]); return { verified, status: verified ? "resolved" as const : "ready_for_review" as const, note };
 }
 
 async function resolveContext(db: D1Database, actor: M3Actor, requestedProjectId: string): Promise<Context> { const project = requestedProjectId === "demo" ? await db.prepare("SELECT id FROM projects WHERE owner_user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1").bind(actor.userId).first<{ id: string }>() : await db.prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, actor.userId).first<{ id: string }>(); if (!project) throw new M7RevisionError("PROJECT_NOT_FOUND", "项目不存在或不属于当前用户。"); return { userId: actor.userId, projectId: project.id }; }

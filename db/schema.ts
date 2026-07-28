@@ -2115,6 +2115,11 @@ export const reviewerComments = sqliteTable(
     reviewerLabel: text("reviewer_label").notNull(),
     commentNumber: text("comment_number").notNull(),
     content: text("content").notNull(),
+    status: text("status", {
+      enum: ["OPEN", "IN_PROGRESS", "RESOLVED", "DEFERRED"],
+    })
+      .notNull()
+      .default("OPEN"),
     sourceMaterialId: text("source_material_id").references(() => materials.id, {
       onDelete: "set null",
     }),
@@ -2154,6 +2159,13 @@ export const revisionTasks = sqliteTable(
       .notNull()
       .default("open"),
     plannedAction: text("planned_action").notNull().default(""),
+    responseStrategy: text("response_strategy", {
+      enum: ["AGREE", "PARTIALLY_AGREE", "DISAGREE"],
+    })
+      .notNull()
+      .default("AGREE"),
+    decisionReason: text("decision_reason"),
+    incompleteExperimentWarning: text("incomplete_experiment_warning"),
     verificationStatus: text("verification_status", {
       enum: ["PENDING", "VERIFIED", "FAILED"],
     })
