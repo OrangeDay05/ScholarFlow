@@ -127,6 +127,42 @@ export type M5ActionProposal = {
   decidedAt: string | null;
 };
 
+export type M5ActionProposalRecoveryStatus =
+  | "WAITING_FOR_USER"
+  | "READY_TO_QUEUE"
+  | "TERMINAL";
+
+export type M5PersistedToolIntent = M5ToolIntent & {
+  projectId: string;
+  conversationSessionId: string;
+  idempotencyKey: string;
+};
+
+export type M5PersistedActionProposal = M5ActionProposal & {
+  projectId: string;
+  conversationSessionId: string;
+  idempotencyKey: string;
+  recoveryStatus: M5ActionProposalRecoveryStatus;
+  updatedAt: string;
+};
+
+export type M5PersistedActionDecision = {
+  id: string;
+  projectId: string;
+  conversationSessionId: string;
+  proposalId: string;
+  decision: "CONFIRM" | "REJECT";
+  reason: string | null;
+  idempotencyKey: string;
+  decidedAt: string;
+};
+
+export type M5ActionProposalWorkspace = {
+  intents: M5PersistedToolIntent[];
+  proposals: M5PersistedActionProposal[];
+  decisions: M5PersistedActionDecision[];
+};
+
 export function createToolIntent(input: {
   conversationId: string;
   productSkill: M5ProductSkill;

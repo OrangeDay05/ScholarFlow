@@ -2,13 +2,13 @@
 
 ## READY
 
-- M5-B2C：Action Proposal、用户决定和恢复状态持久化。
+- M5-B2D：会话压缩边界、失败恢复、权限与完整回归。
 - M5-B3B：TXT、CSV、BibTeX、RIS 解析版本与来源位置。
 - M5-B4：确认平台凭据来源和用户 Key 提交流程。
 
 ## IN_PROGRESS
 
-- 无。M5-B2B 已完成并停在小批次审核点。
+- 无。M5-B2C 已完成并停在小批次审核点。
 
 ## DONE
 
@@ -24,6 +24,7 @@
 - M5-B1：六 Skill 统一上下文/结果、Provider Adapter、凭据解析、预算、超时和任务恢复边界。
 - M5-B2A：双页签、Conversation Agent 前端基础、六 Skill 默认 Prompt、ToolIntent、摘要、Action Proposal 和用户确认门。
 - M5-B2B：长期会话、消息和派生摘要 Repository/API、幂等、归档与所有者隔离；0007 仅生成未执行。
+- M5-B2C：ToolIntent、Action Proposal、用户决定和恢复状态 Repository/API；确认只到 `READY_TO_QUEUE`，0008 仅生成未执行。
 - M5-B3A：Storage Adapter、本地 Miniflare R2、真实上传、安全文件探测、不可覆盖对象记录、0006、隔离与失败补偿。
 
 ## M6 以后

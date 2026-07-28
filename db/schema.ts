@@ -818,6 +818,128 @@ export const conversationSummaries = sqliteTable(
   ],
 );
 
+export const conversationToolIntents = sqliteTable(
+  "conversation_tool_intents",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    conversationSessionId: text("conversation_session_id")
+      .notNull()
+      .references(() => conversationSessions.id, { onDelete: "cascade" }),
+    productSkill: text("product_skill").notNull(),
+    operation: text("operation").notNull(),
+    rationale: text("rationale").notNull(),
+    authorizedMaterialIdsJson: text("authorized_material_ids_json")
+      .notNull()
+      .default("[]"),
+    state: text("state", { enum: ["PROPOSED"] }).notNull().default("PROPOSED"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("conversation_intents_owner_project_idempotency_uq").on(
+      table.ownerUserId,
+      table.projectId,
+      table.idempotencyKey,
+    ),
+    index("conversation_intents_owner_session_created_idx").on(
+      table.ownerUserId,
+      table.conversationSessionId,
+      table.createdAt,
+    ),
+  ],
+);
+
+export const conversationActionProposals = sqliteTable(
+  "conversation_action_proposals",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    conversationSessionId: text("conversation_session_id")
+      .notNull()
+      .references(() => conversationSessions.id, { onDelete: "cascade" }),
+    toolIntentId: text("tool_intent_id")
+      .notNull()
+      .references(() => conversationToolIntents.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    effect: text("effect").notNull(),
+    warningsJson: text("warnings_json").notNull().default("[]"),
+    status: text("status", {
+      enum: ["AWAITING_USER_CONFIRMATION", "CONFIRMED", "REJECTED"],
+    })
+      .notNull()
+      .default("AWAITING_USER_CONFIRMATION"),
+    recoveryStatus: text("recovery_status", {
+      enum: ["WAITING_FOR_USER", "READY_TO_QUEUE", "TERMINAL"],
+    })
+      .notNull()
+      .default("WAITING_FOR_USER"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    decidedAt: text("decided_at"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("conversation_proposals_intent_uq").on(table.toolIntentId),
+    uniqueIndex("conversation_proposals_owner_project_idempotency_uq").on(
+      table.ownerUserId,
+      table.projectId,
+      table.idempotencyKey,
+    ),
+    index("conversation_proposals_owner_session_updated_idx").on(
+      table.ownerUserId,
+      table.conversationSessionId,
+      table.updatedAt,
+    ),
+  ],
+);
+
+export const conversationActionDecisions = sqliteTable(
+  "conversation_action_decisions",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    conversationSessionId: text("conversation_session_id")
+      .notNull()
+      .references(() => conversationSessions.id, { onDelete: "cascade" }),
+    proposalId: text("proposal_id")
+      .notNull()
+      .references(() => conversationActionProposals.id, { onDelete: "cascade" }),
+    decision: text("decision", { enum: ["CONFIRM", "REJECT"] }).notNull(),
+    reason: text("reason"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    decidedAt: text("decided_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("conversation_action_decisions_proposal_uq").on(table.proposalId),
+    uniqueIndex("conversation_decisions_owner_project_idempotency_uq").on(
+      table.ownerUserId,
+      table.projectId,
+      table.idempotencyKey,
+    ),
+    index("conversation_decisions_owner_session_created_idx").on(
+      table.ownerUserId,
+      table.conversationSessionId,
+      table.createdAt,
+    ),
+  ],
+);
+
 export const materialParseResults = sqliteTable(
   "material_parse_results",
   {
