@@ -4,6 +4,11 @@ import {
   MaterialParseError,
   parseTextReferenceMaterial,
 } from "@/app/lib/material-parsers/text-reference-parsers";
+import {
+  DocumentParseError,
+  parseDocx,
+  parseTextPdf,
+} from "@/app/lib/material-parsers/document-parsers";
 import type { StorageAdapter } from "@/app/lib/storage/storage-adapter";
 import { getD1 } from "../index";
 
@@ -100,7 +105,7 @@ export async function parseM5MaterialForActor(
     catch { throw new M5MaterialParseRepositoryError("UNSUPPORTED_FORMAT", "当前批次仅支持 TXT、CSV、BibTeX 和 RIS。" ); }
   })();
   const runId = crypto.randomUUID();
-  const parserKey = `builtin-${format.toLowerCase()}`;
+  const parserKey = format === "PDF" ? "unpdf-text" : `builtin-${format.toLowerCase()}`;
   const parserVersion = "1.0.0";
   try {
     await db.batch([
@@ -124,7 +129,11 @@ export async function parseM5MaterialForActor(
   try {
     const body = await storage.get(source.object_key);
     if (!body) throw new M5MaterialParseRepositoryError("OBJECT_MISSING", "原始文件对象不存在。" );
-    const parsed = parseTextReferenceMaterial(body, format);
+    const parsed = format === "DOCX"
+      ? parseDocx(body)
+      : format === "PDF"
+        ? await parseTextPdf(body)
+        : parseTextReferenceMaterial(body, format);
     const chunkStatements: D1PreparedStatement[] = [];
     for (const chunk of parsed.chunks) {
       chunkStatements.push(db.prepare(`INSERT INTO material_chunks (
@@ -145,7 +154,11 @@ export async function parseM5MaterialForActor(
         WHERE id = ? AND owner_user_id = ? AND project_id = ?`).bind(materialId, actor.userId, projectId),
     ]);
   } catch (error) {
-    const code = error instanceof MaterialParseError ? error.code : error instanceof M5MaterialParseRepositoryError ? error.code : "PARSE_FAILED";
+    const code = error instanceof MaterialParseError || error instanceof DocumentParseError
+      ? error.code
+      : error instanceof M5MaterialParseRepositoryError
+        ? error.code
+        : "PARSE_FAILED";
     const message = error instanceof Error ? error.message : "材料解析失败。";
     await db.batch([
       db.prepare(`DELETE FROM material_chunks WHERE parse_run_id = ? AND owner_user_id = ?`).bind(runId, actor.userId),

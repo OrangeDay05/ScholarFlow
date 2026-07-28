@@ -3,6 +3,7 @@ export const MAX_TEXT_PARSE_BYTES = 5 * 1024 * 1024;
 export const MAX_PARSE_RECORDS = 10_000;
 
 export type TextReferenceFormat = "TXT" | "CSV" | "BIBTEX" | "RIS";
+export type MaterialParseFormat = TextReferenceFormat | "DOCX" | "PDF";
 
 export type MaterialChunkDraft = {
   ordinal: number;
@@ -45,13 +46,15 @@ export class MaterialParseError extends Error {
   }
 }
 
-export function formatFromExtension(extension: string): TextReferenceFormat {
+export function formatFromExtension(extension: string): MaterialParseFormat {
   const normalized = extension.toLowerCase().replace(/^\./u, "");
   if (normalized === "txt") return "TXT";
   if (normalized === "csv") return "CSV";
   if (normalized === "bib" || normalized === "bibtex") return "BIBTEX";
   if (normalized === "ris") return "RIS";
-  throw new MaterialParseError("UNSUPPORTED_FORMAT", "当前批次仅支持 TXT、CSV、BibTeX 和 RIS。" );
+  if (normalized === "docx") return "DOCX";
+  if (normalized === "pdf") return "PDF";
+  throw new MaterialParseError("UNSUPPORTED_FORMAT", "当前仅支持 TXT、CSV、BibTeX、RIS、DOCX 和文本型 PDF。" );
 }
 
 export function parseTextReferenceMaterial(

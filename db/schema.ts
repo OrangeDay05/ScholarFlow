@@ -984,7 +984,9 @@ export const materialParseRuns = sqliteTable(
       .references(() => materialObjects.id, { onDelete: "restrict" }),
     parserKey: text("parser_key").notNull(),
     parserVersion: text("parser_version").notNull(),
-    format: text("format", { enum: ["TXT", "CSV", "BIBTEX", "RIS"] }).notNull(),
+    format: text("format", {
+      enum: ["TXT", "CSV", "BIBTEX", "RIS", "DOCX", "PDF"],
+    }).notNull(),
     contentHash: text("content_hash").notNull(),
     status: text("status", {
       enum: ["RUNNING", "SUCCEEDED", "FAILED", "CANCELLED"],

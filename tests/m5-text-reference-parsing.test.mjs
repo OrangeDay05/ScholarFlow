@@ -57,7 +57,7 @@ test("RIS parser preserves repeated tags and record line ranges", () => {
 });
 
 test("parser rejects unsupported formats, invalid UTF-8 and malformed records", () => {
-  assert.throws(() => formatFromExtension("pdf"), MaterialParseError);
+  assert.throws(() => formatFromExtension("xlsx"), MaterialParseError);
   assert.throws(() => parseTextReferenceMaterial(Uint8Array.from([0xc3, 0x28]), "TXT"), /UTF-8/u);
   assert.throws(() => parseTextReferenceMaterial(encode('a,b\n1,"open'), "CSV"), /引号/u);
   assert.throws(() => parseTextReferenceMaterial(encode("@article{one,"), "BIBTEX"), /未闭合/u);

@@ -62,7 +62,8 @@
 - 依赖：B1；Conversation Agent 通过 ToolIntent 引用材料范围。
 - 已完成 M5-B3A：Storage Adapter、本地持久化 R2、上传安全、0006 对象记录、Session 隔离和补偿；文件只到 `AWAITING_PARSE`。
 - M5-B3B（DONE）：TXT/CSV/BibTeX/RIS、ParseRun/Chunk、行/记录/字段来源位置、失败状态和重解析版本。
-- 后续：DOCX/文本型 PDF、XLSX/图片资产、项目知识库检索及完整恢复回归。
+- M5-B3C（DONE）：DOCX 段落/标题定位与文本型 PDF 逐页解析；ZIP、页数、图像和超时受限；扫描 PDF 不伪装 OCR 成功。
+- 后续：XLSX/图片资产、项目知识库检索及完整恢复回归。
 - 验收：原文件保留；新解析不覆盖；位置可追踪；失败不伪装 READY。
 - 停止条件：解析破坏原文件、来源位置丢失或项目隔离失败。
 

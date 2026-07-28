@@ -12,7 +12,7 @@
 - M2 审核状态：用户已批准，作为核心写作工作台和视觉基线
 - 当前有效需求：`docs/requirements/论文AI科研全流程平台需求说明_V0.5.1_M4修订版.txt`
 - M4 起点 HEAD：`6344af03bcc8ed58e3f849c7cd92c6b7184aa509`
-- 当前批次：M5-B3B TXT、CSV、BibTeX、RIS 版本化解析与来源定位
+- 当前批次：M5-B3C DOCX 与文本型 PDF 解析
 - M4 审计与批次计划：`docs/audits/m4-v051-gap-and-batches.md`
 - M5 批次计划：`docs/audits/m5-v051-batches.md`
 - 生产部署：未授权、未执行
@@ -38,7 +38,8 @@
 - M5-B2D：DONE — 有界消息分页、追加式压缩计划、连续摘要来源、恢复快照、失败重试策略与完整权限回归。
 - M5-B3A：DONE — Storage Adapter、本地 R2、真实上传、安全探测、0006、隔离与补偿。
 - M5-B3B：DONE — TXT、CSV、BibTeX、RIS 解析；ParseRun/Chunk 版本、来源位置、失败状态、隔离与幂等。
-- M5-B3C 以后：PENDING — DOCX/文本型 PDF、XLSX/图片资产、项目知识库与恢复回归。
+- M5-B3C：DONE — DOCX 段落/标题位置与文本型 PDF 页码解析；扫描 PDF 明确要求 OCR，未伪装成功。
+- M5-B3D 以后：PENDING — XLSX/图片资产、项目知识库与恢复回归。
 - M5-B4：PENDING — 真实 Provider、凭据与六 Skill Adapter。
 - M5-B5：PENDING — 执行、审阅、候选/采用版本、DOCX 与 M5 收尾。
 
@@ -52,4 +53,4 @@
 
 ## 下一步
 
-继续 M5-B3C DOCX 与文本型 PDF；当前仅四种文本/文献格式可进入 `success`，其他格式仍保持 `awaiting_parse`。
+继续 M5-B3D XLSX 结构解析与图片资产登记；扫描 PDF 仍保持失败并标记 `SCANNED_PDF_OCR_REQUIRED`。
