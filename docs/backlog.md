@@ -2,11 +2,11 @@
 
 ## READY
 
-- M5-B4：确认平台凭据来源和用户 Key 提交流程。
+- M5 外部验收：用户显式提供专用测试凭据后，验证一次 OpenAI/DeepSeek 连接与有界任务；不得使用生产 Key。
 
 ## IN_PROGRESS
 
-- 无。M5-B2A—B2D 已完成并停在 M5-B2 整体审核点。
+- 无。当前停在 M7 审核门。
 
 ## DONE
 
@@ -25,11 +25,15 @@
 - M5-B2C：ToolIntent、Action Proposal、用户决定和恢复状态 Repository/API；确认只到 `READY_TO_QUEUE`，0008 仅生成未执行。
 - M5-B2D：会话分页、追加式压缩计划、连续摘要来源、恢复快照、幂等失败重试与权限完整回归；无新迁移。
 - M5-B3A：Storage Adapter、本地 Miniflare R2、真实上传、安全文件探测、不可覆盖对象记录、0006、隔离与失败补偿。
+- M5-B3B—B5B：全格式解析、项目知识检索、加密凭据、Provider/Skill Adapter、有界 Runner、任务结果与候选版本。
+- M6：Claim/Evidence、严格核验、高级审阅、Data Availability、投稿准备、真实 DOCX 和 Word 打开验证。
+- M7：决定信、Comment、Revision Task、Response Draft、修改核对和 Response Letter DOCX。
 
-## M6 以后
+## M8 以后
 
-- M6：正式引用证据、检查流程和真实 DOCX。
-- M7—M10：返修、图件、PPT 和发布候选。
+- M8：科研图件。
+- M9：课程/学术/答辩 PPT 与真实 PPTX。
+- M10：管理员、运营与发布候选。
 - M11：只有用户明确授权后才可生产部署。
 
-M5 不得提前启动 M6 以后能力或生产部署。
+未经用户后续批准不得启动 M8 以后能力或生产部署。

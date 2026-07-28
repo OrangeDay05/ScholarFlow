@@ -9,7 +9,7 @@
 | R-005 | 页面出现 V0.3 排除功能入口 | 中 | 高 | 验收矩阵与浏览器检查逐项扫描 | QA | MITIGATED |
 | R-006 | 开发服务器存在多 renderer 警告 | 中 | 中 | M2 收尾时精确清理重复服务器；固定 3000 单实例干净复测，控制台与 stderr 为空且无该警告 | Root Agent | CLOSED |
 | R-007 | 视觉变更频繁导致已批准基线漂移 | 中 | 中 | 所有用户视觉反馈写入 change-log；M1 审核后冻结 | Root Agent | OPEN |
-| R-008 | 未经批准误触生产部署 | 低 | 高 | M8 前禁止部署；hosting.json 不创建第二项目 | Root Agent | MITIGATED |
+| R-008 | 未经批准误触生产部署 | 低 | 高 | M11 前禁止部署；hosting.json 不创建第二项目 | Root Agent | MITIGATED |
 | R-009 | 六项 Skill 看起来都可用，但实际前置条件不同 | 高 | 中 | 按诊断、章节和已授权可读材料动态禁用并解释原因 | Root Agent | MITIGATED |
 | R-010 | M2 Mock 被误解为真实文件解析、AI 或 DOCX 产物 | 中 | 高 | 页面持续显示 Mock；审核包逐项说明未接入能力 | Root Agent | MITIGATED |
 | R-011 | 独立滚动容器导致章节高亮或证据定位状态漂移 | 中 | 中 | 中栏用滚动容器内 IntersectionObserver；章节和证据使用稳定 ID；浏览器双向点击回归 | Root Agent | MITIGATED |
@@ -22,9 +22,12 @@
 | R-018 | 双模型 Mock 被误认为已经接入真实供应商或能验证事实 | 中 | 高 | 页面持续标 Mock；报告明确模型名和结果均为演示；功能开关可完全关闭 | Root Agent | MITIGATED |
 | R-019 | 自动审阅直接覆盖正文或形成无限生成循环 | 中 | 高 | 审阅只出报告；用户明确采纳；修订只追加版本；最多一次自动修订和一次最终验证 | Root Agent | MITIGATED |
 | R-020 | AI 推测被误写为用户事实，或诊断不完整锁死整个项目 | 中 | 高 | 字段状态与来源分离；AI 推测显著标记；采用任务级就绪而非全局必填门 | Root Agent | MITIGATED |
-| R-021 | 真实 API Key 被前端保存、日志记录或跨用户泄漏 | 中 | 高 | M3 禁用真实输入且无 fetch/storage；只显示掩码 Mock；真实加密与隔离延后到服务端实现 | Root Agent | MITIGATED |
+| R-021 | 真实 API Key 被前端保存、日志记录或跨用户泄漏 | 中 | 高 | M5 服务端 AES-GCM、owner/credential AAD、独立密文表、安全错误和显式操作；前端不持久明文 | Root Agent | MITIGATED |
 | R-022 | 增加模型数量被误认为提高事实可信度，或形成无限调用 | 中 | 高 | 一致意见仍要求原始证据；保留模型来源与冲突；模式设模型数、调用数、超时和停止上限 | Root Agent | MITIGATED |
 | R-023 | 本地 Schema 实际状态与 migration 台账不一致，重复执行会因表已存在失败 | 高 | 高 | 用户批准方案 A；完整归档旧状态后由标准 Wrangler 流程创建新持久化 D1，0000→0004 台账、58 表、幂等、运行时与重启持久化均已验证；归档提供可恢复回滚点 | Root Agent | CLOSED |
 | R-024 | 对敏感材料统一删除或脱敏会改变样本、实验条件、时序、数值精度或参与者关系 | 中 | 高 | 七类材料画像、六种处理模式和七项保真检查已持久化；失败时阻断外传，不执行真实自动脱敏 | Root Agent | MITIGATED |
 | R-025 | PPT 可用性按学历或正式答辩场景硬编码，排除课程、课堂、文献和小组汇报 | 中 | 中 | 13 个场景已进入契约与测试；可用性只按材料就绪度和内容真实性 | Root Agent | MITIGATED |
-| R-026 | BYOK 元数据实现意外接收、回显或记录明文 Key | 中 | 高 | M4 API 已拒绝明文字段；只保存掩码、密文引用和角色/范围元数据；真实加密与连接延后 M5 | Root Agent | MITIGATED |
+| R-026 | BYOK 元数据实现意外接收、回显或记录明文 Key | 中 | 高 | M4 元数据与 M5 密文分表；保存、测试、禁用、删除均按 owner/project 限定，响应只返回掩码 | Root Agent | MITIGATED |
+| R-027 | 证据绑定引用旧解析、冲突原文或模型常识，却被标记已验证 | 中 | 高 | 只允许最新成功 ParseRun 的 MaterialChunk；直接引文必须文本匹配；冲突/高风险未核验阻断导出 | Root Agent | MITIGATED |
+| R-028 | 返修系统在未实际修改或用户未确认回复时声称意见已解决 | 中 | 高 | 比较基础/结果版本 hash、同章节关系与用户确认 Response Draft；失败保持 ready_for_review | Root Agent | MITIGATED |
+| R-029 | 生成的 DOCX 结构损坏或内容来源不明确 | 中 | 高 | OOXML 解包测试、不可变对象、来源版本/返修任务记录与本机 Word 只读打开验证 | Root Agent | MITIGATED |

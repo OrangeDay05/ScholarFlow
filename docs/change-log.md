@@ -1,5 +1,14 @@
 # 变更日志
 
+## 2026-07-29 · M5—M7 连续实现与审核收尾
+
+- M5 完成 TXT/CSV/BibTeX/RIS/DOCX/文本 PDF/XLSX/图片解析、项目知识检索、AES-GCM 用户凭据、OpenAI/DeepSeek Adapter、六 Skill 共用请求、有界 Runner、候选版本和部分失败保留。
+- 修复 I-017 预算暂停自动恢复和 I-018 Provider 安全错误字段；没有真实测试凭据时不发起或伪报供应商调用。
+- M6 新增 Claim/Evidence 到最新成功 MaterialChunk 的严格核验、冲突和高风险导出阻断、高级审阅、Data Availability、投稿准备和真实 DOCX。
+- DOCX 经 OOXML 解包测试和本机 Microsoft Word 不可见只读打开验证，标题、章节、段落和参考文献可读取。
+- M7 新增决定信拆分、Reviewer/Comment、Revision Task、同意/部分同意/不同意策略、未完成实验警告、Response Draft 追加版本、用户确认、修改核对和 Response Letter DOCX。
+- 当前停在 M7 审核门；未进入 M8 科研图件、M9 PPTX、M10 发布候选或 M11 部署。
+
 ## 2026-07-28 · M5-B2D 会话压缩、恢复与权限回归
 
 - 会话消息读取改为有界分页，默认 50 条、最多 100 条，并提供向前分页状态，避免长期会话一次加载全部消息。

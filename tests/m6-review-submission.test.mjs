@@ -7,8 +7,8 @@ import { env as workerEnv } from "./cloudflare-workers-shim.mjs";
 
 test("advanced review is scoped to exact versions and stores evidence-bound findings", async () => {
   const database = await databaseWithProject(); workerEnv.DB = new D1DatabaseAdapter(database);
-  const result = await createM6AdvancedReview(actor, "project-a", { versionIds: ["version-a"], findings: [{ perspective: "LOGIC", severity: "minor", sectionId: "section-a", summary: "Clarify the inference boundary.", evidenceBindingIds: [] }] });
-  assert.equal(result.status, "succeeded"); assert.equal(result.findingCount, 1);
+  const result = await createM6AdvancedReview(actor, "project-a", { versionIds: ["version-a"], findings: [{ perspective: "JOURNAL", severity: "minor", sectionId: "section-a", summary: "Clarify the inference boundary.", evidenceBindingIds: [] }, { perspective: "STATISTICS", severity: "note", sectionId: "section-a", summary: "Report uncertainty explicitly.", evidenceBindingIds: [] }] });
+  assert.equal(result.status, "succeeded"); assert.equal(result.findingCount, 2);
   assert.deepEqual(JSON.parse(database.prepare("SELECT scope_json FROM review_runs WHERE id = ?").get(result.id).scope_json).versionIds, ["version-a"]);
 });
 

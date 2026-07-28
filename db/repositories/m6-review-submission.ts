@@ -3,7 +3,7 @@ import { getD1 } from "../index";
 import { evaluateM6ExportReadiness } from "./m6-evidence";
 
 type Context = { userId: string; projectId: string };
-export type M6ReviewPerspective = "METHOD" | "EVIDENCE" | "LOGIC" | "REPORTING" | "LANGUAGE";
+export type M6ReviewPerspective = "JOURNAL" | "METHOD" | "STATISTICS" | "THEORY" | "LANGUAGE_STRUCTURE" | "CITATION_EVIDENCE";
 
 export class M6ReviewSubmissionError extends Error {
   readonly code: "PROJECT_NOT_FOUND" | "VERSION_NOT_FOUND" | "EVIDENCE_NOT_FOUND" | "INVALID_INPUT";

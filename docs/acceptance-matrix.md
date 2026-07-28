@@ -1,6 +1,6 @@
 # 论文 AI 系统 V0.3 验收矩阵
 
-文档状态：M5 V0.5.1 真实服务实施中
+文档状态：M7 V0.5.1 实现完成，等待审核；M5 真实供应商端到端待专用测试凭据
 
 适用版本：V0.3 简易通版
 
@@ -259,3 +259,21 @@
 | M5-B2-04 | 用户确认门 | 未确认等待用户；确认只到待入队；拒绝终止；决定不可覆盖且不直接创建 AI Task | `tests/m5-action-proposal-persistence.test.mjs` | 通过 |
 | M5-B2-05 | 恢复与重试 | 重载后可派生恢复动作；安全重试复用幂等键；恢复状态不包含模型执行 | B2 专项与全量回归 | 通过 |
 | M5-B2-06 | 阶段边界 | 不调用真实模型、不接收真实 Key、不执行 Skill、不执行新增迁移、不部署 | 源码扫描、Git diff、构建 | 通过 |
+
+## 16. M5—M7 实现审核门
+
+| ID | 检查项 | 可测试验收条件 | 验证证据 | 当前状态 |
+|---|---|---|---|---|
+| M5-REAL-01 | 文件解析 | 支持范围内格式有 ParseRun/Chunk、来源位置、资源上限和失败状态；扫描 PDF 不冒充 OCR | `tests/m5-*.test.mjs` | 通过 |
+| M5-REAL-02 | Provider 与凭据 | 用户 Key 仅服务端 AES-GCM；统一安全错误；调用有上限、预算暂停等待用户 | `tests/m5-provider-credentials.test.mjs`、`tests/m5-task-runner.test.mjs` | 通过（真实供应商端到端待测试凭据） |
+| M5-REAL-03 | 版本边界 | 生成/修订只追加候选版本，默认不采用；审阅/验证只存报告；部分失败保留成功产物 | `tests/m5-task-results.test.mjs` | 通过 |
+| M6-01 | 真实证据 | Evidence 只绑定最新成功且有权访问的 MaterialChunk；直接引文必须在片段中 | `tests/m6-evidence.test.mjs` | 通过 |
+| M6-02 | 导出门 | 冲突证据、高风险未核验、正式引用元数据未核验阻断 DOCX | `tests/m6-evidence.test.mjs`、`tests/m6-docx-export.test.mjs` | 通过 |
+| M6-03 | 高级审阅与投稿 | Finding 不改正文；数据材料存在时要求 Data Availability；检查表未完成阻断 | `tests/m6-review-submission.test.mjs` | 通过 |
+| M6-04 | DOCX 真实打开 | OOXML 包包含标题、章节、正文和参考文献；本机 Word 可只读打开 | DOCX 专项 2/2；Word `Opened=true`、6 段 | 通过 |
+| M7-01 | 决定信与 Comment | Reviewer/Comment 可拆分、编号、持久化并跟踪状态 | `tests/m7-revision-workflow.test.mjs` | 通过 |
+| M7-02 | 用户回应决定 | 支持同意/部分同意/不同意；后两者必须有理由；未完成实验显式警告 | M7 专项测试与 API 校验 | 通过 |
+| M7-03 | 返修版本 | 基础版本不覆盖；返修结果创建新版本并绑定 Revision Task | `tests/m7-revision-workflow.test.mjs` | 通过 |
+| M7-04 | 回复与修改核对 | Response Draft 追加版本；用户确认后才可完成修改核对 | `tests/m7-revision-workflow.test.mjs` | 通过 |
+| M7-05 | Response Letter | 仅已验证返修与用户确认回复可导出 DOCX，绑定任务和结果版本 | `tests/m7-revision-workflow.test.mjs` | 通过 |
+| M7-GATE | 阶段边界 | 未进入 M8/M9/M10/M11；未生成图件/PPTX，未部署 | Git diff、路由/构建扫描 | 通过 |
