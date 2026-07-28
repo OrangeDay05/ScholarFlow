@@ -771,24 +771,11 @@ async function resolveContext(
   actor: M3Actor,
   requestedProjectId: string,
 ): Promise<{ userId: string; project: ProjectRow }> {
-  let user = await db
-    .prepare("SELECT id FROM users WHERE email = ?")
-    .bind(actor.email)
+  const user = await db
+    .prepare("SELECT id FROM users WHERE id = ? AND status = 'active'")
+    .bind(actor.userId)
     .first<UserRow>();
-  if (!user) {
-    const id = crypto.randomUUID();
-    await db
-      .prepare(
-        `INSERT OR IGNORE INTO users (id, email, display_name) VALUES (?, ?, ?)`,
-      )
-      .bind(id, actor.email, actor.displayName)
-      .run();
-    user = await db
-      .prepare("SELECT id FROM users WHERE email = ?")
-      .bind(actor.email)
-      .first<UserRow>();
-  }
-  if (!user) throw new Error("无法初始化当前用户。");
+  if (!user) throw new Error("当前 Session 用户不存在或已停用。");
   const project =
     requestedProjectId === "demo"
       ? await db

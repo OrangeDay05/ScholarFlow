@@ -7,10 +7,10 @@ import { getM3Actor, type M3Actor } from "@/app/lib/m3-server-identity";
 import { M4ProjectRepositoryError } from "@/db/repositories/m4-projects";
 import { apiError } from "../m3/_shared";
 
-export function requireM4Actor(
+export async function requireM4Actor(
   request: Request,
   scope: "core" | "diagnosis" = "core",
-): { actor: M3Actor } | { response: Response } {
+): Promise<{ actor: M3Actor } | { response: Response }> {
   const enabled =
     M3_PERSISTENCE_ENABLED &&
     (scope === "diagnosis"
@@ -25,7 +25,7 @@ export function requireM4Actor(
       ),
     };
   }
-  const actor = getM3Actor(request);
+  const actor = await getM3Actor(request);
   return actor
     ? { actor }
     : {

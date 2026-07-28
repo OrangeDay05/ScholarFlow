@@ -44,7 +44,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
-  const auth = requireM4Actor(request);
+  const auth = await requireM4Actor(request);
   if ("response" in auth) return auth.response;
   try {
     return apiSuccess(
@@ -59,7 +59,7 @@ export async function POST(
   request: Request,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
-  const auth = requireM4Actor(request);
+  const auth = await requireM4Actor(request);
   if ("response" in auth) return auth.response;
   let body: unknown;
   try {

@@ -1,5 +1,13 @@
 # 变更日志
 
+## 2026-07-28 · M4-H2 完成 CORE-01 真实认证
+
+- 增加真实邮箱/手机号注册、输入标准化与唯一性检查；密码使用 Web Crypto PBKDF2-SHA256、独立随机盐和版本化参数保存，数据库与 API 均不保存或返回明文密码。
+- 增加注册、登录、退出和 Session API；Session 使用高熵随机 Token，D1 只保存 SHA-256 哈希，Cookie 为 HttpOnly、SameSite=Lax、Path=/，生产环境启用 Secure，并支持到期与撤销。
+- 增加 0005 增量迁移，为 users 补充 `password_hash` 和 `last_login_at`；当前本地 D1 按既有迁移链增量应用，未重建或清空数据库。
+- 项目页面与 M3/M4 API 统一从服务器 Session 获取当前用户；匿名页面重定向登录、匿名 API 返回 401、跨用户资源返回 404，前端 `user_id` 和旧测试 Header 均不能决定所有者。
+- CORE-01 更新为通过，M4 恢复 `M4_PASS` 并继续停在审核门；未进入 M5、调用真实模型、接收真实 Key、执行真实脱敏、生成 PPTX 或部署。
+
 ## 2026-07-28 · M4-H1 解决 I-015 本地 D1 基线
 
 - 用户批准 `M4_PASS_WITH_BLOCKER` 和方案 A；旧 42 表/0 台账的 Miniflare D1 状态完整归档到 `E:\论文系统\local-d1-archives\20260728-102348-I-015-9391D72F`，归档库 SHA-256 保持 `9391D72F0987F2B3080152582D41DA898214FCEF35250F547A4F4282CEC15CDD`。

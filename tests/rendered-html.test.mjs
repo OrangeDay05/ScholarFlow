@@ -29,16 +29,10 @@ async function render(pathname) {
   return { response, html: await response.text() };
 }
 
-test("server-renders the M2 clickable-loop and admin routes", async () => {
+test("server-renders public authentication and admin routes", async () => {
   const routes = [
     ["/login", /进入你的论文工作区/],
-    ["/projects", /当前最重要的下一步/],
-    ["/projects/new", /先说，你手里有什么/],
-    ["/projects/new/idea", /把一个念头，变成研究起点/],
-    ["/projects/demo/diagnosis", /AI 引导梳理/],
-    ["/projects/demo/outline", /确认论文目录/],
-    ["/projects/demo/editor", /AI 工作台/],
-    ["/projects/demo/export", /Word 导出检查/],
+    ["/register", /开始独立研究工作区/],
     ["/admin/users", /用户管理/],
     ["/admin/projects-files", /项目与文件/],
     ["/admin/tasks", /AI 任务/],
@@ -50,7 +44,22 @@ test("server-renders the M2 clickable-loop and admin routes", async () => {
     assert.equal(response.status, 200, `${pathname} should render`);
     assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
     assert.match(html, expectation, `${pathname} should contain its page landmark`);
-    assert.match(html, /Mock|MOCK|演示/, `${pathname} should identify non-real data`);
+  }
+});
+
+test("anonymous project pages redirect to login", async () => {
+  for (const pathname of [
+    "/projects",
+    "/projects/new",
+    "/projects/new/idea",
+    "/projects/demo/diagnosis",
+    "/projects/demo/outline",
+    "/projects/demo/editor",
+    "/projects/demo/export",
+  ]) {
+    const { response } = await render(pathname);
+    assert.ok([302, 307, 308].includes(response.status), `${pathname} should redirect`);
+    assert.match(response.headers.get("location") ?? "", /\/login\?return_to=/);
   }
 });
 
@@ -225,18 +234,6 @@ test("renders the gated V0.4.2 incremental mock pages without replacing M2", asy
 });
 
 test("renders the gated dual-model review mock inside the M2 editor", async () => {
-  const { response, html } = await render("/projects/demo/editor?section=introduction");
-  assert.equal(response.status, 200);
-
-  for (const landmark of [
-    "AI 复核",
-    "严格复核",
-    "DeepSeek Reasoner",
-    "审阅只创建报告",
-  ]) {
-    assert.match(html, new RegExp(landmark));
-  }
-
   const [flagSource, contractSource, editorSource] = await Promise.all([
     readFile(new URL("../app/lib/dual-model-review-features.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/lib/dual-model-review-mock.ts", import.meta.url), "utf8"),
@@ -246,6 +243,11 @@ test("renders the gated dual-model review mock inside the M2 editor", async () =
     ),
   ]);
 
+  for (const landmark of ["AI 复核", "严格复核", "审阅只创建报告"]) {
+    assert.match(editorSource, new RegExp(landmark));
+  }
+  assert.match(contractSource, /DeepSeek Reasoner/);
+
   assert.match(flagSource, /NEXT_PUBLIC_DUAL_MODEL_REVIEW_MOCK/);
   assert.match(contractSource, /REVIEW_FAILED/);
   assert.match(contractSource, /PASSED_WITH_WARNINGS/);
@@ -254,19 +256,6 @@ test("renders the gated dual-model review mock inside the M2 editor", async () =
 });
 
 test("renders the progressive diagnosis entry without adding a seventh skill", async () => {
-  const { response, html } = await render("/projects/demo/diagnosis");
-  assert.equal(response.status, 200);
-
-  for (const landmark of [
-    "AI 引导梳理",
-    "快速开始",
-    "从材料自动提取",
-    "完整专业填写",
-    "创建项目只需要 3 个答案",
-  ]) {
-    assert.match(html, new RegExp(landmark));
-  }
-
   const [flagSource, pageSource, mockSource] = await Promise.all([
     readFile(new URL("../app/lib/progressive-diagnosis-features.ts", import.meta.url), "utf8"),
     readFile(
@@ -278,6 +267,16 @@ test("renders the progressive diagnosis entry without adding a seventh skill", a
     ),
     readFile(new URL("../app/lib/m1-mock.ts", import.meta.url), "utf8"),
   ]);
+
+  for (const landmark of [
+    "AI 引导梳理",
+    "快速开始",
+    "从材料自动提取",
+    "完整专业填写",
+    "创建项目只需要 3 个答案",
+  ]) {
+    assert.match(pageSource, new RegExp(landmark));
+  }
 
   assert.match(flagSource, /NEXT_PUBLIC_PROGRESSIVE_DIAGNOSIS_MOCK/);
   assert.match(pageSource, /不调用真实动态模型/);

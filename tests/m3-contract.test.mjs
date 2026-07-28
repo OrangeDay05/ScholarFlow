@@ -56,10 +56,11 @@ test("keeps owner isolation and append-only section restoration", async () => {
   assert.match(repository, /source_version_id/);
 });
 
-test("keeps M3 persistence and local demo identity explicitly gated", async () => {
-  const [feature, identity, viteConfig] = await Promise.all([
+test("keeps M3 persistence gated and requires server sessions", async () => {
+  const [feature, identity, auth, viteConfig] = await Promise.all([
     source("../app/lib/m3-features.ts"),
     source("../app/lib/m3-server-identity.ts"),
+    source("../app/lib/auth.ts"),
     source("../vite.config.ts"),
   ]);
 
@@ -67,8 +68,8 @@ test("keeps M3 persistence and local demo identity explicitly gated", async () =
     feature,
     /NEXT_PUBLIC_M3_PERSISTENCE_ENABLED === "true"/,
   );
-  assert.match(identity, /M3_ALLOW_LOCAL_DEMO_IDENTITY === "true"/);
-  assert.match(identity, /M3_LOCAL_DEMO_USER_EMAIL/);
-  assert.match(viteConfig, /vars: localDemoVars/);
-  assert.match(viteConfig, /M3_ALLOW_LOCAL_DEMO_IDENTITY === "true"/);
+  assert.match(identity, /resolveRequestSession/);
+  assert.match(auth, /SESSION_COOKIE_NAME/);
+  assert.doesNotMatch(identity, /oai-authenticated-user-email/);
+  assert.doesNotMatch(viteConfig, /M3_ALLOW_LOCAL_DEMO_IDENTITY/);
 });

@@ -1,8 +1,11 @@
 import Link from "next/link";
 import { Brand, MockBadge } from "../components/AppShell";
+import { redirectAuthenticatedUser } from "../lib/page-auth";
 import styles from "../login/Auth.module.css";
+import RegisterForm from "./RegisterForm";
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
+  await redirectAuthenticatedUser();
   return (
     <main className={styles.authPage}>
       <header className={styles.authHeader}>
@@ -16,8 +19,8 @@ export default function RegisterPage() {
       <section className={styles.authGrid}>
         <div className={styles.hero}>
           <div className={styles.heroTop}>
-            <MockBadge>注册骨架 · Mock</MockBadge>
-            <span className={styles.heroIndex}>M1 / 02</span>
+            <MockBadge>账户安全 · M4</MockBadge>
+            <span className={styles.heroIndex}>M4 / CORE-01</span>
           </div>
           <div className={styles.heroCopy}>
             <p className={styles.kicker}>A workspace for one author.</p>
@@ -36,39 +39,15 @@ export default function RegisterPage() {
         <div className={styles.formPanel}>
           <div className={styles.formHeading}>
             <p>创建账号</p>
-            <h2>开始一个演示工作区</h2>
-            <span>填写信息后将进入 Mock 项目列表</span>
+            <h2>开始独立研究工作区</h2>
+            <span>邮箱和手机号均须唯一</span>
           </div>
-
-          <div className={styles.form}>
-            <label>
-              <span>姓名或称呼</span>
-              <input autoComplete="name" defaultValue="林研究员" name="name" type="text" />
-            </label>
-            <label>
-              <span>邮箱</span>
-              <input autoComplete="email" defaultValue="researcher@example.com" name="email" type="email" />
-            </label>
-            <label>
-              <span>设置密码</span>
-              <input autoComplete="new-password" defaultValue="mock-password" name="password" type="password" />
-            </label>
-
-            <div className={styles.errorSample} role="status">
-              <strong>校验状态样例</strong>
-              <span>邮箱格式、密码长度等提示将在此显示；当前不会创建或保存真实账号。</span>
-            </div>
-
-            <Link className={styles.primaryButton} href="/projects">
-              创建并进入演示 <span aria-hidden="true">→</span>
-            </Link>
-          </div>
-
+          <RegisterForm />
           <p className={styles.switchLine}>
             已有账号？ <Link href="/login">返回登录</Link>
           </p>
           <p className={styles.disclaimer}>
-            这是 M1 注册视觉骨架，不包含短信、邮件验证或真实账号持久化。
+            密码使用独立随机盐派生并只保存安全哈希；注册成功后自动登录。
           </p>
         </div>
       </section>

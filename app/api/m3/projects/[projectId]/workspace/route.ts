@@ -9,7 +9,7 @@ export async function GET(
   request: Request,
   { params }: { params: Promise<{ projectId: string }> },
 ) {
-  const auth = requireM3ApiActor(request);
+  const auth = await requireM3ApiActor(request);
   if ("response" in auth) return auth.response;
   const { projectId } = await params;
   const section =

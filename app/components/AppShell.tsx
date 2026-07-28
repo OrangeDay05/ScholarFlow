@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { MODEL_ORCHESTRATION_MOCK_ENABLED } from "../lib/model-orchestration-features";
 import { V042_INCREMENTAL_MOCK_ENABLED } from "../lib/v042-features";
+import LogoutButton from "./LogoutButton";
 import styles from "./AppShell.module.css";
 
 type AppShellProps = {
@@ -58,6 +59,7 @@ export function AppShell({
         <div className={styles.account}>
           <MockBadge />
           <span className={styles.avatar}>林</span>
+          <LogoutButton />
         </div>
       </header>
 

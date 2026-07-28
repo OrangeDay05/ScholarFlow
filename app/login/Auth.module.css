@@ -246,7 +246,13 @@
   background: var(--forest);
   color: var(--cream);
   font-weight: 800;
+  cursor: pointer;
   text-decoration: none;
+}
+
+.primaryButton:disabled {
+  cursor: wait;
+  opacity: 0.7;
 }
 
 .primaryButton:hover {

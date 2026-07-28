@@ -15,7 +15,7 @@ export async function POST(
     params: Promise<{ projectId: string; sectionSlug: string }>;
   },
 ) {
-  const auth = requireM3ApiActor(request);
+  const auth = await requireM3ApiActor(request);
   if ("response" in auth) return auth.response;
 
   let body: unknown;

@@ -24,6 +24,8 @@ M4 将 M3 已批准的渐进式诊断、多模型复核和扩展业务 Mock 转�
 | M4-B6 | PPT 场景/版本/来源与模型、凭据、ExecutionProfile 元数据 | `3b472a5` |
 | M4-B7 | API 隔离、迁移预检、全量 QA 与审核门 | 本报告对应提交 |
 | M4-H1 | I-015 方案 A：归档旧 D1、新持久化 D1 与运行时重启验收 | 本轮独立提交 |
+| M4-H2A | 注册、登录、密码哈希、服务器 Session、退出和 0005 增量迁移 | `6236917` |
+| M4-H2B | 页面/API 游客门禁、Session 所有者隔离、测试与审核收尾 | 本报告对应提交 |
 
 ## 3. 页面与既有前端
 
@@ -83,12 +85,21 @@ M4 没有重写 M2/M3 页面。登录、项目列表、五种创建入口、诊�
 
 ## 5. 所有者与资源隔离
 
-所有项目域 Repository 先解析平台身份，再绑定 `owner_user_id` 和 `project_id`。请求级集成测试已验证：
+所有项目域 Repository 从服务器端 Session 解析当前用户，再绑定 `owner_user_id` 和 `project_id`。前端提交的用户 ID、旧测试 Header 或本地演示身份均不能决定所有者。请求级集成测试已验证：
 
 - 匿名访问返回 401。
 - 用户 A 可创建并读取自己的项目。
 - 用户 B 看不到用户 A 的项目，显式访问其资源返回 404。
 - 材料、任务、隐私、模型配置和 PPT 路由沿用同一所有者边界。
+
+## 5.1 CORE-01 真实认证
+
+- 注册支持邮箱、手机号、密码与确认密码；邮箱和手机号标准化后分别唯一，重复值返回明确业务错误。
+- 密码使用 Web Crypto PBKDF2-SHA256（210,000 次迭代、每个密码 16 字节随机盐、32 字节派生结果），保存算法版本和参数；比较采用恒定时间 XOR 汇总，不记录或返回明文/哈希。
+- 注册与 Session 创建在同一 D1 batch 中完成。登录可使用邮箱或手机号，账号不存在和密码错误统一返回 `INVALID_CREDENTIALS`，成功后更新最后登录时间并记录合规审计信息。
+- Session Token 为 32 字节随机值，数据库只保存 SHA-256 哈希；Cookie 为 HttpOnly、SameSite=Lax、Path=/、7 天到期，生产环境启用 Secure。退出立即撤销，过期或撤销 Session 返回 401。
+- `/projects/**` 在服务端校验 Session；游客重定向 `/login`。M3/M4 受保护 API 使用同一 Session 身份，游客返回 401、跨用户资源返回 404。
+- 浏览器验证注册成功、登录失败停留、登录成功、退出撤销以及退出后项目页重新要求登录；API 集成验证应用 Worker 重建后未过期 Session 仍可使用。
 
 ## 6. Migration 与本地数据库
 
@@ -99,12 +110,13 @@ M4 没有重写 M2/M3 页面。登录、项目列表、五种创建入口、诊�
 - `drizzle/0002_petite_sir_ram.sql`
 - `drizzle/0003_condemned_magik.sql`
 - `drizzle/0004_nervous_maddog.sql`
+- `drizzle/0005_freezing_nextwave.sql`
 
-0000→0004 已同时在全新内存 SQLite 和新的持续存在 Miniflare/D1 文件中顺序执行，得到 58 张业务表。新增迁移只增加表、列和索引；自动化检查禁止 `DROP`、`DELETE`、`TRUNCATE`、危险 `ALTER ... DROP/RENAME`。
+0000→0005 已同时在全新内存 SQLite 和新的持续存在 Miniflare/D1 文件中顺序执行，仍为 58 张业务表。0005 只为 `users` 增加 `password_hash`、`last_login_at`；迁移不含账号、密码或 Session 数据。新增迁移只增加表、列和索引；自动化检查禁止 `DROP`、`DELETE`、`TRUNCATE`、危险 `ALTER ... DROP/RENAME`。
 
 用户批准方案 A 后，旧 42 表/0 台账状态目录被完整移动到 `E:\论文系统\local-d1-archives\20260728-102348-I-015-9391D72F`。归档包含 SQLite、WAL/SHM、元数据、配置快照和清单；主库 SHA-256 归档前后均为 `9391D72F0987F2B3080152582D41DA898214FCEF35250F547A4F4282CEC15CDD`，只读重开确认 42 张业务表和可重建 Mock 数据仍可访问。
 
-当前开发库为 `site\.wrangler\state\v3\d1\miniflare-D1DatabaseObject\faaf2b0445ab934c3aac48ddf0cdfade8f9bac050be98993748742cdd2cb05fb.sqlite`。标准命令 `wrangler d1 migrations apply site-creator-d1 --local --config wrangler.m3-local.jsonc` 记录 0000→0004 共 5 条台账；再次 list/apply 均报告无待执行迁移。`scripts/m4-migration-preflight.mjs` 和只读检查确认 58 张业务表、无缺表、无多余业务表、无列漂移，AI Task、审阅、隐私、PPT、Provider/Model/ExecutionProfile 表与新增列均存在。
+当前开发库为 `site\.wrangler\state\v3\d1\miniflare-D1DatabaseObject\faaf2b0445ab934c3aac48ddf0cdfade8f9bac050be98993748742cdd2cb05fb.sqlite`。标准命令 `wrangler d1 migrations apply site-creator-d1 --local --config wrangler.m3-local.jsonc` 已增量记录 0000→0005 共 6 条台账；未重建或清空数据库。`scripts/m4-migration-preflight.mjs` 和只读检查确认 58 张业务表、无缺表、无多余业务表，认证所需列以及 AI Task、审阅、隐私、PPT、Provider/Model/ExecutionProfile 表均存在。
 
 回滚不依赖删除：停止项目服务，将当前 `.wrangler` D1 状态目录移出，再把已校验归档目录恢复到原位置。生产数据库和真实数据始终未接触。
 
@@ -112,15 +124,15 @@ M4 没有重写 M2/M3 页面。登录、项目列表、五种创建入口、诊�
 
 | 检查 | 结果 |
 |---|---|
-| M4 契约、Repository、隐私、PPT、模型与迁移测试 | 30/30 通过 |
-| M4 请求级 API/隔离集成测试 | 2/2 通过 |
-| 既有 M2/M3/V0.4.2/V0.4.3 回归测试 | 25/25 通过 |
+| M2/M3/M4 契约、Repository、认证、隐私、PPT、模型、迁移与渲染回归 | 57/57 通过 |
+| CORE-01 与 M4 请求级 API/隔离集成测试 | 3/3 通过 |
 | 持久化本地 D1 运行时与重启验收 | 通过；唯一标记 `I015_PERSISTENCE_20260728_1052` |
-| 持久化库只读结构检查 | 5 条迁移台账、58 张业务表、1 个伪匿名映射引用 |
+| 持久化库只读结构检查 | 6 条迁移台账、58 张业务表、认证列与既有伪匿名映射引用均保留 |
 | TypeScript `tsc --noEmit` | 通过 |
 | 全仓 ESLint（排除生成目录） | 通过 |
 | `git diff --check` | 通过 |
 | M4 功能开关开启的 Vinext build | 通过，7 个 M4 API 路由进入构建 |
+| 浏览器认证流程 | 注册、错误登录、成功登录、退出、退出后项目页门禁均通过；控制台无错误 |
 
 请求级 API 集成测试继续使用全新内存 SQLite 和构建后的 Worker；M4-H1 另以真实 Vinext/Miniflare 本地文件 D1 完成运行时写入和重启复查。验收标记包含 2 个诊断版本、2 个父子任务、1 份 ReviewReport/ReviewIssue、用户决定与版本采用、6 种处理副本、3 条外传计划、1 个 ExecutionProfile、13 种 PresentationProject 和 PresentationVersion/Slide。匿名请求返回 401，另一用户列表无项目且越权材料请求返回 404。重启服务器 stderr 为空；两次准确记录的进程树均已停止，端口 3000 已释放。全程未调用外部服务。
 
@@ -138,13 +150,14 @@ M4 后端增量没有新增页面。M4 期间已经完成的编辑器响应式�
 ## 9. 已知问题与未实现内容
 
 - 旧 D1 归档仍保留作为回滚点，不会被 Miniflare 自动复用，也不进入 Git。
-- 两处 M4 开始前已有的 UI 样式修改仍在工作区，属于独立 UI 批次，未纳入 M4-H1。
+- 编辑器与模型设置的两处 UI 样式已在认证任务前作为独立提交完成；M4-H2 未修改或混入这两个文件。
 - 浏览器视觉仍沿用已审核的 M2/M3 页面与本目录 6 张截图；B1—B7 没有新增业务页面。
 - 材料只登记元数据，没有对象存储和真实解析。
 - 凭据只保存安全元数据契约，没有真实 Key、加密实现、连接测试或供应商路由。
 - 隐私能力只记录策略、处理副本和保真结果，没有真实自动脱敏。
 - PPT 只保存项目、版本、幻灯片及来源关系，不生成 PPTX。
 - AI Task、审阅和验证只具备持久化与状态机，不调用真实模型。
+- 本地开发库包含浏览器验收创建的测试账号；不属于 migration、Mock 种子或生产数据，未保存到 Git。
 
 ## 10. 审核事项
 
@@ -157,5 +170,6 @@ M4 后端增量没有新增页面。M4 期间已经完成的编辑器响应式�
 5. 13 种 PPT 场景和来源快照关系。
 6. BYOK 只保存元数据且拒绝明文 Key 的范围。
 7. I-015 已按用户批准的方案 A 解除；审核归档、回滚和持久化运行时证据。
+8. CORE-01 已实现真实认证；审核注册、登录、退出、游客门禁、Session 所有者隔离和 0005 增量迁移证据。
 
-M4 最终结论为 `M4_PASS`。当前仍停留在 M4 审核门；M4 代码、迁移文件、API、Repository、本地数据库基线与测试均已通过，I-015/R-023 已解除。尚未进入 M5，等待用户审核。
+M4 最终结论为 `M4_PASS`。当前仍停留在 M4 审核门；M4 代码、迁移文件、API、Repository、本地数据库基线与测试均已通过，I-015、I-016 与 R-023 已解除，CORE-01 已通过。尚未进入 M5，等待用户审核。

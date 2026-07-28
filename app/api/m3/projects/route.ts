@@ -23,7 +23,7 @@ const creationMethods = new Set<M3CreationMethod>([
 ]);
 
 export async function GET(request: Request) {
-  const auth = requireM3ApiActor(request);
+  const auth = await requireM3ApiActor(request);
   if ("response" in auth) return auth.response;
 
   try {
@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = requireM3ApiActor(request);
+  const auth = await requireM3ApiActor(request);
   if ("response" in auth) return auth.response;
 
   let body: unknown;

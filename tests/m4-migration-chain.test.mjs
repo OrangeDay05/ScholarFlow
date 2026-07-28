@@ -13,18 +13,20 @@ function executableSql(sql) {
 test("M4 migrations apply in order to a fresh isolated SQLite database", async () => {
   const db = new DatabaseSync(":memory:");
   db.exec("PRAGMA foreign_keys = ON");
-  const [m0, m1, m2, m3, m4] = await Promise.all([
+  const [m0, m1, m2, m3, m4, m5] = await Promise.all([
     migration("0000_swift_blue_shield.sql"),
     migration("0001_vengeful_tigra.sql"),
     migration("0002_petite_sir_ram.sql"),
     migration("0003_condemned_magik.sql"),
     migration("0004_nervous_maddog.sql"),
+    migration("0005_freezing_nextwave.sql"),
   ]);
   db.exec(executableSql(m0));
   db.exec(executableSql(m1));
   db.exec(executableSql(m2));
   db.exec(executableSql(m3));
   db.exec(executableSql(m4));
+  db.exec(executableSql(m5));
   const tables = db
     .prepare(
       `SELECT name FROM sqlite_master
@@ -71,6 +73,9 @@ test("M4 migrations apply in order to a fresh isolated SQLite database", async (
     assert.ok(tables.includes(table), `${table} should exist after 0004`);
   }
   assert.equal(tables.length, 58);
+  const userColumns = db.prepare("PRAGMA table_info(users)").all().map((row) => row.name);
+  assert.ok(userColumns.includes("password_hash"));
+  assert.ok(userColumns.includes("last_login_at"));
   db.close();
 });
 
@@ -108,4 +113,12 @@ test("0001 is additive and does not contain destructive DDL", async () => {
   );
   assert.doesNotMatch(sql, /\bALTER\s+TABLE\b/i);
   assert.equal((sql.match(/CREATE TABLE `/g) ?? []).length, 5);
+});
+
+test("0005 only adds authentication columns", async () => {
+  const sql = await migration("0005_freezing_nextwave.sql");
+  assert.doesNotMatch(executableSql(sql), /(?:^|;)\s*(?:DROP|DELETE|TRUNCATE)\b/im);
+  assert.equal((sql.match(/ALTER TABLE `users` ADD/g) ?? []).length, 2);
+  assert.match(sql, /password_hash/);
+  assert.match(sql, /last_login_at/);
 });

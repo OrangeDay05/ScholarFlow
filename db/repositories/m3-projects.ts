@@ -729,31 +729,12 @@ async function ensureUser(db: D1Database, actor: M3Actor): Promise<UserRow> {
     .prepare(
       `SELECT id, email, display_name
        FROM users
-       WHERE email = ?`,
+       WHERE id = ? AND status = 'active'`,
     )
-    .bind(actor.email)
+    .bind(actor.userId)
     .first<UserRow>();
   if (existing) return existing;
-
-  const id = crypto.randomUUID();
-  await db
-    .prepare(
-      `INSERT OR IGNORE INTO users (id, email, display_name)
-       VALUES (?, ?, ?)`,
-    )
-    .bind(id, actor.email, actor.displayName)
-    .run();
-
-  const created = await db
-    .prepare(
-      `SELECT id, email, display_name
-       FROM users
-       WHERE email = ?`,
-    )
-    .bind(actor.email)
-    .first<UserRow>();
-  if (!created) throw new Error("无法初始化当前用户。");
-  return created;
+  throw new Error("当前 Session 用户不存在或已停用。");
 }
 
 async function resolveOwnedProjectId(

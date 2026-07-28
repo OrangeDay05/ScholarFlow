@@ -7,6 +7,8 @@ import { env as workerEnv } from "./cloudflare-workers-shim.mjs";
 const enabled = process.env.M4_API_INTEGRATION === "true";
 let worker;
 let database;
+let ownerACookie;
+let ownerBCookie;
 
 class PreparedStatement {
   constructor(db, sql, values = []) {
@@ -75,6 +77,7 @@ async function setup() {
     "0002_petite_sir_ram.sql",
     "0003_condemned_magik.sql",
     "0004_nervous_maddog.sql",
+    "0005_freezing_nextwave.sql",
   ]) {
     const sql = await readFile(new URL(`../drizzle/${name}`, import.meta.url), "utf8");
     database.exec(sql.replaceAll("--> statement-breakpoint", ""));
@@ -85,10 +88,11 @@ async function setup() {
   ({ default: worker } = await import(workerUrl.href));
 }
 
-async function api(pathname, { email, method = "GET", body } = {}) {
+async function api(pathname, { cookie, headers: extraHeaders, method = "GET", body } = {}) {
   await setup();
   const headers = new Headers({ accept: "application/json" });
-  if (email) headers.set("oai-authenticated-user-email", email);
+  if (cookie) headers.set("cookie", cookie);
+  for (const [name, value] of Object.entries(extraHeaders ?? {})) headers.set(name, value);
   if (body !== undefined) headers.set("content-type", "application/json");
   const response = await worker.fetch(
     new Request(`http://localhost${pathname}`, {
@@ -106,12 +110,142 @@ async function api(pathname, { email, method = "GET", body } = {}) {
   return { response, payload };
 }
 
+async function register(email, phone, displayName) {
+  const result = await api("/api/auth/register", {
+    method: "POST",
+    body: {
+      display_name: displayName,
+      email,
+      phone,
+      password: "Secure-pass-123",
+      confirm_password: "Secure-pass-123",
+    },
+  });
+  assert.equal(result.response.status, 201);
+  const setCookie = result.response.headers.get("set-cookie");
+  assert.match(setCookie, /HttpOnly/i);
+  assert.match(setCookie, /SameSite=Lax/i);
+  assert.match(setCookie, /Path=\//i);
+  return setCookie.split(";", 1)[0];
+}
+
+async function login(identifier, password = "Secure-pass-123") {
+  return api("/api/auth/login", {
+    method: "POST",
+    body: { identifier, password },
+  });
+}
+
+test("CORE-01 registers, hashes passwords, authenticates sessions and revokes logout", { skip: !enabled }, async () => {
+  const anonymous = await api("/api/auth/session");
+  assert.equal(anonymous.response.status, 401);
+
+  const mismatch = await api("/api/auth/register", {
+    method: "POST",
+    body: {
+      display_name: "Mismatch",
+      email: "mismatch@example.test",
+      phone: "+8613800000099",
+      password: "Secure-pass-123",
+      confirm_password: "different-pass",
+    },
+  });
+  assert.equal(mismatch.response.status, 400);
+  assert.equal(mismatch.payload.error.code, "VALIDATION_ERROR");
+
+  const missing = await api("/api/auth/register", { method: "POST", body: {} });
+  assert.equal(missing.response.status, 400);
+
+  ownerACookie = await register("OWNER-A@example.test", "+86 138 0000 0001", "Owner A");
+  const storedA = database
+    .prepare("SELECT id, email, phone, password_hash FROM users WHERE email = ?")
+    .get("owner-a@example.test");
+  assert.ok(storedA.password_hash.startsWith("pbkdf2-sha256$v=1$i="));
+  assert.notEqual(storedA.password_hash, "Secure-pass-123");
+  assert.equal(storedA.phone, "+8613800000001");
+  const storedSession = database
+    .prepare("SELECT token_hash FROM sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT 1")
+    .get(storedA.id);
+  assert.ok(storedSession.token_hash);
+  assert.ok(!ownerACookie.includes(storedSession.token_hash));
+
+  const duplicateEmail = await api("/api/auth/register", {
+    method: "POST",
+    body: {
+      display_name: "Duplicate",
+      email: "owner-a@example.test",
+      phone: "+8613800000003",
+      password: "Secure-pass-123",
+      confirm_password: "Secure-pass-123",
+    },
+  });
+  assert.equal(duplicateEmail.payload.error.code, "EMAIL_ALREADY_EXISTS");
+
+  const duplicatePhone = await api("/api/auth/register", {
+    method: "POST",
+    body: {
+      display_name: "Duplicate",
+      email: "other@example.test",
+      phone: "+8613800000001",
+      password: "Secure-pass-123",
+      confirm_password: "Secure-pass-123",
+    },
+  });
+  assert.equal(duplicatePhone.payload.error.code, "PHONE_ALREADY_EXISTS");
+
+  const wrong = await login("owner-a@example.test", "wrong-password");
+  const absent = await login("absent@example.test", "wrong-password");
+  assert.equal(wrong.payload.error.code, "INVALID_CREDENTIALS");
+  assert.equal(absent.payload.error.code, "INVALID_CREDENTIALS");
+  assert.equal(wrong.payload.error.message, absent.payload.error.message);
+
+  const current = await api("/api/auth/session", { cookie: ownerACookie });
+  assert.equal(current.response.status, 200);
+  assert.equal(current.payload.data.user.email, "owner-a@example.test");
+
+  const logout = await api("/api/auth/logout", { cookie: ownerACookie, method: "POST" });
+  assert.equal(logout.response.status, 200);
+  assert.match(logout.response.headers.get("set-cookie"), /Max-Age=0/);
+  assert.equal((await api("/api/auth/session", { cookie: ownerACookie })).response.status, 401);
+
+  let relogin = await login("+8613800000001");
+  assert.equal(relogin.response.status, 200);
+  ownerACookie = relogin.response.headers.get("set-cookie").split(";", 1)[0];
+
+  database.prepare("UPDATE sessions SET expires_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+    .run("2000-01-01T00:00:00.000Z", storedA.id);
+  const expired = await api("/api/auth/session", { cookie: ownerACookie });
+  assert.equal(expired.payload.error.code, "SESSION_EXPIRED");
+
+  relogin = await login("owner-a@example.test");
+  ownerACookie = relogin.response.headers.get("set-cookie").split(";", 1)[0];
+  database.prepare("UPDATE sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL")
+    .run(new Date().toISOString(), storedA.id);
+  assert.equal((await api("/api/auth/session", { cookie: ownerACookie })).response.status, 401);
+
+  relogin = await login("owner-a@example.test");
+  ownerACookie = relogin.response.headers.get("set-cookie").split(";", 1)[0];
+  ownerBCookie = await register("owner-b@example.test", "+8613800000002", "Owner B");
+
+  const previousWorker = worker;
+  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
+  workerUrl.searchParams.set("auth-restart-test", `${process.pid}-${Date.now()}`);
+  ({ default: worker } = await import(workerUrl.href));
+  assert.notEqual(worker, previousWorker);
+  assert.equal((await api("/api/auth/session", { cookie: ownerACookie })).response.status, 200);
+});
+
 test("M4 APIs reject anonymous access and isolate project resources", { skip: !enabled }, async () => {
   const anonymous = await api("/api/m4/projects");
   assert.equal(anonymous.response.status, 401);
 
+  const forgedHeader = await api("/api/m4/projects", {
+    headers: { "oai-authenticated-user-email": "forged@example.test" },
+  });
+  assert.equal(forgedHeader.response.status, 401);
+
   const created = await api("/api/m4/projects", {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
     method: "POST",
     body: {
       primaryCreationMethod: "idea",
@@ -119,32 +253,33 @@ test("M4 APIs reject anonymous access and isolate project resources", { skip: !e
       materialsSummary: "课程要求和三篇文献",
       firstAiHelp: "先判断题目是否可做",
       idempotencyKey: "ignored-body-key",
+      user_id: "forged-owner-b",
     },
   });
   assert.equal(created.response.status, 201);
   const projectId = created.payload.data.project.id;
 
   const ownerList = await api("/api/m4/projects", {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
   });
   assert.equal(ownerList.payload.data.length, 1);
   const otherList = await api("/api/m4/projects", {
-    email: "owner-b@example.test",
+    cookie: ownerBCookie,
   });
   assert.equal(otherList.payload.data.length, 0);
   const crossed = await api(`/api/m4/projects/${projectId}/materials`, {
-    email: "owner-b@example.test",
+    cookie: ownerBCookie,
   });
   assert.equal(crossed.response.status, 404);
 });
 
 test("M4 persists material, task, privacy, model metadata and PPT contracts without external calls", { skip: !enabled }, async () => {
   const projects = await api("/api/m4/projects", {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
   });
   const projectId = projects.payload.data[0].id;
   const material = await api(`/api/m4/projects/${projectId}/materials`, {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
     method: "POST",
     body: {
       kind: "data",
@@ -157,7 +292,7 @@ test("M4 persists material, task, privacy, model metadata and PPT contracts with
   const materialId = material.payload.data.id;
 
   const task = await api(`/api/m4/projects/${projectId}/tasks`, {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
     method: "POST",
     body: {
       action: "create",
@@ -176,7 +311,7 @@ test("M4 persists material, task, privacy, model metadata and PPT contracts with
   const taskId = task.payload.data.id;
 
   const profile = await api(`/api/m4/projects/${projectId}/privacy`, {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
     method: "POST",
     body: {
       action: "profile",
@@ -209,7 +344,7 @@ test("M4 persists material, task, privacy, model metadata and PPT contracts with
     blocking: false,
   }));
   const copy = await api(`/api/m4/projects/${projectId}/privacy`, {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
     method: "POST",
     body: {
       action: "copy",
@@ -225,7 +360,7 @@ test("M4 persists material, task, privacy, model metadata and PPT contracts with
   assert.equal(copy.payload.data.copies[0].status, "READY");
 
   const transmission = await api(`/api/m4/projects/${projectId}/privacy`, {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
     method: "POST",
     body: {
       action: "transmission",
@@ -239,12 +374,12 @@ test("M4 persists material, task, privacy, model metadata and PPT contracts with
   assert.equal(transmission.payload.data.transmissions[0].status, "PLANNED");
 
   const models = await api(`/api/m4/projects/${projectId}/model-configs`, {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
   });
   assert.equal(models.response.status, 200);
   assert.equal(models.payload.data.providers.length, 2);
   const plaintext = await api(`/api/m4/projects/${projectId}/model-configs`, {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
     method: "POST",
     body: { action: "credential", api_key: "must-not-be-accepted" },
   });
@@ -252,7 +387,7 @@ test("M4 persists material, task, privacy, model metadata and PPT contracts with
   assert.equal(plaintext.payload.error.code, "PLAINTEXT_KEY_REJECTED");
 
   const presentation = await api(`/api/m4/projects/${projectId}/presentations`, {
-    email: "owner-a@example.test",
+    cookie: ownerACookie,
     method: "POST",
     body: {
       action: "create",

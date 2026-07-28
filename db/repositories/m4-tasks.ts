@@ -594,8 +594,8 @@ async function resolveContext(
   requestedProjectId: string,
 ): Promise<Context> {
   const user = await db
-    .prepare("SELECT id FROM users WHERE email = ?")
-    .bind(actor.email)
+    .prepare("SELECT id FROM users WHERE id = ? AND status = 'active'")
+    .bind(actor.userId)
     .first<{ id: string }>();
   if (!user) {
     throw new M4TaskRepositoryError(

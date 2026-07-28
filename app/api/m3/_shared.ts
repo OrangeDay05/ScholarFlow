@@ -6,9 +6,9 @@ import {
 } from "@/app/lib/m3-server-identity";
 import { M3RepositoryError } from "@/db/repositories/m3-projects";
 
-export function requireM3ApiActor(
+export async function requireM3ApiActor(
   request: Request,
-): { actor: M3Actor } | { response: Response } {
+): Promise<{ actor: M3Actor } | { response: Response }> {
   if (!M3_PERSISTENCE_ENABLED) {
     return {
       response: apiError(
@@ -19,7 +19,7 @@ export function requireM3ApiActor(
     };
   }
 
-  const actor = getM3Actor(request);
+  const actor = await getM3Actor(request);
   if (!actor) {
     return {
       response: apiError(

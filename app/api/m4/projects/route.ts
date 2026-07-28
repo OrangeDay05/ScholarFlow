@@ -16,7 +16,7 @@ const creationMethods = new Set<M3CreationMethod>([
 ]);
 
 export async function GET(request: Request) {
-  const auth = requireM4Actor(request);
+  const auth = await requireM4Actor(request);
   if ("response" in auth) return auth.response;
   try {
     return apiSuccess(await listM4ProjectsForActor(auth.actor));
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const auth = requireM4Actor(request);
+  const auth = await requireM4Actor(request);
   if ("response" in auth) return auth.response;
   let body: unknown;
   try {

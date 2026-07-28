@@ -7,17 +7,6 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
   "00000000-0000-4000-8000-000000000000";
 
 const { d1, r2 } = hostingConfig;
-const localDemoVars: Record<string, string> =
-  process.env.M3_ALLOW_LOCAL_DEMO_IDENTITY === "true" &&
-  process.env.M3_LOCAL_DEMO_USER_EMAIL
-    ? {
-        M3_ALLOW_LOCAL_DEMO_IDENTITY: "true",
-        M3_LOCAL_DEMO_USER_EMAIL: process.env.M3_LOCAL_DEMO_USER_EMAIL,
-        M3_LOCAL_DEMO_USER_NAME:
-          process.env.M3_LOCAL_DEMO_USER_NAME ??
-          process.env.M3_LOCAL_DEMO_USER_EMAIL,
-      }
-    : {};
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -25,7 +14,6 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
-  vars: localDemoVars,
   d1_databases: d1
     ? [
         {
