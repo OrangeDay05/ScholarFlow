@@ -244,6 +244,7 @@
 | M4-PPT-01 | PPT 场景 | 13 个场景均可记录，不以学历限制可用性 | PPT 枚举测试 | 通过 |
 | M4-PPT-02 | PPT 来源版本 | 项目、版本、幻灯片绑定来源版本或材料快照 | PPT Repository/API 测试 | 通过 |
 | M4-BYOK-01 | 凭据元数据 | 区分平台/用户凭据，记录掩码与密文引用，API 拒绝明文 Key | 明文 Key 负向测试 | 通过（元数据） |
-| M4-MIG-01 | migration | 全新隔离库可顺序迁移；现有库预检无盲目重跑；回滚/幂等说明完整 | 30 项 M4 测试、只读预检、M4 review | 通过（旧本地库待协调） |
+| M4-MIG-01 | migration | 全新隔离库可顺序迁移；现有库预检无盲目重跑；回滚/幂等说明完整 | 30 项 M4 测试、标准 Wrangler 0000→0004、只读预检、M4 review | 通过（方案 A 已完成，5 条台账、58 表） |
+| M4-PERSIST-01 | 持久化运行时 | 实际应用连接新本地文件 D1；写入跨重启保留；匿名拒绝且跨用户隔离 | `scripts/m4-persistent-d1-acceptance.mjs`、`scripts/m4-persistent-d1-inspect.mjs`、唯一标记 `I015_PERSISTENCE_20260728_1052` | 通过 |
 | M4-QA-01 | 工程质量 | diff、局部/全仓 lint、类型、自动化测试和 build 通过 | `docs/reviews/M4/review.md` | 通过 |
 | M4-GATE-01 | 阶段边界 | 无真实模型、真实 Key、真实脱敏、真实 PPTX、M5 或部署 | 源码扫描、Git diff、审核报告 | 通过 |

@@ -4,7 +4,7 @@
 
 分支：`m4/progressive-diagnosis-persistence`
 
-状态：`WAITING_FOR_REVIEW`
+状态：`WAITING_FOR_REVIEW · M4_PASS`
 
 ## 1. 目标与边界
 
@@ -23,6 +23,7 @@ M4 将 M3 已批准的渐进式诊断、多模型复核和扩展业务 Mock 转�
 | M4-B5 | 隐私画像、处理副本、伪匿名引用、外传和分析保真 | `841f304` |
 | M4-B6 | PPT 场景/版本/来源与模型、凭据、ExecutionProfile 元数据 | `3b472a5` |
 | M4-B7 | API 隔离、迁移预检、全量 QA 与审核门 | 本报告对应提交 |
+| M4-H1 | I-015 方案 A：归档旧 D1、新持久化 D1 与运行时重启验收 | 本轮独立提交 |
 
 ## 3. 页面与既有前端
 
@@ -99,16 +100,13 @@ M4 没有重写 M2/M3 页面。登录、项目列表、五种创建入口、诊�
 - `drizzle/0003_condemned_magik.sql`
 - `drizzle/0004_nervous_maddog.sql`
 
-0000→0004 已在全新内存 SQLite 中顺序执行，得到 58 张业务表。新增迁移只增加表、列和索引；自动化检查禁止 `DROP`、`DELETE`、`TRUNCATE`、危险 `ALTER ... DROP/RENAME`。
+0000→0004 已同时在全新内存 SQLite 和新的持续存在 Miniflare/D1 文件中顺序执行，得到 58 张业务表。新增迁移只增加表、列和索引；自动化检查禁止 `DROP`、`DELETE`、`TRUNCATE`、危险 `ALTER ... DROP/RENAME`。
 
-现有 `.wrangler` 本地 D1 是旧快照：42 张业务表、`d1_migrations` 0 条，缺少 16 张 M4 表以及 AI Task/PPT 新列。`scripts/m4-migration-preflight.mjs` 以只读方式验证了这一漂移。本轮没有修改、重建或盲目迁移该数据库。后续必须先确定保留数据与台账协调方案，再进行一次受控升级。
+用户批准方案 A 后，旧 42 表/0 台账状态目录被完整移动到 `E:\论文系统\local-d1-archives\20260728-102348-I-015-9391D72F`。归档包含 SQLite、WAL/SHM、元数据、配置快照和清单；主库 SHA-256 归档前后均为 `9391D72F0987F2B3080152582D41DA898214FCEF35250F547A4F4282CEC15CDD`，只读重开确认 42 张业务表和可重建 Mock 数据仍可访问。
 
-因此：
+当前开发库为 `site\.wrangler\state\v3\d1\miniflare-D1DatabaseObject\faaf2b0445ab934c3aac48ddf0cdfade8f9bac050be98993748742cdd2cb05fb.sqlite`。标准命令 `wrangler d1 migrations apply site-creator-d1 --local --config wrangler.m3-local.jsonc` 记录 0000→0004 共 5 条台账；再次 list/apply 均报告无待执行迁移。`scripts/m4-migration-preflight.mjs` 和只读检查确认 58 张业务表、无缺表、无多余业务表、无列漂移，AI Task、审阅、隐私、PPT、Provider/Model/ExecutionProfile 表与新增列均存在。
 
-- 新数据库的迁移链已验证。
-- M4 Schema/迁移文件已完成。
-- 旧本地数据库尚未升级，I-015/R-023 保持开放。
-- 生产数据库和真实数据均未接触。
+回滚不依赖删除：停止项目服务，将当前 `.wrangler` D1 状态目录移出，再把已校验归档目录恢复到原位置。生产数据库和真实数据始终未接触。
 
 ## 7. 自动化检查
 
@@ -117,12 +115,14 @@ M4 没有重写 M2/M3 页面。登录、项目列表、五种创建入口、诊�
 | M4 契约、Repository、隐私、PPT、模型与迁移测试 | 30/30 通过 |
 | M4 请求级 API/隔离集成测试 | 2/2 通过 |
 | 既有 M2/M3/V0.4.2/V0.4.3 回归测试 | 25/25 通过 |
+| 持久化本地 D1 运行时与重启验收 | 通过；唯一标记 `I015_PERSISTENCE_20260728_1052` |
+| 持久化库只读结构检查 | 5 条迁移台账、58 张业务表、1 个伪匿名映射引用 |
 | TypeScript `tsc --noEmit` | 通过 |
 | 全仓 ESLint（排除生成目录） | 通过 |
 | `git diff --check` | 通过 |
 | M4 功能开关开启的 Vinext build | 通过，7 个 M4 API 路由进入构建 |
 
-API 集成测试使用全新内存 SQLite 和构建后的 Worker，不启动长驻开发服务器，不调用外部服务。
+请求级 API 集成测试继续使用全新内存 SQLite 和构建后的 Worker；M4-H1 另以真实 Vinext/Miniflare 本地文件 D1 完成运行时写入和重启复查。验收标记包含 2 个诊断版本、2 个父子任务、1 份 ReviewReport/ReviewIssue、用户决定与版本采用、6 种处理副本、3 条外传计划、1 个 ExecutionProfile、13 种 PresentationProject 和 PresentationVersion/Slide。匿名请求返回 401，另一用户列表无项目且越权材料请求返回 404。重启服务器 stderr 为空；两次准确记录的进程树均已停止，端口 3000 已释放。全程未调用外部服务。
 
 ## 8. 截图索引
 
@@ -137,7 +137,8 @@ M4 后端增量没有新增页面。M4 期间已经完成的编辑器响应式�
 
 ## 9. 已知问题与未实现内容
 
-- I-015/R-023：旧本地 D1 的实际 Schema 与空迁移台账不一致，必须单独协调；不能直接执行正常迁移命令。
+- 旧 D1 归档仍保留作为回滚点，不会被 Miniflare 自动复用，也不进入 Git。
+- 两处 M4 开始前已有的 UI 样式修改仍在工作区，属于独立 UI 批次，未纳入 M4-H1。
 - 浏览器视觉仍沿用已审核的 M2/M3 页面与本目录 6 张截图；B1—B7 没有新增业务页面。
 - 材料只登记元数据，没有对象存储和真实解析。
 - 凭据只保存安全元数据契约，没有真实 Key、加密实现、连接测试或供应商路由。
@@ -155,6 +156,6 @@ M4 后端增量没有新增页面。M4 期间已经完成的编辑器响应式�
 4. 隐私分类、六种模式与分析保真阻断边界。
 5. 13 种 PPT 场景和来源快照关系。
 6. BYOK 只保存元数据且拒绝明文 Key 的范围。
-7. 是否批准单独制定旧本地 D1 的受控升级与台账协调方案。
+7. I-015 已按用户批准的方案 A 解除；审核归档、回滚和持久化运行时证据。
 
-当前停留在 M4 审核门。M4 代码、迁移文件、API、Repository 与测试已完成并提交，旧本地数据库未盲目升级；尚未进入 M5，等待用户审核。
+M4 最终结论为 `M4_PASS`。当前仍停留在 M4 审核门；M4 代码、迁移文件、API、Repository、本地数据库基线与测试均已通过，I-015/R-023 已解除。尚未进入 M5，等待用户审核。

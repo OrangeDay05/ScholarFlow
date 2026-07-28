@@ -5,14 +5,14 @@
 ## 当前
 
 - 当前里程碑：M4 业务持久化与安全契约
-- 当前状态：WAITING_FOR_REVIEW
+- 当前状态：WAITING_FOR_REVIEW（M4_PASS）
 - 活动工程：`site/`（唯一活动工程）
 - 当前分支：`m4/progressive-diagnosis-persistence`
 - M0/M1/M2/M3：已完成
 - M2 审核状态：用户已批准，作为核心写作工作台和视觉基线
 - 当前有效需求：`docs/requirements/论文AI科研全流程平台需求说明_V0.5.1_M4修订版.txt`
 - M4 起点 HEAD：`6344af03bcc8ed58e3f849c7cd92c6b7184aa509`
-- 当前批次：M4-B7 已完成，等待用户审核
+- 当前批次：M4-H1 已完成；I-015 已解除，等待用户审核
 - M4 审计与批次计划：`docs/audits/m4-v051-gap-and-batches.md`
 - 生产部署：未授权、未执行
 
@@ -25,6 +25,7 @@
 - M4-B5：DONE — 隐私画像、处理副本、伪匿名、外传和分析保真。
 - M4-B6：DONE — PPT 场景/版本以及 Provider/BYOK 元数据。
 - M4-B7：DONE — 请求级隔离、迁移链、全量检查和 M4 审核包。
+- M4-H1：DONE — 按方案 A 完整归档旧本地 D1，创建新持久化 D1，验证 0000→0004、58 表、5 条台账、运行时连接、重启持久化和权限隔离。
 
 ## 阶段边界
 
@@ -36,4 +37,4 @@
 
 ## 下一步
 
-审核 `docs/reviews/M4/review.md`。现有旧本地 D1 的空迁移台账仍需单独协调；不得以此为由盲目重跑迁移。用户批准前不进入 M5。
+审核 `docs/reviews/M4/review.md`。M4 功能与本地数据库基线结论为 `M4_PASS`；当前仍停在 M4 审核门，用户明确批准前不进入 M5。两处既有 UI 样式修改继续作为独立批次保留。
