@@ -300,9 +300,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const [notice, setNotice] = useState("");
   const [workspaceMode, setWorkspaceMode] = useState<WorkspaceMode>("conversation");
   const [assistantTab, setAssistantTab] = useState<AssistantTab>("materials");
-  const [conversationPromptId, setConversationPromptId] = useState<string>(
-    M5_CONVERSATION_SKILL_PROMPTS[0].uiSkillId,
-  );
+  const [conversationPromptId, setConversationPromptId] = useState<string | null>(null);
   const [conversationDraft, setConversationDraft] = useState("");
   const [conversationMessages, setConversationMessages] = useState<
     M5ConversationMessage[]
@@ -310,7 +308,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     {
       id: "message-agent-welcome",
       role: "AGENT",
-      content: "告诉我你现在想推进什么。我会先梳理意图并提出操作建议，未经确认不会执行。",
+      content: "告诉我你现在想推进什么。",
       createdAt: "2026-07-28T00:00:00.000Z",
     },
   ]);
@@ -483,7 +481,11 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const selectedConversationPrompt =
     M5_CONVERSATION_SKILL_PROMPTS.find(
       (prompt) => prompt.uiSkillId === conversationPromptId,
-    ) ?? M5_CONVERSATION_SKILL_PROMPTS[0];
+    ) ??
+    M5_CONVERSATION_SKILL_PROMPTS.find(
+      (prompt) => prompt.uiSkillId === selectedSkillId,
+    ) ??
+    M5_CONVERSATION_SKILL_PROMPTS[0];
 
   useEffect(() => {
     if (initialSectionHandledRef.current) return;
@@ -859,6 +861,19 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     );
   }
 
+  function openSkillInConversation(skillId: string) {
+    const prompt = M5_CONVERSATION_SKILL_PROMPTS.find(
+      (item) => item.uiSkillId === skillId,
+    );
+    if (!prompt) return;
+    setSelectedSkillId(skillId);
+    setConversationPromptId(skillId);
+    setConversationDraft(prompt.prompt);
+    setToolIntent(null);
+    setActionProposal(null);
+    setWorkspaceMode("conversation");
+  }
+
   function prepareConversationProposal() {
     const content = conversationDraft.trim();
     if (!content) return;
@@ -899,13 +914,14 @@ export default function EditorClient({ projectId }: EditorClientProps) {
       {
         id: "message-agent-welcome",
         role: "AGENT",
-        content: "告诉我你现在想推进什么。我会先梳理意图并提出操作建议，未经确认不会执行。",
+        content: "告诉我你现在想推进什么。",
         createdAt: "2026-07-28T00:00:00.000Z",
       },
     ]);
     setConversationSummary(null);
     setToolIntent(null);
     setActionProposal(null);
+    setConversationPromptId(null);
     setConversationDraft("");
   }
 
@@ -913,10 +929,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     return (
       <section className={styles.conversationAgent} aria-label="Conversation Agent">
         <div className={styles.conversationHeader}>
-          <div>
-            <strong>Conversation Agent</strong>
-            <span>长期会话基础 · 当前仅生成意图与提案</span>
-          </div>
+          <strong>Conversation Agent</strong>
           <button onClick={resetConversation} type="button">
             新会话
           </button>
@@ -938,34 +951,12 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           ))}
         </div>
 
-        <div className={styles.promptPicker}>
-          <div className={styles.sectionLabel}>
-            <span>六个 Skill 默认 Prompt</span>
-            <span>选择一个起点</span>
-          </div>
-          <div>
-            {M5_CONVERSATION_SKILL_PROMPTS.map((prompt) => (
-              <button
-                aria-pressed={conversationPromptId === prompt.uiSkillId}
-                key={prompt.uiSkillId}
-                onClick={() => {
-                  setConversationPromptId(prompt.uiSkillId);
-                  setConversationDraft(prompt.prompt);
-                }}
-                type="button"
-              >
-                {prompt.title}
-              </button>
-            ))}
-          </div>
-        </div>
-
         <div className={styles.conversationComposer}>
           <label htmlFor="conversation-agent-input">告诉 AI 你想推进什么</label>
           <textarea
             id="conversation-agent-input"
             onChange={(event) => setConversationDraft(event.target.value)}
-            placeholder={selectedConversationPrompt.prompt}
+            placeholder="直接描述你希望 AI 帮你推进的任务"
             rows={3}
             value={conversationDraft}
           />
@@ -1145,7 +1136,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
                         disabled={!availability.enabled}
                         key={skill.id}
                         onClick={() => {
-                          setSelectedSkillId(skill.id);
+                          openSkillInConversation(skill.id);
                           setNotice("");
                         }}
                         title={availability.enabled ? skill.description : availability.reason}

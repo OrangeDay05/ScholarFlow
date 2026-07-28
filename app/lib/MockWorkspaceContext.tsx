@@ -288,7 +288,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
           setConfirmedDiagnosis(confirmed ? nextDiagnosis : null);
           setDiagnosisStatus(confirmed ? "confirmed" : "draft");
         }
-        if (snapshot.outline) {
+        if (snapshot.outline?.sections.length) {
           setOutline(
             snapshot.outline.sections.map((item) => ({
               id: item.slug,
@@ -299,6 +299,9 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
             })),
           );
           setOutlineConfirmed(snapshot.outline.status === "confirmed");
+        } else if (requestedProjectId === "demo") {
+          setOutline(initialOutline);
+          setOutlineConfirmed(false);
         }
         setSelectedSectionId(snapshot.selectedSectionSlug);
         setVersions(snapshot.versions.map(toWorkspaceVersion));

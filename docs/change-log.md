@@ -1,5 +1,12 @@
 # 变更日志
 
+## 2026-07-28 · M5-B2A 审核反馈修正
+
+- 修复 demo D1 返回空提纲时覆盖中栏演示章节的问题；空提纲仅在 demo 项目回退到既有章节，不写回数据库。
+- Conversation Agent 移除重复的六 Skill Prompt 选择条，只保留纯对话与操作提案。
+- 六个 Skill 卡片成为 Prompt 入口：点击可用 Skill 后自动切换到“对话 Agent”，并把对应默认 Prompt 放入输入框供用户继续修改。
+- 未改变 Skill 启用条件、任务执行、确认门、数据库 Schema、Provider 或部署。
+
 ## 2026-07-28 · M5-B2A 对话优先 AI 工作台与 Conversation Agent 基础
 
 - 按用户确认的新路线将已完成的 Storage Adapter 与上传安全基础重分类为 M5-B3A，代码和原提交不重做。

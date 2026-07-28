@@ -820,18 +820,12 @@
   gap: 10px;
 }
 
-.conversationHeader > div {
-  display: grid;
-  gap: 3px;
-}
-
 .conversationHeader strong {
   color: var(--forest);
   font-family: var(--font-serif);
   font-size: 15px;
 }
 
-.conversationHeader span,
 .conversationHeader button {
   color: var(--muted);
   font-size: 8px;
@@ -890,32 +884,6 @@
   margin: 1px 0 0;
   font-size: 9px;
   line-height: 1.65;
-}
-
-.promptPicker > div:last-child {
-  display: flex;
-  gap: 6px;
-  padding-bottom: 3px;
-  overflow-x: auto;
-}
-
-.promptPicker button {
-  flex: 0 0 auto;
-  min-height: 30px;
-  padding: 0 9px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--muted-strong);
-  font-size: 8px;
-  font-weight: 750;
-  white-space: nowrap;
-}
-
-.promptPicker button[aria-pressed="true"] {
-  border-color: var(--green);
-  background: var(--mint);
-  color: var(--forest);
 }
 
 .conversationComposer {

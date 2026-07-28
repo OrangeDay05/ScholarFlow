@@ -13,6 +13,10 @@ const editor = await readFile(
   new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
   "utf8",
 );
+const workspaceContext = await readFile(
+  new URL("../app/lib/MockWorkspaceContext.tsx", import.meta.url),
+  "utf8",
+);
 
 test("provides one default prompt for each of the six product skills", () => {
   assert.equal(M5_CONVERSATION_SKILL_PROMPTS.length, 6);
@@ -81,6 +85,20 @@ test("editor exposes dual workspace tabs without replacing existing skill task t
   assert.match(editor, /本次材料授权/);
   assert.match(editor, /引用证据/);
   assert.match(editor, /任务记录/);
-  assert.match(editor, /未经确认不会执行/);
+  assert.match(editor, /尚未执行真实任务/);
   assert.doesNotMatch(editor, /execute\(.*actionProposal/s);
+});
+
+test("skill selection opens the conversation with its prompt instead of duplicating a prompt picker", () => {
+  assert.match(editor, /function openSkillInConversation/);
+  assert.match(editor, /setConversationDraft\(prompt\.prompt\)/);
+  assert.match(editor, /setWorkspaceMode\("conversation"\)/);
+  assert.match(editor, /openSkillInConversation\(skill\.id\)/);
+  assert.doesNotMatch(editor, /六个 Skill 默认 Prompt/);
+});
+
+test("the demo editor keeps its main content when persisted outline data is empty", () => {
+  assert.match(workspaceContext, /snapshot\.outline\?\.sections\.length/);
+  assert.match(workspaceContext, /requestedProjectId === "demo"/);
+  assert.match(workspaceContext, /setOutline\(initialOutline\)/);
 });
