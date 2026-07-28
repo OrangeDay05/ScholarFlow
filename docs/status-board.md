@@ -12,7 +12,7 @@
 - M2 审核状态：用户已批准，作为核心写作工作台和视觉基线
 - 当前有效需求：`docs/requirements/论文AI科研全流程平台需求说明_V0.5.1_M4修订版.txt`
 - M4 起点 HEAD：`6344af03bcc8ed58e3f849c7cd92c6b7184aa509`
-- 当前批次：M5-B4 Provider、加密凭据与六 Skill Adapter
+- 当前批次：M5-B5 有界 Runner、审阅与候选版本执行
 - M4 审计与批次计划：`docs/audits/m4-v051-gap-and-batches.md`
 - M5 批次计划：`docs/audits/m5-v051-batches.md`
 - 生产部署：未授权、未执行
@@ -42,7 +42,7 @@
 - M5-B3D：DONE — XLSX Sheet/行/单元格/公式来源登记与 PNG/JPEG 尺寸资产登记；不执行公式或图像理解。
 - M5-B3E：DONE — 项目内最新成功解析片段检索、来源返回、查询限制与所有者隔离；不冒充向量/外部检索。
 - M5-B4：DONE — AES-GCM 用户 Key、显式保存/测试/禁用/删除、OpenAI/DeepSeek Adapter、统一错误与六 Skill 请求契约；未配置 Key 时不调用。
-- M5-B5：PENDING — 执行、审阅、候选/采用版本、DOCX 与 M5 收尾。
+- M5-B5：PARTIAL — 有界 Runner、独立审阅、部分成功保留、预算暂停与取消已完成；持久化执行编排和真实凭据端到端验收待完成。
 
 ## 阶段边界
 
@@ -54,4 +54,4 @@
 
 ## 下一步
 
-进入 M5-B5：可恢复 Runner、预算/取消/降级、生成/审阅/验证、候选采用版本与 M5 收尾。
+继续 M5-B5：将 Runner 接入现有 AI Task/结果/版本持久化；真实供应商端到端验收需要用户显式提供测试凭据。
