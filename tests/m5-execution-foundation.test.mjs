@@ -65,6 +65,7 @@ test("keeps diagnosis, material authorization and recovery gates explicit", () =
     message: "正式章节写作需要已确认诊断卡。",
   });
   assert.equal(recoveryDecision("CALLING_MODEL"), "RESUME");
+  assert.equal(recoveryDecision("BUDGET_PAUSED"), "WAIT_FOR_USER");
   assert.equal(
     recoveryDecision("WAITING_FOR_USER_CONFIRMATION"),
     "WAIT_FOR_USER",

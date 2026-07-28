@@ -36,7 +36,7 @@ test("Provider errors are unified and do not include provider response bodies", 
   const adapter = new OpenAiCompatibleProviderAdapter({ providerKey: "deepseek", baseUrl: "https://provider.test", fetcher: async () => new Response('{"message":"secret upstream detail"}', { status: 401 }) });
   await assert.rejects(
     () => adapter.execute({ requestId: "r", modelKey: "m", modelVersion: "v", taskRole: "GENERATOR", messages: [], maxOutputTokens: 1, timeoutSeconds: 10 }, "key-value", AbortSignal.timeout(1000)),
-    (error) => error instanceof M5ProviderError && error.code === "AUTHENTICATION_FAILED" && !error.message.includes("secret upstream detail"),
+    (error) => error instanceof M5ProviderError && error.code === "AUTHENTICATION_FAILED" && error.provider === "deepseek" && error.statusCode === 401 && error.safeMessage === error.message && !error.message.includes("secret upstream detail"),
   );
 });
 

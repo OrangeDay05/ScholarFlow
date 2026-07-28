@@ -134,7 +134,7 @@ export const M5_RECOVERABLE_TASK_STATUSES = [
 export type M5RecoveryDecision = "RESUME" | "WAIT_FOR_USER" | "TERMINAL";
 
 export function recoveryDecision(status: string): M5RecoveryDecision {
-  if (status === "WAITING_FOR_USER_CONFIRMATION") return "WAIT_FOR_USER";
+  if (status === "WAITING_FOR_USER_CONFIRMATION" || status === "BUDGET_PAUSED") return "WAIT_FOR_USER";
   return M5_RECOVERABLE_TASK_STATUSES.includes(
     status as (typeof M5_RECOVERABLE_TASK_STATUSES)[number],
   )
