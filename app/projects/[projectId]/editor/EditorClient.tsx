@@ -322,7 +322,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const [rightCollapsed, setRightCollapsed] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("standard");
-  const [reviewerId, setReviewerId] = useState("deepseek-reasoner");
+  const [reviewerId, setReviewerId] = useState("deepseek-v4-pro");
   const [reviewWorkflow, setReviewWorkflow] =
     useState<ReviewWorkflowStatus>("idle");
   const [reviewConclusion, setReviewConclusion] =

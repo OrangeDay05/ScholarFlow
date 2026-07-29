@@ -28,6 +28,32 @@
   margin-top: 18px;
 }
 
+.pilotPanel {
+  margin-top: 18px;
+  padding: 20px;
+  border: 1px solid var(--forest);
+  background: var(--paper-strong);
+}
+
+.pilotPanel > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.pilotPanel header span { color: var(--green); font-size: 8px; font-weight: 850; letter-spacing: .12em; }
+.pilotPanel h2 { margin: 6px 0 0; font-family: var(--font-serif); font-size: 24px; font-weight: 500; }
+.pilotPanel header > strong { padding: 6px 8px; background: var(--mint); color: var(--forest); font-size: 8px; }
+.pilotPanel > p { color: var(--muted); font-size: 8px; line-height: 1.6; }
+.pilotGrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
+.pilotGrid label { display: grid; gap: 6px; min-width: 0; font-size: 8px; font-weight: 800; }
+.pilotGrid select, .pilotGrid input { width: 100%; min-height: 38px; padding: 0 9px; border: 1px solid var(--line); background: var(--paper); color: var(--ink); font-size: 8px; }
+.pilotGrid select:disabled { opacity: .55; cursor: not-allowed; }
+.pilotHint { padding: 9px 11px; border-left: 3px solid #a36a14; background: #fff4d2; color: #704b0d !important; }
+.capabilityLine { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 12px; }
+.capabilityLine span { padding: 5px 7px; border: 1px solid var(--line); font-size: 7px; }
+.pilotConfirm { display: flex; align-items: center; gap: 8px; margin-top: 14px; font-size: 8px; }
+.pilotConfirm input { accent-color: var(--green); }
+.pilotActions { display: flex; gap: 8px; margin-top: 12px; }
+.pilotActions button { min-height: 36px; padding: 0 11px; border: 1px solid var(--forest); background: var(--forest); color: var(--cream); font-size: 8px; font-weight: 800; cursor: pointer; }
+.pilotActions button:disabled { opacity: .4; cursor: not-allowed; }
+.pilotResult { max-height: 180px; overflow: auto; margin: 14px 0 0; padding: 12px; background: #00392e; color: #fffbe2; font-size: 8px; line-height: 1.55; white-space: pre-wrap; word-break: break-word; }
+
 .platformCard,
 .userKeyCard {
   min-height: 280px;
@@ -776,6 +802,7 @@
   }
 
   .credentialChoice,
+  .pilotGrid,
   .modeGrid,
   .keyForm,
   .conflictGrid,
@@ -792,6 +819,10 @@
   .keyActions {
     flex-wrap: wrap;
   }
+
+  .pilotPanel > header { align-items: flex-start; flex-direction: column; }
+  .pilotActions { flex-direction: column; }
+  .pilotActions button { width: 100%; }
 
   .keyActions .dangerButton {
     margin-left: 0;

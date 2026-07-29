@@ -246,7 +246,7 @@ test("renders the gated dual-model review mock inside the M2 editor", async () =
   for (const landmark of ["AI 复核", "严格复核", "审阅只创建报告"]) {
     assert.match(editorSource, new RegExp(landmark));
   }
-  assert.match(contractSource, /DeepSeek Reasoner/);
+  assert.match(contractSource, /DeepSeek V4 Pro/);
 
   assert.match(flagSource, /NEXT_PUBLIC_DUAL_MODEL_REVIEW_MOCK/);
   assert.match(contractSource, /REVIEW_FAILED/);

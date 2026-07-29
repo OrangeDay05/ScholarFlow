@@ -88,9 +88,9 @@ export const generationModel: ReviewModelOption = {
 
 export const reviewModelOptions: ReviewModelOption[] = [
   {
-    id: "deepseek-reasoner",
+    id: "deepseek-v4-pro",
     provider: "DeepSeek",
-    model: "DeepSeek Reasoner",
+    model: "DeepSeek V4 Pro · 思考 HIGH",
     skill: "独立学术审阅",
     skillVersion: "v0.1 Mock",
     note: "默认与生成模型使用不同供应商。",

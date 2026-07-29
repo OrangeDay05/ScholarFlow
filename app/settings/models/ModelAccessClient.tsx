@@ -19,13 +19,14 @@ import {
   type OrchestrationMode,
 } from "@/app/lib/model-orchestration-mock";
 import styles from "./models.module.css";
+import DeepSeekPilotPanel from "./DeepSeekPilotPanel";
 
 const roleModelDefaults: Record<ModelRole, string> = {
   GENERATOR: "openai-gpt-5-2",
-  REVIEWER: "deepseek-reasoner",
+  REVIEWER: "deepseek-v4-pro",
   VERIFIER: "anthropic-claude",
   REVISER: "openai-gpt-5-2",
-  ROUTER: "deepseek-reasoner",
+  ROUTER: "deepseek-v4-flash",
 };
 
 const credentialStatusCopy: Record<CredentialStatus, string> = {
@@ -123,6 +124,8 @@ export default function ModelAccessClient() {
           不接收真实 API Key，不调用供应商，不消耗额度，不修改数据库；真实加密与路由推迟到 M5。
         </span>
       </div>
+
+      <DeepSeekPilotPanel />
 
       <section className={styles.credentialChoice}>
         <article className={styles.platformCard}>

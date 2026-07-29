@@ -1,9 +1,16 @@
 import type { M4TaskRole } from "./m4-task-contracts";
+import type { M5InferenceConfiguration, M5ModelCapability } from "./m5-model-capabilities";
+import type { M5ProviderError } from "./m5-provider-error";
 
 export type M5ProviderMessage = {
-  role: "system" | "user" | "assistant";
-  content: string;
+  role: "system" | "user" | "assistant" | "tool";
+  content: string | null;
+  reasoningContent?: string;
+  toolCallId?: string;
+  toolCalls?: M5ProviderToolCall[];
 };
+
+export type M5ProviderToolCall = { id: string; type: "function"; function: { name: string; arguments: string } };
 
 export type M5ProviderRequest = {
   requestId: string;
@@ -13,6 +20,10 @@ export type M5ProviderRequest = {
   messages: M5ProviderMessage[];
   maxOutputTokens: number;
   timeoutSeconds: number;
+  inference?: M5InferenceConfiguration;
+  tools?: Array<{ type: "function"; function: { name: string; description: string; parameters: Record<string, unknown> } }>;
+  toolChoice?: "auto" | "none";
+  metadata?: Record<string, string>;
 };
 
 export type M5ProviderResult = {
@@ -24,6 +35,12 @@ export type M5ProviderResult = {
   inputTokens: number | null;
   outputTokens: number | null;
   providerRequestId: string | null;
+  systemFingerprint?: string | null;
+  retryable?: boolean;
+  toolCalls?: M5ProviderToolCall[];
+  reasoningAudit?: { produced: boolean; characters: number; toolCallNames: string[] };
+  usage?: { promptTokens: number | null; cacheHitTokens: number | null; cacheMissTokens: number | null; completionTokens: number | null; reasoningTokens: number | null };
+  warnings?: string[];
 };
 
 export type M5ConnectionTestResult = {
@@ -39,6 +56,12 @@ export interface M5CredentialResolver {
 
 export interface M5ProviderAdapter {
   readonly providerKey: string;
+  listModels(credential: string, signal: AbortSignal): Promise<string[]>;
+  validateCredential(credential: string, signal: AbortSignal): Promise<boolean>;
+  validateModelConfiguration(capability: M5ModelCapability, configuration: M5InferenceConfiguration): void;
+  normalizeUsage(value: unknown): NonNullable<M5ProviderResult["usage"]>;
+  normalizeFinishReason(value: unknown): M5ProviderResult["finishReason"];
+  normalizeError(error: unknown, modelId?: string | null): M5ProviderError;
   testConnection(
     modelKey: string,
     credential: string,
@@ -48,6 +71,17 @@ export interface M5ProviderAdapter {
     request: M5ProviderRequest,
     credential: string,
     signal: AbortSignal,
+  ): Promise<M5ProviderResult>;
+  createCompletion(
+    request: M5ProviderRequest,
+    credential: string,
+    signal: AbortSignal,
+  ): Promise<M5ProviderResult>;
+  streamCompletion(
+    request: M5ProviderRequest,
+    credential: string,
+    signal: AbortSignal,
+    onContent: (contentDelta: string) => void,
   ): Promise<M5ProviderResult>;
 }
 
