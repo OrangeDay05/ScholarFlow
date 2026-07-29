@@ -4,15 +4,15 @@
 
 ## 当前
 
-- 当前里程碑：M7 审稿返修
-- 当前状态：M7_WAITING_FOR_REVIEW（M5 外部供应商验收项单独保留）
+- 当前里程碑：M8 科研图件
+- 当前状态：M8.1_INTERNAL_GATE_PASSED（M5 DeepSeek Provider Pilot 插入为独立检查点）
 - 活动工程：`site/`（唯一活动工程）
-- 当前分支：`m5/real-services-foundation`
+- 当前分支：`m8/research-figures`
 - M0/M1/M2/M3：已完成
 - M2 审核状态：用户已批准，作为核心写作工作台和视觉基线
 - 当前有效需求：`docs/requirements/论文AI科研全流程平台需求说明_V0.5.1_M4修订版.txt`
 - M4 起点 HEAD：`6344af03bcc8ed58e3f849c7cd92c6b7184aa509`
-- 当前批次：M5—M7 集成审核收尾
+- 当前批次：M8.1 核心闭环已验证；下一步先完成 M5-B4 DeepSeek Provider Pilot
 - M4 审计与批次计划：`docs/audits/m4-v051-gap-and-batches.md`
 - M5 批次计划：`docs/audits/m5-v051-batches.md`
 - 生产部署：未授权、未执行
@@ -52,14 +52,21 @@
 - M7-R1：DONE — 决定信拆分 Reviewer/Comment、Revision Task、回应策略、未完成实验警告和 Comment 状态。
 - M7-R2：DONE — Response Draft 追加版本、用户确认、返修正文新版本、修改核对和 Response Letter DOCX。
 
+## M8 批次
+
+- M8.1：DONE — CSV/表格输入、字段识别、五类真实图型、独立数据/代码/运行/资产版本、本地受信任 Runner、真实 PNG、浏览器与回归验证。
+- M8.2：NOT_STARTED — 扩展统计图型。
+- M8.3：NOT_STARTED — 多格式资产与清单。
+- M8.4：NOT_STARTED — 概念图件。
+
 ## 阶段边界
 
 - 已实现 M5 所需的真实文件解析、服务端密钥加密、Provider/Skill Adapter、任务执行恢复、预算和失败降级。
 - 真实 Key 只能在用户明确提交后由服务端加密，不得进入前端持久状态、日志、错误或普通字段。
 - 无凭据时不得发起供应商调用或伪装成功；所有外传必须通过材料授权、隐私模式和处理副本门。
-- 不进入 M8 科研图件、M9 PPTX、M10 发布候选或 M11 部署。
+- 尚未进入 M8.2、M9 PPTX、M10 发布候选或 M11 部署。
 - 不重做已完成的 M2/M3 前端；关闭新增开关后保留完整 M2 体验。
 
 ## 下一步
 
-等待用户审核 M5—M7；如需关闭 M5 外部验收项，由用户显式提供专用测试凭据后单独执行，不接受或使用生产 Key。
+先建立 M8.1 Git 检查点，再按用户最新要求在既有 M5 分支实施 DeepSeek Provider Pilot；不接收对话中的 Key，不部署。

@@ -43,3 +43,7 @@ next-env.d.ts
 /work/
 /.sites-dev*.log
 /preview-*.png
+/.venv-m8/
+/.m8-runner/
+__pycache__/
+*.py[cod]

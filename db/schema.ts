@@ -2220,6 +2220,50 @@ export const figureProjects = sqliteTable(
   (table) => [index("figure_projects_owner_project_idx").on(table.ownerUserId, table.projectId)],
 );
 
+export const figureDataSnapshots = sqliteTable(
+  "figure_data_snapshots",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    figureProjectId: text("figure_project_id").notNull().references(() => figureProjects.id, { onDelete: "cascade" }),
+    sourceType: text("source_type", { enum: ["manual", "upload", "project_material"] }).notNull(),
+    originalFilename: text("original_filename"),
+    objectKey: text("object_key").notNull(),
+    columnsSchemaJson: text("columns_schema_json").notNull(),
+    rowCount: integer("row_count").notNull(),
+    dataHash: text("data_hash").notNull(),
+    createdByUserId: text("created_by_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("figure_data_snapshots_figure_hash_uq").on(table.figureProjectId, table.dataHash),
+    index("figure_data_snapshots_owner_project_idx").on(table.ownerUserId, table.projectId),
+  ],
+);
+
+export const figureCodeVersions = sqliteTable(
+  "figure_code_versions",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    figureProjectId: text("figure_project_id").notNull().references(() => figureProjects.id, { onDelete: "cascade" }),
+    language: text("language", { enum: ["python", "r"] }).notNull().default("python"),
+    engine: text("engine", { enum: ["matplotlib", "seaborn", "plotly", "ggplot2", "graphviz"] }).notNull().default("matplotlib"),
+    code: text("code").notNull(),
+    codeHash: text("code_hash").notNull(),
+    codeMode: text("code_mode", { enum: ["managed", "customized", "forked"] }).notNull(),
+    parentVersionId: text("parent_version_id"),
+    createdByUserId: text("created_by_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("figure_code_versions_figure_hash_uq").on(table.figureProjectId, table.codeHash),
+    index("figure_code_versions_owner_project_idx").on(table.ownerUserId, table.projectId),
+  ],
+);
+
 export const figureVersions = sqliteTable(
   "figure_versions",
   {
@@ -2236,7 +2280,11 @@ export const figureVersions = sqliteTable(
     versionNumber: integer("version_number").notNull(),
     sourceVersionId: text("source_version_id"),
     sourceDataRef: text("source_data_ref"),
+    specKind: text("spec_kind", { enum: ["statistical", "diagram"] }).notNull().default("statistical"),
     specificationJson: text("specification_json").notNull().default("{}"),
+    mappingJson: text("mapping_json").notNull().default("{}"),
+    publicationJson: text("publication_json").notNull().default("{}"),
+    caption: text("caption"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
   (table) => [
@@ -2245,6 +2293,45 @@ export const figureVersions = sqliteTable(
       table.versionNumber,
     ),
     index("figure_versions_owner_project_idx").on(table.ownerUserId, table.projectId),
+  ],
+);
+
+export const figureRunRecords = sqliteTable(
+  "figure_run_records",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    figureProjectId: text("figure_project_id").notNull().references(() => figureProjects.id, { onDelete: "cascade" }),
+    figureVersionId: text("figure_version_id").notNull().references(() => figureVersions.id, { onDelete: "cascade" }),
+    dataSnapshotId: text("data_snapshot_id").notNull().references(() => figureDataSnapshots.id, { onDelete: "restrict" }),
+    codeVersionId: text("code_version_id").notNull().references(() => figureCodeVersions.id, { onDelete: "restrict" }),
+    executionMode: text("execution_mode", { enum: ["local_trusted", "remote_sandbox", "disabled"] }).notNull(),
+    runnerId: text("runner_id").notNull(),
+    runnerVersion: text("runner_version"),
+    pythonVersion: text("python_version"),
+    dependenciesJson: text("dependencies_json").notNull().default("{}"),
+    dependencyLockHash: text("dependency_lock_hash"),
+    status: text("status", {
+      enum: ["queued", "running", "succeeded", "failed", "timed_out", "cancelled", "runner_unavailable"],
+    })
+      .notNull()
+      .default("queued"),
+    queuedAt: text("queued_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    startedAt: text("started_at"),
+    finishedAt: text("finished_at"),
+    timeoutSeconds: integer("timeout_seconds").notNull(),
+    exitCode: integer("exit_code"),
+    stdout: text("stdout"),
+    stderr: text("stderr"),
+    errorType: text("error_type"),
+    errorMessage: text("error_message"),
+    createdByUserId: text("created_by_user_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("figure_run_records_owner_figure_idx").on(table.ownerUserId, table.figureProjectId),
+    index("figure_run_records_snapshot_code_idx").on(table.dataSnapshotId, table.codeVersionId),
   ],
 );
 
@@ -2258,15 +2345,24 @@ export const figureAssets = sqliteTable(
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
+    figureProjectId: text("figure_project_id").references(() => figureProjects.id, { onDelete: "cascade" }),
     figureVersionId: text("figure_version_id")
       .notNull()
       .references(() => figureVersions.id, { onDelete: "cascade" }),
-    format: text("format", { enum: ["png", "svg"] }).notNull(),
+    runRecordId: text("run_record_id").references(() => figureRunRecords.id, { onDelete: "cascade" }),
+    format: text("format", { enum: ["png", "svg", "pdf", "tiff", "html"] }).notNull(),
     objectKey: text("object_key"),
     contentHash: text("content_hash").notNull(),
+    fileSize: integer("file_size"),
+    width: integer("width"),
+    height: integer("height"),
+    dpi: integer("dpi"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
-  (table) => [index("figure_assets_owner_version_idx").on(table.ownerUserId, table.figureVersionId)],
+  (table) => [
+    index("figure_assets_owner_version_idx").on(table.ownerUserId, table.figureVersionId),
+    index("figure_assets_run_idx").on(table.runRecordId),
+  ],
 );
 
 export const presentationProjects = sqliteTable(

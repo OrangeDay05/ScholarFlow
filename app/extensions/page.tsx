@@ -12,14 +12,14 @@ export default function ExtensionsPage() {
 
   return (
     <AppShell
-      action={<MockBadge>V0.4.2 · 增量 Mock</MockBadge>}
+      action={<MockBadge>M8 · 增量实施</MockBadge>}
       description="独立承接研究前期、外部资料、审稿返修与研究表达，不改变已批准的 M2 论文写作主流程。"
       eyebrow="Research extensions"
       title="研究扩展工作区"
     >
       <div className={styles.modeNotice}>
         <strong>M2 核心工作台保持不变</strong>
-        <span>这里的六项能力均为独立 Mock 页面，尚未接入真实 Skill 或外部服务。</span>
+        <span>科研图件已进入 M8.1 本地受信任执行；其余增量能力继续按原阶段边界展示。</span>
       </div>
 
       <section className={styles.capabilityGrid} aria-label="V0.4.2 增量能力">
@@ -31,7 +31,7 @@ export default function ExtensionsPage() {
           >
             <div className={styles.cardTop}>
               <span className={styles.cardIndex}>{capability.index}</span>
-              <span className={styles.cardStatus}>MOCK</span>
+              <span className={styles.cardStatus}>{capability.slug === "research-figures" ? "M8.1" : "MOCK"}</span>
             </div>
             <p className={styles.cardKicker}>{capability.kicker}</p>
             <h2>{capability.title}</h2>

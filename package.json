@@ -7,6 +7,7 @@
   },
   "scripts": {
     "dev": "vinext dev",
+    "dev:m8": "node scripts/start-m8-local.mjs",
     "build": "vinext build",
     "start": "vinext start",
     "test": "vinext build && node --import ./tests/register-cloudflare-workers.mjs --test tests/rendered-html.test.mjs tests/m3-contract.test.mjs tests/dual-model-review-mock.test.mjs tests/progressive-diagnosis-mock.test.mjs tests/model-orchestration-mock.test.mjs",

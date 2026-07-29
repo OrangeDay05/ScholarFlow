@@ -9,6 +9,10 @@ const SITE_CREATOR_PLACEHOLDER_DATABASE_ID =
 const { d1, r2 } = hostingConfig;
 const localMaterialStorageEnabled =
   process.env.M5_LOCAL_OBJECT_STORAGE === "true";
+const localWorkerVars: Record<string, string> = {};
+if (process.env.M8_FIGURE_RUNNER_URL) {
+  localWorkerVars.M8_FIGURE_RUNNER_URL = process.env.M8_FIGURE_RUNNER_URL;
+}
 
 // macOS Seatbelt blocks FSEvents, so Codex previews need polling for HMR.
 const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
@@ -16,6 +20,7 @@ const isCodexSeatbeltSandbox = process.env.CODEX_SANDBOX === "seatbelt";
 const localBindingConfig = {
   main: "./worker/index.ts",
   compatibility_flags: ["nodejs_compat"],
+  vars: localWorkerVars,
   d1_databases: d1
     ? [
         {

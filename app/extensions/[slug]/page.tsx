@@ -8,6 +8,7 @@ import {
 } from "@/app/lib/v042-mock";
 import styles from "../Extensions.module.css";
 import { CapabilityWorkspace } from "./CapabilityWorkspace";
+import { ResearchFiguresWorkspace } from "./ResearchFiguresWorkspace";
 
 export function generateStaticParams() {
   return v042Capabilities.map((capability) => ({ slug: capability.slug }));
@@ -31,7 +32,7 @@ export default async function ExtensionCapabilityPage({
 
   return (
     <AppShell
-      action={<MockBadge>V0.4.2 · 未接真实服务</MockBadge>}
+      action={slug === "research-figures" ? <MockBadge>M8 · 本地受限执行</MockBadge> : <MockBadge>V0.4.2 · 未接真实服务</MockBadge>}
       description={capability.summary}
       eyebrow={`${capability.index} · ${capability.kicker}`}
       title={capability.title}
@@ -42,7 +43,11 @@ export default async function ExtensionCapabilityPage({
           返回研究扩展工作区 →
         </Link>
       </div>
-      <CapabilityWorkspace capability={capability} />
+      {slug === "research-figures" ? (
+        <ResearchFiguresWorkspace projectId="demo" />
+      ) : (
+        <CapabilityWorkspace capability={capability} />
+      )}
     </AppShell>
   );
 }

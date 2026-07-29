@@ -46,7 +46,7 @@ export function AppShell({
           <Link href="/projects/new">新建项目</Link>
           {V042_INCREMENTAL_MOCK_ENABLED ? (
             <Link className={styles.extensionNav} href="/extensions">
-              研究扩展 <small>V0.4.2</small>
+              研究扩展 <small>M8</small>
             </Link>
           ) : null}
           {MODEL_ORCHESTRATION_MOCK_ENABLED ? (

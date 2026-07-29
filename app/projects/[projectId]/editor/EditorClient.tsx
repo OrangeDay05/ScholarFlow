@@ -1097,7 +1097,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             <summary>
               <span>
                 <strong>研究扩展</strong>
-                <small>V0.4.2 · 6 个独立 Mock 工作区</small>
+                <small>独立研究工作区 · 科研图件进入 M8.1</small>
               </span>
               <span aria-hidden="true">＋</span>
             </summary>
