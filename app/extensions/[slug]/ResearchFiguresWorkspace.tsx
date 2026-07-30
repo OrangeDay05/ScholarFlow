@@ -13,6 +13,7 @@ import {
   type M8DatasetRow,
   type M8ImplementedFigureType,
   type M8StatisticalFigureSpec,
+  type M8DiagramType,
 } from "@/app/lib/m8-figure-contracts";
 import styles from "./ResearchFiguresWorkspace.module.css";
 
@@ -30,6 +31,8 @@ type RunHistory = {
   status: string; queued_at: string; finished_at: string | null; error_type: string | null; error_message: string | null;
   data_hash: string; row_count: number; code_hash: string; code_mode: string; assets: string | null;
 };
+
+type DiagramResult = { figureProjectId: string; figureVersionNumber: number; codeVersionId: string; runRecordId: string; asset: { id: string; format: "svg"; contentHash: string; fileSize: number }; code: string };
 
 const initialRows = defaultM8FigureData();
 const initialSpec: M8StatisticalFigureSpec = {
@@ -57,6 +60,11 @@ export function ResearchFiguresWorkspace({ projectId }: { projectId: string }) {
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("导入数据、确认字段映射后运行；图片优先展示，代码默认折叠。");
+  const [diagramType, setDiagramType] = useState<M8DiagramType>("theoretical_framework");
+  const [diagramTitle, setDiagramTitle] = useState("研究框架与证据路径");
+  const [diagramNodes, setDiagramNodes] = useState("question|研究问题\ntheory|理论框架\ndata|研究材料\nanalysis|分析过程\nclaim|研究结论");
+  const [diagramEdges, setDiagramEdges] = useState("question|theory|界定\ntheory|analysis|指导\ndata|analysis|输入\nanalysis|claim|支持");
+  const [diagramResult, setDiagramResult] = useState<DiagramResult | null>(null);
   const columns = useMemo(() => inferM8Columns(rows), [rows]);
   const recommendations = useMemo(() => recommendM8FigureTypes(columns), [columns]);
 
@@ -107,6 +115,19 @@ export function ResearchFiguresWorkspace({ projectId }: { projectId: string }) {
     finally { setBusy(false); }
   }
 
+  async function runDiagram() {
+    setBusy(true); setMessage("正在使用受控 SVG 模板生成概念图……");
+    try {
+      const nodes = diagramNodes.split(/\r?\n/u).filter(Boolean).map((line) => { const [id, ...label] = line.split("|"); return { id: id.trim(), label: label.join("|").trim() }; });
+      const edges = diagramEdges.split(/\r?\n/u).filter(Boolean).map((line) => { const [source, target, ...label] = line.split("|"); return { source: source.trim(), target: target.trim(), label: label.join("|").trim() || undefined }; });
+      const response = await fetch(`/api/m8/projects/${projectId}/diagrams`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ specification: { kind: "diagram", diagramType, title: diagramTitle, caption: `${diagramTitle}。`, nodes, edges } }) });
+      const payload = await response.json() as { data?: DiagramResult; error?: { message?: string } };
+      if (!response.ok || !payload.data) throw new Error(payload.error?.message || "概念图生成失败。");
+      setDiagramResult(payload.data); setMessage(`概念图 V${payload.data.figureVersionNumber} 已生成；SVG、代码版本和来源结构均可追溯。`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "概念图生成失败。"); }
+    finally { setBusy(false); }
+  }
+
   function editCode(value: string) {
     setCode(value);
     if (codeMode === "managed") setCodeMode(result ? "forked" : "customized");
@@ -137,6 +158,7 @@ export function ResearchFiguresWorkspace({ projectId }: { projectId: string }) {
         <label>出版预设<select value={spec.publication.preset} onChange={(event) => updateSpec({ publication: M8_PUBLICATION_PRESETS[event.target.value as keyof typeof M8_PUBLICATION_PRESETS] })}><option value="screen_preview">屏幕预览</option><option value="paper_single_column">论文单栏</option><option value="paper_double_column">论文双栏</option></select></label>
         <button className={styles.executeButton} disabled={busy} onClick={runFigure} type="button">{busy ? "正在运行 Python…" : "运行并创建 RunRecord"}</button>
         <p className={styles.boundary}>本地受信任执行模式 · 仅项目所有者可用 · 不是生产沙箱。Worker 只调用 Runner Adapter，不在 Web 进程执行 Python。</p>
+        <fieldset className={styles.mapping}><legend>概念图件</legend><label>类型<select value={diagramType} onChange={(event) => setDiagramType(event.target.value as M8DiagramType)}><option value="mechanism_diagram">机制图</option><option value="theoretical_framework">理论框架图</option><option value="research_flow">研究流程图</option><option value="graphical_abstract">Graphical Abstract</option><option value="research_infographic">科研信息图</option></select></label><label>标题<input value={diagramTitle} onChange={(event) => setDiagramTitle(event.target.value)} /></label><label>节点（ID|标签）<textarea rows={5} value={diagramNodes} onChange={(event) => setDiagramNodes(event.target.value)} /></label><label>关系（起点|终点|标签）<textarea rows={4} value={diagramEdges} onChange={(event) => setDiagramEdges(event.target.value)} /></label><button className={styles.executeButton} disabled={busy} onClick={runDiagram} type="button">生成受控概念图</button><p className={styles.boundary}>参数化 SVG 渲染，不执行 Mermaid、Python、R 或 Shell；代码仅作为可查看的结构说明。</p></fieldset>
       </aside>
 
       <main className={styles.resultPanel}>
@@ -147,6 +169,7 @@ export function ResearchFiguresWorkspace({ projectId }: { projectId: string }) {
         {result ? <div className={styles.trace}><span>DataSnapshot <code>{short(result.dataSnapshotId)}</code>{result.dataSnapshotReused ? " · 复用" : " · 新建"}</span><span>CodeVersion <code>{short(result.codeVersionId)}</code>{result.codeVersionReused ? " · 复用" : " · 新建"}</span><span>RunRecord <code>{short(result.runRecordId)}</code></span></div> : null}
         <div className={styles.resultActions}>{result?.assets.length ? result.assets.map((asset) => <a download key={asset.id} href={`/api/m8/projects/${projectId}/figures/assets/${asset.id}`}>下载 {asset.format.toUpperCase()}</a>) : <span>暂无可下载资产</span>}<span>代码状态：{codeModeLabel(codeMode)}</span><span>{rows.length} 行 · {columns.length} 列</span></div>
         {result?.assets.length ? <details className={styles.historyPanel}><summary>资产清单 · {result.assets.length}</summary><div>{result.assets.map((asset) => <p key={asset.id}><strong>{asset.format.toUpperCase()}</strong> · {asset.fileSize} bytes · SHA-256 {asset.contentHash.slice(0, 12)}…</p>)}</div></details> : null}
+        {diagramResult ? <section><div className={styles.resultHeader}><div><span>CONCEPTUAL FIGURE</span><h2>{diagramTitle} · V{diagramResult.figureVersionNumber}</h2></div><a download href={`/api/m8/projects/${projectId}/figures/assets/${diagramResult.asset.id}`}>下载 SVG</a></div><section className={styles.canvas}><Image alt={diagramTitle} height={620} src={`/api/m8/projects/${projectId}/figures/assets/${diagramResult.asset.id}`} unoptimized width={980} /></section><details className={styles.codePanel}><summary><span><strong>查看结构代码</strong><small>Mermaid 文本仅供查看，不在服务器执行</small></span><span>展开</span></summary><textarea aria-label="概念图结构代码" readOnly value={diagramResult.code} /></details></section> : null}
         <details className={styles.codePanel}><summary><span><strong>查看生成代码</strong><small>默认折叠 · Python · 可下载</small></span><span>展开</span></summary><div className={styles.codeToolbar}><label><input checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} type="checkbox" />高级编辑</label><button onClick={() => navigator.clipboard.writeText(code)} type="button">复制</button><button onClick={() => downloadText(code, `figure-${result?.codeVersionId ?? "draft"}.py`, "text/x-python")} type="button">下载 .py</button><button onClick={restoreManagedCode} type="button">从托管版本重新生成</button></div><textarea aria-label="Python 图件代码" readOnly={!advanced} spellCheck={false} value={code} onChange={(event) => editCode(event.target.value)} /><p>{advanced ? "编辑后将创建 customized/forked CodeVersion；安全检查仍会执行。" : "普通模式为只读。开启高级编辑后才能修改代码。"}</p></details>
         <details className={styles.historyPanel} open><summary>运行历史 · {history.length}</summary><div>{history.length ? history.map((run) => { const assetId = firstAssetId(run.assets); return <button key={run.id} onClick={() => assetId && setSelectedAssetId(assetId)} type="button"><span><strong>{run.status}</strong><small>{new Date(run.queued_at).toLocaleString("zh-CN")}</small></span><span>数据 {short(run.data_snapshot_id)} · 代码 {short(run.code_version_id)}</span><span>{run.error_type ?? (assetId ? "查看图件" : "无资产")}</span></button>; }) : <p>尚无运行记录。</p>}</div></details>
       </main>

@@ -9,7 +9,7 @@ export const M8_FIGURE_CATALOG = [
 
 export const M8_STATISTICAL_FIGURE_TYPES = M8_FIGURE_CATALOG.flatMap((group) => group.items);
 export const M8_IMPLEMENTED_FIGURE_TYPES = M8_STATISTICAL_FIGURE_TYPES;
-export const M8_DIAGRAM_TYPES = ["conceptual_diagram", "research_flow", "path_diagram"] as const;
+export const M8_DIAGRAM_TYPES = ["mechanism_diagram", "theoretical_framework", "research_flow", "graphical_abstract", "research_infographic"] as const;
 
 export type M8StatisticalFigureType = (typeof M8_STATISTICAL_FIGURE_TYPES)[number];
 export type M8ImplementedFigureType = (typeof M8_IMPLEMENTED_FIGURE_TYPES)[number];
@@ -92,7 +92,7 @@ export type M8DiagramFigureSpec = {
   caption: string;
   nodes: Array<{ id: string; label: string }>;
   edges: Array<{ source: string; target: string; label?: string }>;
-  renderer: "graphviz" | "mermaid";
+  renderer: "controlled_svg";
   publication: M8PublicationSettings;
 };
 
