@@ -44,6 +44,7 @@ next-env.d.ts
 /outputs/
 /work/
 /.sites-dev*.log
+/.codex-dev.*.log
 /preview-*.png
 /.venv-m8/
 /.m8-runner/

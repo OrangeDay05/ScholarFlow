@@ -673,6 +673,7 @@ export const diagnosisTaskReadiness = sqliteTable(
       enum: [
         "READY",
         "READY_WITH_WARNINGS",
+        "NEEDS_CONTENT",
         "NEEDS_CONFIRMATION",
         "NEEDS_MATERIAL",
         "BLOCKED",
@@ -2641,5 +2642,29 @@ export const slides = sqliteTable(
   (table) => [
     uniqueIndex("slides_version_position_uq").on(table.presentationVersionId, table.position),
     index("slides_owner_project_idx").on(table.ownerUserId, table.projectId),
+  ],
+);
+
+export const presentationExports = sqliteTable(
+  "presentation_exports",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    presentationVersionId: text("presentation_version_id").notNull().references(() => presentationVersions.id, { onDelete: "cascade" }),
+    format: text("format", { enum: ["pptx"] }).notNull().default("pptx"),
+    objectKey: text("object_key").notNull(),
+    contentHash: text("content_hash").notNull(),
+    fileSize: integer("file_size").notNull(),
+    runnerId: text("runner_id").notNull(),
+    runnerVersion: text("runner_version").notNull(),
+    artifactToolVersion: text("artifact_tool_version").notNull(),
+    status: text("status", { enum: ["GENERATED", "OPEN_VERIFIED", "FAILED"] }).notNull(),
+    openedVerifiedAt: text("opened_verified_at"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("presentation_exports_owner_version_idx").on(table.ownerUserId, table.presentationVersionId),
+    uniqueIndex("presentation_exports_version_hash_uq").on(table.presentationVersionId, table.contentHash),
   ],
 );

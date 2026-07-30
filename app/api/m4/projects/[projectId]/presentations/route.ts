@@ -15,6 +15,7 @@ import { m4RepositoryError, requireM4Actor } from "../../../_shared";
 const readiness = [
   "READY",
   "READY_WITH_WARNINGS",
+  "NEEDS_CONTENT",
   "NEEDS_CONFIRMATION",
   "NEEDS_MATERIAL",
   "BLOCKED",
@@ -123,13 +124,14 @@ export async function POST(
         const position = optionalInteger(body.position, 1, 500);
         const title = text(body.title);
         const sources = stringArray(body.source_bindings);
+        const assets = stringArray(body.asset_bindings ?? []);
         const verificationStatus = text(body.verification_status);
         if (
           !presentationVersionId ||
           position === null ||
           position === undefined ||
           !title ||
-          !sources ||
+          !sources || !assets ||
           !isRecord(body.content) ||
           !verification.includes(
             verificationStatus as (typeof verification)[number],
@@ -144,6 +146,7 @@ export async function POST(
             title,
             content: body.content,
             speakerNotes: text(body.speaker_notes),
+            assetBindings: assets,
             sourceBindings: sources,
             verificationStatus:
               verificationStatus as (typeof verification)[number],

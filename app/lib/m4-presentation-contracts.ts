@@ -18,6 +18,7 @@ export type M4PresentationScene = (typeof M4_PRESENTATION_SCENES)[number];
 export type M4PresentationReadiness =
   | "READY"
   | "READY_WITH_WARNINGS"
+  | "NEEDS_CONTENT"
   | "NEEDS_CONFIRMATION"
   | "NEEDS_MATERIAL"
   | "BLOCKED";

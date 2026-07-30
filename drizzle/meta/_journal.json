@@ -113,6 +113,13 @@
       "when": 1785347032277,
       "tag": "0015_talented_justice",
       "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1785378141659,
+      "tag": "0016_curvy_nick_fury",
+      "breakpoints": true
     }
   ]
 }

@@ -159,6 +159,7 @@ export async function saveM4Slide(
     title: string;
     content: Record<string, unknown>;
     speakerNotes: string;
+    assetBindings?: string[];
     sourceBindings: string[];
     verificationStatus: "UNVERIFIED" | "VERIFIED_WITH_WARNINGS" | "VERIFIED";
   },
@@ -172,7 +173,7 @@ export async function saveM4Slide(
         id, owner_user_id, project_id, presentation_version_id, position,
         title, content_json, speaker_notes, asset_bindings_json,
         source_bindings_json, verification_status
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, '[]', ?, ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       ON CONFLICT(presentation_version_id, position) DO UPDATE SET
         title = excluded.title,
         content_json = excluded.content_json,
@@ -189,6 +190,7 @@ export async function saveM4Slide(
       input.title,
       JSON.stringify(input.content),
       input.speakerNotes,
+      JSON.stringify(input.assetBindings ?? []),
       JSON.stringify(input.sourceBindings),
       input.verificationStatus,
     )
