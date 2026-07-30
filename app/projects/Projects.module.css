@@ -392,6 +392,20 @@
   gap: 16px;
   border: 1px dashed rgb(20 84 58 / 32%);
   color: var(--muted-strong);
+  cursor: pointer;
+  text-decoration: none;
+  transition: border-color 140ms ease, background-color 140ms ease;
+}
+
+.emptyHint:hover {
+  border-color: var(--green);
+  background: rgb(215 234 218 / 34%);
+}
+
+.emptyHint:focus-visible {
+  border-color: var(--green);
+  outline: 3px solid rgb(0 119 70 / 24%);
+  outline-offset: 3px;
 }
 
 .emptyMark {
@@ -421,10 +435,15 @@
   font-size: 11px;
 }
 
-.emptyHint a {
+.emptyAction {
   color: var(--green);
   font-size: 11px;
   font-weight: 800;
+}
+
+.emptyHint:hover .emptyMark,
+.emptyHint:hover .emptyAction {
+  color: var(--forest);
 }
 
 @media (max-width: 900px) {
@@ -567,7 +586,7 @@
     padding: 19px;
   }
 
-  .emptyHint a {
+  .emptyAction {
     grid-column: 2;
   }
 }

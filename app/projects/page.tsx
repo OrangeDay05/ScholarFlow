@@ -112,14 +112,20 @@ export default function ProjectsPage() {
           })}
         </div>
 
-        <div className={styles.emptyHint}>
+        <Link
+          className={styles.emptyHint}
+          href="/projects/new"
+          aria-label="创建新项目，选择创建方式"
+        >
           <span className={styles.emptyMark}>＋</span>
           <div>
-            <strong>没有更多项目</strong>
-            <p>你也可以从 Idea、初稿、论文要求、文献范文或研究数据开始。</p>
+            <strong>创建新项目</strong>
+            <p>可从 Idea、初稿、论文要求、文献范文或研究数据开始。</p>
           </div>
-          <Link href="/projects/new">选择创建方式</Link>
-        </div>
+          <span className={styles.emptyAction}>
+            选择创建方式 <span aria-hidden="true">→</span>
+          </span>
+        </Link>
       </section>
 
       <StateGallery />

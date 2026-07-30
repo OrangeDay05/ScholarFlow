@@ -98,16 +98,18 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
   const { draftSaved, saveCreationDraft } = useMockWorkspace();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [projectTitle, setProjectTitle] = useState(copy[kind].defaultTitle);
-  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
   const [uploadError, setUploadError] = useState("");
-  const [storedMaterial, setStoredMaterial] = useState<StoredMaterial | null>(null);
+  const [storedMaterials, setStoredMaterials] = useState<StoredMaterial[]>([]);
   const [projectId, setProjectId] = useState<string | null>(null);
   const abortController = useRef<AbortController | null>(null);
+  const fileInput = useRef<HTMLInputElement | null>(null);
   const page = copy[kind];
   const materialSummary =
     uploadState === "stored"
-      ? "1 个原始材料已安全存储 · 等待解析"
+      ? `${storedMaterials.length} 个原始材料已安全存储 · 等待解析`
       : uploadState === "cancelled"
         ? "材料已取消，可先创建项目后再补充"
         : "尚未完成材料上传";
@@ -119,7 +121,7 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
   function goNext() {
     if (step === 1) {
       setStep(2);
-      if (selectedFile) void uploadSelectedFile();
+      if (selectedFiles.length > 0) void uploadSelectedFiles();
       return;
     }
     setStep(3);
@@ -155,29 +157,56 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
     return id;
   }
 
-  async function uploadSelectedFile() {
-    if (!selectedFile || uploadState === "uploading") return;
+  function chooseFiles(files: FileList | null) {
+    const nextFiles = Array.from(files ?? []);
+    setSelectedFiles(nextFiles);
+    setUploadState("idle");
+    setUploadError("");
+    setStoredMaterials([]);
+  }
+
+  function removeFile(file: File) {
+    setSelectedFiles((current) =>
+      current.filter(
+        (candidate) =>
+          candidate.name !== file.name ||
+          candidate.size !== file.size ||
+          candidate.lastModified !== file.lastModified,
+      ),
+    );
+    setUploadState("idle");
+    setUploadError("");
+    setStoredMaterials([]);
+    if (fileInput.current) fileInput.current.value = "";
+  }
+
+  async function uploadSelectedFiles() {
+    if (selectedFiles.length === 0 || uploadState === "uploading") return;
     const controller = new AbortController();
+    const snapshots: StoredMaterial[] = [];
     abortController.current = controller;
     setUploadState("uploading");
     setUploadError("");
     try {
       const targetProjectId = await ensureProject(controller.signal);
-      const form = new FormData();
-      form.set("file", selectedFile);
-      form.set("kind", materialKind(kind, selectedFile.name));
-      const response = await fetch(
-        `/api/m5/projects/${targetProjectId}/materials`,
-        {
-          method: "POST",
-          headers: { "Idempotency-Key": `upload:${crypto.randomUUID()}` },
-          body: form,
-          signal: controller.signal,
-        },
-      );
-      const payload = await response.json();
-      if (!response.ok) throw new Error(apiMessage(payload, "文件上传失败。"));
-      setStoredMaterial(payload.data.snapshot as StoredMaterial);
+      for (const selectedFile of selectedFiles) {
+        const form = new FormData();
+        form.set("file", selectedFile);
+        form.set("kind", materialKind(kind, selectedFile.name));
+        const response = await fetch(
+          `/api/m5/projects/${targetProjectId}/materials`,
+          {
+            method: "POST",
+            headers: { "Idempotency-Key": `upload:${crypto.randomUUID()}` },
+            body: form,
+            signal: controller.signal,
+          },
+        );
+        const payload = await response.json();
+        if (!response.ok) throw new Error(apiMessage(payload, "文件上传失败。"));
+        snapshots.push(payload.data.snapshot as StoredMaterial);
+        setStoredMaterials([...snapshots]);
+      }
       setUploadState("stored");
     } catch (error) {
       if (controller.signal.aborted) {
@@ -299,8 +328,10 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
             title={page.uploadTitle}
             description={`${page.uploadHint} · 原文件安全存储后进入等待解析状态`}
           >
-            <label className={formStyles.uploadBox}>
+            <div className={formStyles.uploadArea}>
               <input
+                ref={fileInput}
+                className={formStyles.visuallyHidden}
                 accept={
                   kind === "data"
                     ? ".xlsx,.csv,.txt,.jpg,.jpeg,.png"
@@ -310,23 +341,80 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
                         ? ".docx,.pdf,.txt,.bib,.bibtex,.ris"
                         : ".docx,.pdf,.txt"
                 }
+                multiple
+                tabIndex={-1}
+                aria-hidden="true"
                 type="file"
-                onChange={(event) => {
-                  setSelectedFile(event.target.files?.[0] ?? null);
-                  setUploadState("idle");
-                  setUploadError("");
-                  setStoredMaterial(null);
-                }}
+                onChange={(event) => chooseFiles(event.target.files)}
               />
-              <div>
+              <button
+                type="button"
+                className={`${formStyles.uploadBox} ${isDragging ? formStyles.uploadBoxDragging : ""}`}
+                onClick={() => fileInput.current?.click()}
+                onDragEnter={(event) => {
+                  event.preventDefault();
+                  setIsDragging(true);
+                }}
+                onDragOver={(event) => {
+                  event.preventDefault();
+                  event.dataTransfer.dropEffect = "copy";
+                  setIsDragging(true);
+                }}
+                onDragLeave={(event) => {
+                  if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+                    setIsDragging(false);
+                  }
+                }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setIsDragging(false);
+                  chooseFiles(event.dataTransfer.files);
+                }}
+                aria-label="选择或拖放本机材料"
+                aria-describedby={`upload-help-${kind}`}
+              >
                 <strong>＋ 选择本机材料</strong>
-                <span>
-                  {selectedFile
-                    ? `${selectedFile.name} · ${formatBytes(selectedFile.size)}`
-                    : "单个文件不超过 25 MB；旧 DOC、XLS 和可执行文件不支持。"}
-                </span>
-              </div>
-            </label>
+                <span>也可以将文件拖放到这里</span>
+                <small id={`upload-help-${kind}`}>
+                  单个文件不超过 25 MB；旧 DOC、XLS 和可执行文件不支持。
+                </small>
+              </button>
+              {selectedFiles.length > 0 ? (
+                <div className={formStyles.fileSelection} aria-live="polite">
+                  <strong>已选择 {selectedFiles.length} 个文件</strong>
+                  <ul className={formStyles.fileList}>
+                    {selectedFiles.map((file) => (
+                      <li
+                        className={formStyles.fileRow}
+                        key={`${file.name}:${file.size}:${file.lastModified}`}
+                      >
+                        <div className={formStyles.fileDetails}>
+                          <span className={formStyles.fileName}>{file.name}</span>
+                          <small>
+                            {formatBytes(file.size)} · {fileTypeLabel(file)} ·{" "}
+                            {fileStatus(
+                              uploadState,
+                              storedMaterials.some(
+                                (material) => material.originalFilename === file.name,
+                              ),
+                            )}
+                          </small>
+                        </div>
+                        <button
+                          type="button"
+                          className={formStyles.removeFile}
+                          onClick={() => removeFile(file)}
+                          disabled={uploadState === "uploading"}
+                          aria-label={`移除 ${file.name}`}
+                        >
+                          移除
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
           </FormSection>
         </>
       ) : null}
@@ -344,9 +432,9 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
             <div>
               <strong>{uploadStatusTitle(uploadState)}</strong>
               <span>
-                {storedMaterial
-                  ? `${storedMaterial.originalFilename} · ${formatBytes(storedMaterial.sizeBytes)} · ${storedMaterial.detectedContentType} · ${storedMaterial.objectStatus} / AWAITING_PARSE`
-                  : uploadError || selectedFile?.name || "尚未选择文件。"}
+                {storedMaterials.length > 0
+                  ? `${storedMaterials.length} 个原始文件已存储 · 等待解析`
+                  : uploadError || selectedFiles.map((file) => file.name).join("、") || "尚未选择文件。"}
               </span>
             </div>
           </div>
@@ -355,7 +443,7 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
               取消上传
             </button>
           ) : uploadState === "failed" || uploadState === "cancelled" ? (
-            <button type="button" onClick={() => void uploadSelectedFile()}>
+            <button type="button" onClick={() => void uploadSelectedFiles()}>
               重新上传
             </button>
           ) : null}
@@ -398,7 +486,7 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
         step={step}
         draftSaved={draftSaved}
         createDisabled={
-          (step === 1 && !selectedFile) ||
+          (step === 1 && selectedFiles.length === 0) ||
           uploadState === "uploading" ||
           (step === 3 && uploadState !== "stored" && uploadState !== "cancelled")
         }
@@ -435,6 +523,17 @@ function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function fileTypeLabel(file: File) {
+  const extension = file.name.split(".").pop()?.toUpperCase();
+  return extension || file.type || "未知类型";
+}
+
+function fileStatus(state: UploadState, stored: boolean) {
+  if (state === "stored" || stored) return "等待解析";
+  if (state === "uploading") return "等待上传";
+  return "已选择";
 }
 
 function apiMessage(payload: unknown, fallback: string): string {
