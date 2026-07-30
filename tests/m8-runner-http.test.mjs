@@ -56,3 +56,12 @@ for (const item of [
     assert.equal(result.outputs.length, 1); assert.ok(result.outputs[0].width > 100); assert.ok(result.outputs[0].height > 100);
   });
 }
+
+test("M8.3 runner creates validated PNG, SVG, PDF and TIFF assets", async () => {
+  const publication = { ...M8_PUBLICATION_PRESETS.paper_single_column, outputFormats: ["png", "svg", "pdf", "tiff"] };
+  const multiFormatSpec = { kind: "statistical", chartType: "bar", title: "multi-format", xLabel: "X", yLabel: "Y", caption: "", mapping: { category: "condition", value: "score" }, publication };
+  const adapter = new HttpM8FigureRunnerAdapter(endpoint);
+  const result = await adapter.execute({ runId: crypto.randomUUID(), code: buildM8PythonFigureCode(multiFormatSpec), data: rows, requiredColumns: ["condition", "score"], timeoutSeconds: 30, formats: publication.outputFormats });
+  assert.equal(result.status, "succeeded", JSON.stringify({ errorType: result.errorType, errorMessage: result.errorMessage, stderr: result.stderr }));
+  assert.deepEqual(result.outputs.map((output) => output.format).sort(), ["pdf", "png", "svg", "tiff"]);
+});

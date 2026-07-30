@@ -5,14 +5,14 @@
 ## 当前
 
 - 当前里程碑：M8 科研图件
-- 当前状态：M8.2_INTERNAL_GATE_PASSED
+- 当前状态：M8.3_INTERNAL_GATE_PASSED
 - 活动工程：`site/`（唯一活动工程）
 - 当前分支：`m8-m11/delivery-readiness`
 - M0/M1/M2/M3：已完成
 - M2 审核状态：用户已批准，作为核心写作工作台和视觉基线
 - 当前有效需求：`docs/requirements/论文AI科研全流程平台需求说明_V0.5.1_M4修订版.txt`
 - M4 起点 HEAD：`6344af03bcc8ed58e3f849c7cd92c6b7184aa509`
-- 当前批次：M8.2 扩展统计图件已验证；下一批 M8.3 多格式资产与清单
+- 当前批次：M8.3 多格式资产与清单已验证；下一批 M8.4 概念图件
 - M4 审计与批次计划：`docs/audits/m4-v051-gap-and-batches.md`
 - M5 批次计划：`docs/audits/m5-v051-batches.md`
 - 生产部署：未授权、未执行
@@ -56,7 +56,7 @@
 
 - M8.1：DONE — CSV/表格输入、字段识别、五类真实图型、独立数据/代码/运行/资产版本、本地受信任 Runner、真实 PNG、浏览器与回归验证。
 - M8.2：DONE — 17 类统计图型均已通过真实本地 PNG 生成验证。
-- M8.3：NOT_STARTED — 多格式资产与清单。
+- M8.3：DONE — PNG/SVG/PDF/TIFF 安全输出、MIME、hash、大小与下载清单。
 - M8.4：NOT_STARTED — 概念图件。
 
 ## 阶段边界
@@ -69,4 +69,4 @@
 
 ## 下一步
 
-实施 M8.3 多格式资产与清单；继续保持本地受信任执行边界，不接收对话中的 Key，不部署。
+实施 M8.4 受控概念图件；继续保持参数化渲染边界，不接收对话中的 Key，不部署。

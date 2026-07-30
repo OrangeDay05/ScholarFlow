@@ -26,11 +26,11 @@ import numpy
 import pandas
 
 RUNNER_ID = "scholarflow-local-python"
-RUNNER_VERSION = "0.1.0"
+RUNNER_VERSION = "0.2.0"
 MAX_BODY_BYTES = 4 * 1024 * 1024
 MAX_CODE_CHARACTERS = 32_000
 MAX_ROWS = 10_000
-MAX_OUTPUT_FILES = 3
+MAX_OUTPUT_FILES = 4
 MAX_OUTPUT_BYTES = 12 * 1024 * 1024
 MAX_LOG_CHARACTERS = 8_000
 ALLOWED_IMPORTS = {"__future__", "argparse", "json", "pathlib", "random", "matplotlib", "pandas", "numpy", "math", "statistics"}
@@ -81,8 +81,12 @@ def execute(payload: dict[str, Any]) -> dict[str, Any]:
     run_id = payload.get("runId")
     required_columns = payload.get("requiredColumns")
     timeout_seconds = payload.get("timeoutSeconds", 30)
-    if not isinstance(code, str) or not isinstance(data, list) or not isinstance(required_columns, list):
+    requested_formats = payload.get("formats")
+    if not isinstance(code, str) or not isinstance(data, list) or not isinstance(required_columns, list) or not isinstance(requested_formats, list):
         return failure("failed", "INVALID_INPUT", "代码、数据或字段契约格式无效。")
+    allowed_formats = {"png", "svg", "pdf", "tiff"}
+    if not requested_formats or len(requested_formats) > MAX_OUTPUT_FILES or len(set(requested_formats)) != len(requested_formats) or any(item not in allowed_formats for item in requested_formats):
+        return failure("failed", "INVALID_FORMATS", "输出格式必须是 PNG、SVG、PDF、TIFF 的非重复子集。")
     if not isinstance(run_id, str) or not re.fullmatch(r"[A-Za-z0-9-]{8,80}", run_id):
         return failure("failed", "INVALID_RUN_ID", "Run ID 格式无效。")
     if not 1 <= len(data) <= MAX_ROWS or not all(isinstance(row, dict) for row in data):
@@ -138,13 +142,14 @@ def execute(payload: dict[str, Any]) -> dict[str, Any]:
             return failure("failed", "TOO_MANY_OUTPUTS", "单次运行输出文件数量超过限制。")
         outputs: list[dict[str, Any]] = []
         for path in output_files:
-            if path.suffix.lower() != ".png":
-                return failure("failed", "FORMAT_NOT_ALLOWED", f"M8.1 只允许保留 PNG，发现 {path.suffix}。")
+            output_format = path.suffix.lower().lstrip(".")
+            if output_format not in requested_formats:
+                return failure("failed", "FORMAT_NOT_ALLOWED", f"发现未请求的输出格式 {path.suffix}。")
             content = path.read_bytes()
-            if len(content) > MAX_OUTPUT_BYTES or not content.startswith(b"\x89PNG\r\n\x1a\n"):
-                return failure("failed", "INVALID_OUTPUT", "输出不是有效的受限大小 PNG。")
-            width, height = struct.unpack(">II", content[16:24])
-            outputs.append({"format": "png", "base64": base64.b64encode(content).decode("ascii"), "width": width, "height": height, "dpi": 0})
+            if len(content) > MAX_OUTPUT_BYTES or not valid_output(output_format, content):
+                return failure("failed", "INVALID_OUTPUT", f"输出不是有效且安全的 {output_format.upper()}。")
+            width, height = struct.unpack(">II", content[16:24]) if output_format == "png" else (0, 0)
+            outputs.append({"format": output_format, "base64": base64.b64encode(content).decode("ascii"), "width": width, "height": height, "dpi": 0})
         return {
             **runtime_metadata(),
             "status": "succeeded",
@@ -164,6 +169,23 @@ def runtime_metadata() -> dict[str, Any]:
         "pythonVersion": f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}",
         "dependencies": {"matplotlib": matplotlib.__version__, "pandas": pandas.__version__, "numpy": numpy.__version__},
     }
+
+
+def valid_output(output_format: str, content: bytes) -> bool:
+    if output_format == "png":
+        return content.startswith(b"\x89PNG\r\n\x1a\n")
+    if output_format == "pdf":
+        return content.startswith(b"%PDF-")
+    if output_format == "tiff":
+        return content.startswith((b"II*\x00", b"MM\x00*"))
+    if output_format == "svg":
+        try:
+            text = content.decode("utf-8").lower()
+        except UnicodeDecodeError:
+            return False
+        blocked = ("<script", "javascript:", "href=\"http", "href='http", "url(http", "file:", "data:", " onload=", " onclick=")
+        return "<svg" in text and not any(token in text for token in blocked)
+    return False
 
 
 def failure(status: str, error_type: str, message: str, *, exit_code: int | None = None, stdout: str = "", stderr: str = "") -> dict[str, Any]:

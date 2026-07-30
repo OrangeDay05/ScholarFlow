@@ -50,7 +50,11 @@ export function buildM8PythonFigureCode(spec: M8StatisticalFigureSpec): string {
     "ax.spines[['top', 'right']].set_visible(False)",
     "ax.grid(axis='y', color='#D7EADA', linewidth=0.8, alpha=0.75)",
     "fig.tight_layout()",
-    `fig.savefig(output_dir / 'figure.png', dpi=${publication.dpi}, bbox_inches='tight', facecolor=${pythonString(publication.background === "paper" ? "#FFFDF7" : publication.background === "white" ? "white" : "none")}, transparent=${publication.background === "transparent" ? "True" : "False"})`,
+    `output_formats = ${JSON.stringify(publication.outputFormats)}`,
+    "for output_format in output_formats:",
+    `    save_options = {'dpi': ${publication.dpi}, 'bbox_inches': 'tight', 'facecolor': ${pythonString(publication.background === "paper" ? "#FFFDF7" : publication.background === "white" ? "white" : "none")}, 'transparent': ${publication.background === "transparent" ? "True" : "False"}}`,
+    "    if output_format == 'tiff': save_options['pil_kwargs'] = {'compression': 'tiff_lzw'}",
+    "    fig.savefig(output_dir / f'figure.{output_format}', format=output_format, **save_options)",
     "plt.close(fig)",
     "",
   ].join("\n");

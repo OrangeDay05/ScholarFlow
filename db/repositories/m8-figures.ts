@@ -30,7 +30,7 @@ export type M8FigureRunView = {
   runRecordId: string;
   status: "succeeded" | "failed" | "timed_out" | "runner_unavailable";
   code: string;
-  assets: Array<{ id: string; format: "png"; width: number; height: number; dpi: number }>;
+  assets: Array<{ id: string; format: "png" | "svg" | "pdf" | "tiff"; width: number; height: number; dpi: number; contentHash: string; fileSize: number }>;
   errorType: string | null;
   errorMessage: string | null;
   stderr: string;
@@ -119,7 +119,7 @@ export async function runM8Figure(
       data: input.data,
       requiredColumns: mappedColumns(input.specification),
       timeoutSeconds: 30,
-      formats: ["png"],
+      formats: input.specification.publication.outputFormats,
     });
   } catch {
     const message = "本地绘图执行器不可用。数据快照、代码版本和运行记录已保留，可稍后重试。";
@@ -136,14 +136,14 @@ export async function runM8Figure(
       const assetId = crypto.randomUUID();
       const objectKey = `users/${context.userId}/projects/${context.projectId}/figures/${figure.id}/runs/${runRecordId}/${assetId}.${output.format}`;
       try {
-        await storage.put(objectKey, bytes.buffer as ArrayBuffer, { contentType: "image/png", contentHash: hash });
+        await storage.put(objectKey, bytes.buffer as ArrayBuffer, { contentType: figureContentType(output.format), contentHash: hash });
         await db.prepare(
           `INSERT INTO figure_assets (
              id, owner_user_id, project_id, figure_project_id, figure_version_id, run_record_id,
              format, object_key, content_hash, file_size, width, height, dpi
            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).bind(assetId, context.userId, context.projectId, figure.id, figureVersion.id, runRecordId, output.format, objectKey, hash, bytes.byteLength, output.width, output.height, input.specification.publication.dpi).run();
-        assets.push({ id: assetId, format: output.format, width: output.width, height: output.height, dpi: input.specification.publication.dpi });
+        assets.push({ id: assetId, format: output.format, width: output.width, height: output.height, dpi: input.specification.publication.dpi, contentHash: hash, fileSize: bytes.byteLength });
       } catch {
         await storage.delete(objectKey).catch(() => undefined);
         execution = { ...execution, status: "failed" as const, errorType: "STORAGE_FAILED", errorMessage: "图件已生成，但资产保存失败。", outputs: [] };
@@ -166,7 +166,11 @@ export async function getM8FigureAsset(actor: M3Actor, requestedProjectId: strin
   if (!asset?.object_key) throw new M8FigureError("ASSET_NOT_FOUND", "图件资产不存在或不属于当前用户。");
   const body = await storage.get(asset.object_key);
   if (!body) throw new M8FigureError("ASSET_NOT_FOUND", "图件资产文件不存在。");
-  return { body, contentType: asset.format === "png" ? "image/png" : "application/octet-stream", format: asset.format };
+  return { body, contentType: figureContentType(asset.format), format: asset.format };
+}
+
+function figureContentType(format: string) {
+  return ({ png: "image/png", svg: "image/svg+xml", pdf: "application/pdf", tiff: "image/tiff" } as Record<string, string>)[format] ?? "application/octet-stream";
 }
 
 async function resolveOrCreateFigure(db: D1Database, context: Context, requestedId: string | undefined, spec: M8StatisticalFigureSpec) {

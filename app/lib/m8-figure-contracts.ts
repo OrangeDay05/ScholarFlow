@@ -63,13 +63,13 @@ export type M8PublicationSettings = {
   grayscaleCompatible: boolean;
   colorblindSafe: boolean;
   legendPosition: "best" | "top" | "right" | "bottom" | "none";
-  outputFormats: Array<"png" | "svg" | "pdf">;
+  outputFormats: Array<"png" | "svg" | "pdf" | "tiff">;
 };
 
 export const M8_PUBLICATION_PRESETS: Record<M8PublicationPreset, M8PublicationSettings> = {
   screen_preview: { preset: "screen_preview", width: 7.2, height: 4.6, unit: "in", dpi: 150, fontFamily: "sans-serif", baseFontSize: 10, titleFontSize: 14, axisFontSize: 10, legendFontSize: 9, lineWidth: 1.8, markerSize: 6, background: "paper", colorPalette: "colorblind_safe", grayscaleCompatible: false, colorblindSafe: true, legendPosition: "best", outputFormats: ["png"] },
-  paper_single_column: { preset: "paper_single_column", width: 3.5, height: 3.0, unit: "in", dpi: 300, fontFamily: "sans-serif", baseFontSize: 8, titleFontSize: 10, axisFontSize: 8, legendFontSize: 7, lineWidth: 1.2, markerSize: 4, background: "white", colorPalette: "colorblind_safe", grayscaleCompatible: true, colorblindSafe: true, legendPosition: "best", outputFormats: ["png"] },
-  paper_double_column: { preset: "paper_double_column", width: 7.2, height: 4.6, unit: "in", dpi: 300, fontFamily: "sans-serif", baseFontSize: 9, titleFontSize: 12, axisFontSize: 9, legendFontSize: 8, lineWidth: 1.5, markerSize: 5, background: "white", colorPalette: "colorblind_safe", grayscaleCompatible: true, colorblindSafe: true, legendPosition: "best", outputFormats: ["png"] },
+  paper_single_column: { preset: "paper_single_column", width: 3.5, height: 3.0, unit: "in", dpi: 300, fontFamily: "sans-serif", baseFontSize: 8, titleFontSize: 10, axisFontSize: 8, legendFontSize: 7, lineWidth: 1.2, markerSize: 4, background: "white", colorPalette: "colorblind_safe", grayscaleCompatible: true, colorblindSafe: true, legendPosition: "best", outputFormats: ["png", "svg", "pdf", "tiff"] },
+  paper_double_column: { preset: "paper_double_column", width: 7.2, height: 4.6, unit: "in", dpi: 300, fontFamily: "sans-serif", baseFontSize: 9, titleFontSize: 12, axisFontSize: 9, legendFontSize: 8, lineWidth: 1.5, markerSize: 5, background: "white", colorPalette: "colorblind_safe", grayscaleCompatible: true, colorblindSafe: true, legendPosition: "best", outputFormats: ["png", "svg", "pdf", "tiff"] },
 };
 
 export type M8StatisticalFigureSpec<T extends M8StatisticalFigureType = M8StatisticalFigureType> = {
@@ -104,7 +104,7 @@ export type M8FigureExecutionRequest = {
   data: M8DatasetRow[];
   requiredColumns: string[];
   timeoutSeconds: number;
-  formats: Array<"png">;
+  formats: Array<"png" | "svg" | "pdf" | "tiff">;
 };
 
 export type M8FigureExecutionResult = {
@@ -118,7 +118,7 @@ export type M8FigureExecutionResult = {
   errorType: string | null;
   errorMessage: string | null;
   exitCode: number | null;
-  outputs: Array<{ format: "png"; base64: string; width: number; height: number; dpi: number }>;
+  outputs: Array<{ format: "png" | "svg" | "pdf" | "tiff"; base64: string; width: number; height: number; dpi: number }>;
 };
 
 export const M8_RUNTIME_LIMITS = { maxCodeCharacters: 32_000, maxRows: 10_000, minTimeoutSeconds: 5, maxTimeoutSeconds: 60, maxOutputBytes: 12 * 1024 * 1024 } as const;

@@ -59,6 +59,17 @@ class RunnerSmokeTest(unittest.TestCase):
         result = RUNNER.execute({"runId": str(uuid.uuid4()), "code": "import os\nos.remove('x')", "data": [{"x": 1}], "requiredColumns": ["x"], "timeoutSeconds": 30, "formats": ["png"]})
         self.assertEqual(result["errorType"], "CODE_POLICY_BLOCKED")
 
+    def test_svg_safety_rejects_active_or_external_content(self) -> None:
+        safe = b'<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0"/></svg>'
+        self.assertTrue(RUNNER.valid_output("svg", safe))
+        self.assertFalse(RUNNER.valid_output("svg", b'<svg><script>alert(1)</script></svg>'))
+        self.assertFalse(RUNNER.valid_output("svg", b'<svg><image href="https://example.test/a.png"/></svg>'))
+
+    def test_binary_format_signatures(self) -> None:
+        self.assertTrue(RUNNER.valid_output("pdf", b"%PDF-1.7"))
+        self.assertTrue(RUNNER.valid_output("tiff", b"II*\x00"))
+        self.assertFalse(RUNNER.valid_output("pdf", b"not a pdf"))
+
 
 if __name__ == "__main__":
     unittest.main()

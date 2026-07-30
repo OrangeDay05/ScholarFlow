@@ -51,7 +51,10 @@ function parseSpecification(value: unknown): M8StatisticalFigureSpec | null {
 
 function parsePublication(value: unknown): M8PublicationSettings | null {
   if (!isRecord(value)) return null;
-  const formats = Array.isArray(value.outputFormats) && value.outputFormats.length === 1 && value.outputFormats[0] === "png" ? ["png"] as ["png"] : null;
+  const allowedFormats = new Set(["png", "svg", "pdf", "tiff"]);
+  const formats = Array.isArray(value.outputFormats) && value.outputFormats.length >= 1 && value.outputFormats.length <= 4 && new Set(value.outputFormats).size === value.outputFormats.length && value.outputFormats.every((item) => typeof item === "string" && allowedFormats.has(item))
+    ? value.outputFormats as M8PublicationSettings["outputFormats"]
+    : null;
   if (!formats) return null;
   const numberKeys = ["width", "height", "dpi", "baseFontSize", "titleFontSize", "axisFontSize", "legendFontSize", "lineWidth", "markerSize"] as const;
   if (numberKeys.some((key) => !Number.isFinite(Number(value[key])))) return null;

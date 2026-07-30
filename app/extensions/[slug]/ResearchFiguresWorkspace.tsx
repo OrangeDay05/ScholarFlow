@@ -21,7 +21,7 @@ type RunResult = {
   dataSnapshotId: string; dataSnapshotReused: boolean; codeVersionId: string; codeVersionReused: boolean;
   codeMode: "managed" | "customized" | "forked"; runRecordId: string;
   status: "succeeded" | "failed" | "timed_out" | "runner_unavailable"; code: string;
-  assets: Array<{ id: string; format: "png"; width: number; height: number; dpi: number }>;
+  assets: Array<{ id: string; format: "png" | "svg" | "pdf" | "tiff"; width: number; height: number; dpi: number; contentHash: string; fileSize: number }>;
   errorType: string | null; errorMessage: string | null; stderr: string;
 };
 
@@ -100,7 +100,7 @@ export function ResearchFiguresWorkspace({ projectId }: { projectId: string }) {
       const payload = await response.json() as { data?: RunResult; error?: { message?: string } };
       if (!response.ok || !payload.data) throw new Error(payload.error?.message || "科研图件运行失败。");
       setResult(payload.data); setCode(payload.data.code); setCodeMode(payload.data.codeMode);
-      const assetId = payload.data.assets[0]?.id ?? null; setSelectedAssetId(assetId);
+      const assetId = payload.data.assets.find((asset) => asset.format === "png")?.id ?? null; setSelectedAssetId(assetId);
       setMessage(payload.data.status === "succeeded" ? `运行成功：图件规格 V${payload.data.figureVersionNumber}，数据快照和代码版本均可追溯。` : `${payload.data.errorType ?? payload.data.status}：${payload.data.errorMessage ?? payload.data.stderr}`);
       await loadHistory(projectId, setHistory);
     } catch (error) { setMessage(error instanceof Error ? error.message : "科研图件运行失败。"); }
@@ -145,7 +145,8 @@ export function ResearchFiguresWorkspace({ projectId }: { projectId: string }) {
         <p className={styles.caption}>{spec.caption}</p>
         <div className={styles.message} role="status">{message}</div>
         {result ? <div className={styles.trace}><span>DataSnapshot <code>{short(result.dataSnapshotId)}</code>{result.dataSnapshotReused ? " · 复用" : " · 新建"}</span><span>CodeVersion <code>{short(result.codeVersionId)}</code>{result.codeVersionReused ? " · 复用" : " · 新建"}</span><span>RunRecord <code>{short(result.runRecordId)}</code></span></div> : null}
-        <div className={styles.resultActions}>{imageUrl ? <a download href={imageUrl}>下载 PNG</a> : <span>暂无可下载资产</span>}<span>代码状态：{codeModeLabel(codeMode)}</span><span>{rows.length} 行 · {columns.length} 列</span></div>
+        <div className={styles.resultActions}>{result?.assets.length ? result.assets.map((asset) => <a download key={asset.id} href={`/api/m8/projects/${projectId}/figures/assets/${asset.id}`}>下载 {asset.format.toUpperCase()}</a>) : <span>暂无可下载资产</span>}<span>代码状态：{codeModeLabel(codeMode)}</span><span>{rows.length} 行 · {columns.length} 列</span></div>
+        {result?.assets.length ? <details className={styles.historyPanel}><summary>资产清单 · {result.assets.length}</summary><div>{result.assets.map((asset) => <p key={asset.id}><strong>{asset.format.toUpperCase()}</strong> · {asset.fileSize} bytes · SHA-256 {asset.contentHash.slice(0, 12)}…</p>)}</div></details> : null}
         <details className={styles.codePanel}><summary><span><strong>查看生成代码</strong><small>默认折叠 · Python · 可下载</small></span><span>展开</span></summary><div className={styles.codeToolbar}><label><input checked={advanced} onChange={(event) => setAdvanced(event.target.checked)} type="checkbox" />高级编辑</label><button onClick={() => navigator.clipboard.writeText(code)} type="button">复制</button><button onClick={() => downloadText(code, `figure-${result?.codeVersionId ?? "draft"}.py`, "text/x-python")} type="button">下载 .py</button><button onClick={restoreManagedCode} type="button">从托管版本重新生成</button></div><textarea aria-label="Python 图件代码" readOnly={!advanced} spellCheck={false} value={code} onChange={(event) => editCode(event.target.value)} /><p>{advanced ? "编辑后将创建 customized/forked CodeVersion；安全检查仍会执行。" : "普通模式为只读。开启高级编辑后才能修改代码。"}</p></details>
         <details className={styles.historyPanel} open><summary>运行历史 · {history.length}</summary><div>{history.length ? history.map((run) => { const assetId = firstAssetId(run.assets); return <button key={run.id} onClick={() => assetId && setSelectedAssetId(assetId)} type="button"><span><strong>{run.status}</strong><small>{new Date(run.queued_at).toLocaleString("zh-CN")}</small></span><span>数据 {short(run.data_snapshot_id)} · 代码 {short(run.code_version_id)}</span><span>{run.error_type ?? (assetId ? "查看图件" : "无资产")}</span></button>; }) : <p>尚无运行记录。</p>}</div></details>
       </main>
