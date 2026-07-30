@@ -34,6 +34,13 @@ test("M8.1 generator emits standalone reproducible violin Python", () => {
   assert.match(code, /plt\.close\(fig\)/u);
 });
 
+test("M8.2 exposes and validates the full statistical figure catalog", () => {
+  const catalog = ["histogram", "density", "boxplot", "violin", "bar", "point", "errorbar", "forest", "scatter", "bubble", "regression", "line", "area", "heatmap", "correlation_heatmap", "facet", "multi_panel"];
+  for (const chartType of catalog) assert.doesNotThrow(() => buildM8PythonFigureCode({ ...spec, chartType, mapping: chartType === "correlation_heatmap" ? { variables: ["score", "time"] } : chartType === "multi_panel" ? { panelSpecs: [{ figureType: "bar", mapping: { category: "condition", value: "score" } }, { figureType: "scatter", mapping: { x: "time", y: "score" } }] } : spec.mapping }));
+  const correlation = { ...spec, chartType: "correlation_heatmap", mapping: { variables: ["score", "time"] } };
+  assert.deepEqual(validateM8StatisticalSpec(correlation, inferM8Columns(rows)), []);
+});
+
 test("M8.1 reuses equal snapshots and code but creates a RunRecord and asset per run", async () => {
   const database = await migratedDatabase(); workerEnv.DB = new D1DatabaseAdapter(database); seed(database);
   const storage = new InMemoryStorageAdapter(); const runner = successRunner();

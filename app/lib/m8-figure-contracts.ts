@@ -8,7 +8,7 @@ export const M8_FIGURE_CATALOG = [
 ] as const;
 
 export const M8_STATISTICAL_FIGURE_TYPES = M8_FIGURE_CATALOG.flatMap((group) => group.items);
-export const M8_IMPLEMENTED_FIGURE_TYPES = ["scatter", "line", "bar", "boxplot", "violin"] as const;
+export const M8_IMPLEMENTED_FIGURE_TYPES = M8_STATISTICAL_FIGURE_TYPES;
 export const M8_DIAGRAM_TYPES = ["conceptual_diagram", "research_flow", "path_diagram"] as const;
 
 export type M8StatisticalFigureType = (typeof M8_STATISTICAL_FIGURE_TYPES)[number];
@@ -144,12 +144,16 @@ export function requiredM8MappingFields(type: M8StatisticalFigureType): string[]
 export function validateM8StatisticalSpec(spec: M8StatisticalFigureSpec, columns: M8ColumnSchema[]): string[] {
   const errors: string[] = [];
   if (!spec.title.trim()) errors.push("图件标题不能为空。");
-  if (!M8_IMPLEMENTED_FIGURE_TYPES.includes(spec.chartType as M8ImplementedFigureType)) errors.push(`${spec.chartType} 已列入 M8 目录，但尚未在 M8.1 开放执行。`);
   const columnNames = new Set(columns.map((column) => column.name));
   const mapping = spec.mapping as Record<string, unknown>;
   for (const field of requiredM8MappingFields(spec.chartType)) {
     const value = mapping[field];
-    if (typeof value !== "string" || !value.trim()) errors.push(`当前图型缺少字段映射：${field}。`);
+    if (field === "variables") {
+      if (!Array.isArray(value) || value.length < 2) errors.push("相关矩阵至少需要两个数值字段。");
+      else for (const column of value) if (typeof column !== "string" || !columnNames.has(column)) errors.push(`相关矩阵指向不存在的数据列：${String(column)}。`);
+    } else if (field === "panelSpecs") {
+      if (!Array.isArray(value) || value.length < 2) errors.push("多面板图至少需要两个面板规格。");
+    } else if (typeof value !== "string" || !value.trim()) errors.push(`当前图型缺少字段映射：${field}。`);
     else if (!columnNames.has(value)) errors.push(`字段映射 ${field} 指向不存在的数据列：${value}。`);
   }
   for (const field of numericMappingFields(spec.chartType)) {

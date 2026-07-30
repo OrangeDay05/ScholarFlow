@@ -6,7 +6,7 @@
 
 ## IN_PROGRESS
 
-- 无。当前停在 M7 审核门。
+- M8.3：多格式图件资产与清单。
 
 ## DONE
 
@@ -28,10 +28,12 @@
 - M5-B3B—B5B：全格式解析、项目知识检索、加密凭据、Provider/Skill Adapter、有界 Runner、任务结果与候选版本。
 - M6：Claim/Evidence、严格核验、高级审阅、Data Availability、投稿准备、真实 DOCX 和 Word 打开验证。
 - M7：决定信、Comment、Revision Task、Response Draft、修改核对和 Response Letter DOCX。
+- M8.1：CSV/表格、五类核心统计图、本地受信任 Runner、真实 PNG 与全链路追溯。
+- M8.2：完整 17 类统计图目录，含直方图、密度图、点图、误差线、森林图、气泡图、回归、面积、热图、相关矩阵、分面与多面板图。
 
 ## M8 以后
 
-- M8：科研图件。
+- M8.3—M8.4：多格式资产、清单和概念图件。
 - M9：课程/学术/答辩 PPT 与真实 PPTX。
 - M10：管理员、运营与发布候选。
 - M11：只有用户明确授权后才可生产部署。

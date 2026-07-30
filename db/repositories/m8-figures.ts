@@ -242,7 +242,18 @@ async function updateFigureStatus(db: D1Database, context: Context, figureId: st
 
 function mappedColumns(spec: M8StatisticalFigureSpec): string[] {
   const mapping = spec.mapping as Record<string, unknown>;
-  return requiredM8MappingFields(spec.chartType).flatMap((field) => typeof mapping[field] === "string" ? [mapping[field] as string] : []);
+  const direct = requiredM8MappingFields(spec.chartType).flatMap((field) => {
+    const value = mapping[field];
+    if (typeof value === "string") return [value];
+    if (field === "variables" && Array.isArray(value)) return value.filter((item): item is string => typeof item === "string");
+    return [];
+  });
+  const panels = Array.isArray(mapping.panelSpecs)
+    ? mapping.panelSpecs.flatMap((panel) => panel && typeof panel === "object" && "mapping" in panel
+      ? Object.values((panel as { mapping: Record<string, unknown> }).mapping).filter((item): item is string => typeof item === "string")
+      : [])
+    : [];
+  return [...new Set([...direct, ...panels])];
 }
 
 function view(figureProjectId: string, figureVersion: { id: string; versionNumber: number }, snapshot: { id: string; reused: boolean }, codeVersion: { id: string; reused: boolean; mode: "managed" | "customized" | "forked" }, runRecordId: string, status: M8FigureRunView["status"], code: string, assets: M8FigureRunView["assets"], errorType: string | null, errorMessage: string | null, stderr: string): M8FigureRunView {
