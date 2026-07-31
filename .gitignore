@@ -45,6 +45,7 @@ next-env.d.ts
 /work/
 /.sites-dev*.log
 /.codex-dev.*.log
+/.codex-dev.pid
 /preview-*.png
 /.venv-m8/
 /.m8-runner/
