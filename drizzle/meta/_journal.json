@@ -127,6 +127,13 @@
       "when": 1785381537164,
       "tag": "0017_third_chimera",
       "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1785514429695,
+      "tag": "0018_plain_paibok",
+      "breakpoints": true
     }
   ]
 }

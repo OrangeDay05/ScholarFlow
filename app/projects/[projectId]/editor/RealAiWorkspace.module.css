@@ -136,7 +136,8 @@
 
 .preflight,
 .blocker,
-.proposal {
+.proposal,
+.executionResult {
   display: grid;
   gap: 6px;
   padding: 13px;
@@ -146,14 +147,16 @@
 
 .preflight strong,
 .blocker strong,
-.proposal strong {
+.proposal strong,
+.executionResult strong {
   color: var(--forest);
   font-size: 10px;
 }
 
 .preflight small,
 .blocker span,
-.proposal p {
+.proposal p,
+.executionResult p {
   margin: 0;
   color: var(--muted);
   font-size: 8px;
@@ -248,14 +251,16 @@
 }
 
 .actions,
-.proposal > div {
+.proposal > div,
+.executionResult > div {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
 }
 
 .actions button,
-.proposal button {
+.proposal button,
+.executionResult button {
   min-height: 38px;
   padding: 0 12px;
   border: 1px solid var(--forest);
@@ -268,16 +273,70 @@
 }
 
 .actions button + button,
-.proposal button + button {
+.proposal button + button,
+.executionResult button + button {
   background: transparent;
   color: var(--forest);
 }
 
 .actions button:disabled,
-.proposal button:disabled {
+.proposal button:disabled,
+.executionResult button:disabled {
   cursor: not-allowed;
   opacity: 0.42;
 }
+
+.executionGate {
+  display: grid !important;
+  gap: 10px;
+}
+
+.executionGate dl {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+}
+
+.executionGate dl > div {
+  display: grid;
+  grid-template-columns: 88px minmax(0, 1fr);
+  gap: 8px;
+  font-size: 8px;
+  line-height: 1.5;
+}
+
+.executionGate dt { color: var(--muted); }
+.executionGate dd { min-width: 0; margin: 0; overflow-wrap: anywhere; color: var(--ink); }
+
+.executionResult {
+  border-left: 3px solid var(--green);
+}
+
+.executionResult > span {
+  color: var(--green);
+  font-size: 8px;
+  font-weight: 850;
+}
+
+.diff {
+  display: grid !important;
+  gap: 7px;
+}
+
+.diff > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  font-size: 8px;
+  line-height: 1.6;
+}
+
+.diff b { color: var(--green); }
+.diff del, .diff ins { overflow-wrap: anywhere; white-space: pre-wrap; }
+.diff del { color: #8a3b2d; background: #fff0ec; }
+.diff ins { color: var(--forest); background: var(--mint); text-decoration: none; }
 
 @media (max-width: 520px) {
   .heading {

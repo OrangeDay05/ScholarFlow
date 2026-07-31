@@ -23,7 +23,7 @@ export const M5_CONVERSATION_SKILL_PROMPTS = [
     uiSkillId: "revision",
     productSkill: "general_revision",
     title: "通用修改",
-    prompt: "分析当前章节可以怎样修改，并先列出修改范围。",
+    prompt: "请先分析当前章节并与我讨论，不要直接覆盖正文。请明确需要保留的事实、数据、术语和引用；总结具体修改项，逐项说明修改位置和理由；列出不会修改的内容。讨论完成后，请询问我是否生成候选版本。",
   },
   {
     uiSkillId: "consistency",
@@ -135,6 +135,9 @@ export type M5ToolIntent = {
   operation: string;
   rationale: string;
   authorizedMaterialIds: string[];
+  sectionId: string | null;
+  baseVersionId: string | null;
+  excludedScope: string | null;
   state: "PROPOSED";
   createdAt: string;
 };
@@ -238,6 +241,9 @@ export function createToolIntent(input: {
   operation: string;
   rationale: string;
   authorizedMaterialIds: string[];
+  sectionId?: string | null;
+  baseVersionId?: string | null;
+  excludedScope?: string | null;
   now: string;
 }): M5ToolIntent {
   return {
@@ -247,6 +253,9 @@ export function createToolIntent(input: {
     operation: input.operation,
     rationale: input.rationale,
     authorizedMaterialIds: [...new Set(input.authorizedMaterialIds)],
+    sectionId: input.sectionId ?? null,
+    baseVersionId: input.baseVersionId ?? null,
+    excludedScope: input.excludedScope ?? null,
     state: "PROPOSED",
     createdAt: input.now,
   };

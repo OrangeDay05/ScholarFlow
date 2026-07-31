@@ -21,6 +21,18 @@ export function requireDeepSeekPlatformCredential(): string {
   return key;
 }
 
+export function deepSeekPlatformBaseUrl(): string {
+  const value = (env as unknown as Record<string, unknown>).DEEPSEEK_BASE_URL;
+  if (typeof value !== "string" || !value.trim()) return "https://api.deepseek.com";
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== "https:") throw new Error("invalid protocol");
+    return url.toString().replace(/\/$/u, "");
+  } catch {
+    throw new Error("DEEPSEEK_BASE_URL_INVALID");
+  }
+}
+
 function readDeepSeekKey(): string | null {
   const value = (env as unknown as Record<string, unknown>).DEEPSEEK_API_KEY;
   return typeof value === "string" && value.trim() ? value.trim() : null;

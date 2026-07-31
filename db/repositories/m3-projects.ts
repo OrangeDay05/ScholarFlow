@@ -367,6 +367,10 @@ export async function getWorkspaceForActor(
                 content, summary, created_at
          FROM section_versions
          WHERE section_id = ? AND project_id = ? AND owner_user_id = ?
+           AND NOT EXISTS (
+             SELECT 1 FROM section_version_adoptions adoption
+             WHERE adoption.version_id = section_versions.id
+           )
          ORDER BY version_number DESC`,
       )
       .bind(selectedSection.id, projectId, user.id)

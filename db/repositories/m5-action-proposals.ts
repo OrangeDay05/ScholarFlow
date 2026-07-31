@@ -36,6 +36,9 @@ type IntentRow = {
   operation: string;
   rationale: string;
   authorized_material_ids_json: string;
+  section_id: string | null;
+  base_version_id: string | null;
+  excluded_scope: string | null;
   state: "PROPOSED";
   idempotency_key: string;
   created_at: string;
@@ -77,6 +80,9 @@ export async function createM5ActionProposalForActor(
     operation: string;
     rationale: string;
     authorizedMaterialIds: string[];
+    scopeSectionSlug?: string | null;
+    baseVersionId?: string | null;
+    excludedScope?: string | null;
     title: string;
     effect: string;
     warnings: string[];
@@ -113,6 +119,13 @@ export async function createM5ActionProposalForActor(
 
   const materialIds = [...new Set(input.authorizedMaterialIds)];
   await validateMaterialScope(db, actor.userId, projectId, materialIds);
+  const scope = await resolveExecutionScope(
+    db,
+    actor.userId,
+    projectId,
+    input.scopeSectionSlug ?? null,
+    input.baseVersionId ?? null,
+  );
   const intentId = crypto.randomUUID();
   const proposalId = crypto.randomUUID();
   try {
@@ -122,8 +135,8 @@ export async function createM5ActionProposalForActor(
           `INSERT INTO conversation_tool_intents (
             id, owner_user_id, project_id, conversation_session_id,
             product_skill, operation, rationale, authorized_material_ids_json,
-            state, idempotency_key
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'PROPOSED', ?)`,
+            section_id, base_version_id, excluded_scope, state, idempotency_key
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'PROPOSED', ?)`,
         )
         .bind(
           intentId,
@@ -134,6 +147,9 @@ export async function createM5ActionProposalForActor(
           input.operation,
           input.rationale,
           JSON.stringify(materialIds),
+          scope.sectionId,
+          scope.baseVersionId,
+          input.excludedScope?.trim() || null,
           input.idempotencyKey,
         ),
       db
@@ -393,6 +409,40 @@ async function validateMaterialScope(
   }
 }
 
+async function resolveExecutionScope(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string,
+  sectionSlug: string | null,
+  baseVersionId: string | null,
+): Promise<{ sectionId: string | null; baseVersionId: string | null }> {
+  if (!sectionSlug && !baseVersionId) return { sectionId: null, baseVersionId: null };
+  if (!sectionSlug || !baseVersionId) {
+    throw new M5ActionProposalRepositoryError(
+      "PROPOSAL_NOT_FOUND",
+      "执行型提案必须同时绑定章节和基础版本。",
+    );
+  }
+  const row = await db
+    .prepare(
+      `SELECT s.id AS section_id, v.id AS version_id
+       FROM sections s
+       JOIN section_versions v ON v.section_id = s.id
+       WHERE s.owner_user_id = ? AND s.project_id = ? AND s.slug = ?
+         AND v.id = ? AND v.owner_user_id = s.owner_user_id
+         AND v.project_id = s.project_id`,
+    )
+    .bind(ownerUserId, projectId, sectionSlug, baseVersionId)
+    .first<{ section_id: string; version_id: string }>();
+  if (!row) {
+    throw new M5ActionProposalRepositoryError(
+      "PROPOSAL_NOT_FOUND",
+      "当前章节或基础版本不存在，不能创建执行型提案。",
+    );
+  }
+  return { sectionId: row.section_id, baseVersionId: row.version_id };
+}
+
 async function ownedProjectId(
   db: D1Database,
   ownerUserId: string,
@@ -560,7 +610,8 @@ function findDecisionForProposal(
 }
 
 const intentSelect = `SELECT id, project_id, conversation_session_id,
-  product_skill, operation, rationale, authorized_material_ids_json, state,
+  product_skill, operation, rationale, authorized_material_ids_json,
+  section_id, base_version_id, excluded_scope, state,
   idempotency_key, created_at FROM conversation_tool_intents`;
 const proposalSelect = `SELECT id, project_id, conversation_session_id,
   tool_intent_id, title, effect, warnings_json, status, recovery_status,
@@ -580,6 +631,9 @@ function toIntent(row: IntentRow): M5PersistedToolIntent {
     operation: row.operation,
     rationale: row.rationale,
     authorizedMaterialIds: JSON.parse(row.authorized_material_ids_json) as string[],
+    sectionId: row.section_id,
+    baseVersionId: row.base_version_id,
+    excludedScope: row.excluded_scope,
     state: row.state,
     idempotencyKey: row.idempotency_key,
     createdAt: row.created_at,

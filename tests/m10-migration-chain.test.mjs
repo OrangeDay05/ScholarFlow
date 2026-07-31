@@ -14,7 +14,7 @@ test("M0 through M10 migrations replay into a fresh isolated database", async ()
     .filter((name) => /^\d{4}_.+\.sql$/u.test(name))
     .sort();
 
-  assert.equal(migrationNames.length, 18);
+  assert.equal(migrationNames.length, 19);
 
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
@@ -31,7 +31,7 @@ test("M0 through M10 migrations replay into a fresh isolated database", async ()
     .all()
     .map(({ name }) => name);
 
-  assert.equal(tables.length, 83);
+  assert.equal(tables.length, 84);
   for (const table of [
     "agent_role_model_configs",
     "model_capability_versions",
@@ -40,6 +40,7 @@ test("M0 through M10 migrations replay into a fresh isolated database", async ()
     "feature_flags",
     "experiments",
     "experiment_assignments",
+    "section_candidate_decisions",
   ]) {
     assert.ok(tables.includes(table), `${table} should exist after the full migration chain`);
   }

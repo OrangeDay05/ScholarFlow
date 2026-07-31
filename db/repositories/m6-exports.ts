@@ -46,6 +46,10 @@ export async function loadM6ExportWorkspace(
           WHERE latest.section_id = s.id
             AND latest.owner_user_id = s.owner_user_id
             AND latest.project_id = s.project_id
+            AND NOT EXISTS (
+              SELECT 1 FROM section_version_adoptions candidate
+               WHERE candidate.version_id = latest.id
+            )
           ORDER BY latest.version_number DESC, latest.created_at DESC
           LIMIT 1
        )

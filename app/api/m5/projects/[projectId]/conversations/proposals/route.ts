@@ -54,6 +54,9 @@ export async function POST(
       const idempotencyKey = idValue(body.idempotencyKey);
       const authorizedMaterialIds = idArray(body.authorizedMaterialIds, 100);
       const warnings = textArray(body.warnings, 20, 500);
+      const scopeSectionSlug = optionalSlug(body.scopeSectionSlug);
+      const baseVersionId = optionalId(body.baseVersionId);
+      const excludedScope = optionalText(body.excludedScope, 1_000);
       if (
         !conversationSessionId ||
         !productSkill ||
@@ -63,7 +66,10 @@ export async function POST(
         !effect ||
         !idempotencyKey ||
         !authorizedMaterialIds ||
-        !warnings
+        !warnings ||
+        scopeSectionSlug === undefined ||
+        baseVersionId === undefined ||
+        excludedScope === undefined
       ) {
         return invalidInput();
       }
@@ -73,6 +79,9 @@ export async function POST(
         operation,
         rationale,
         authorizedMaterialIds,
+        scopeSectionSlug,
+        baseVersionId,
+        excludedScope,
         title,
         effect,
         warnings,
@@ -149,6 +158,18 @@ function limitedText(value: unknown, min: number, max: number): string | null {
 function optionalText(value: unknown, max: number): string | null | undefined {
   if (value === null || value === undefined || value === "") return null;
   return limitedText(value, 1, max) ?? undefined;
+}
+
+function optionalId(value: unknown): string | null | undefined {
+  if (value === null || value === undefined || value === "") return null;
+  return idValue(value) ?? undefined;
+}
+
+function optionalSlug(value: unknown): string | null | undefined {
+  if (value === null || value === undefined || value === "") return null;
+  if (typeof value !== "string") return undefined;
+  const slug = value.trim();
+  return /^[a-z0-9][a-z0-9_-]{0,63}$/u.test(slug) ? slug : undefined;
 }
 
 function invalidInput(): Response {

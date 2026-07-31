@@ -5,7 +5,7 @@ const prompts: Record<M5ProductSkill, string> = {
   project_diagnosis_outline: "梳理项目诊断与提纲；区分用户事实、材料提取、AI 推测和缺失信息。",
   literature_summary_matrix: "仅根据授权且可定位的材料生成文献总结与矩阵；标记原文事实、AI 归纳和缺失项。",
   chapter_writing: "根据已确认诊断卡与授权材料起草章节；不得虚构数据、结果、引用或来源。",
-  general_revision: "在不改变用户原意和事实边界的前提下修改文本；输出新候选版本，不覆盖原稿。",
+  general_revision: "在不改变用户原意和事实边界的前提下修改文本。只输出完整的修订后章节正文，不要附加说明、标题或 Markdown 代码围栏；必须保留事实、数据、术语和引用，遵守明确排除的范围；输出仅作为候选版本，不覆盖原稿。",
   consistency_check: "检查研究问题、方法、结果、讨论、结论和术语一致性；只生成报告，不修改正文。",
   citation_evidence_check: "核对论断、引用和证据位置；无法核对时标记 UNVERIFIED，不得凭模型知识确认。",
 };

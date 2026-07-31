@@ -9,7 +9,7 @@ import type { M5InferenceConfiguration, M5ModelCapability } from "./m5-model-cap
 import { requireM5ModelCapability, validateM5ModelConfiguration } from "./m5-model-capabilities";
 import { M5ProviderError } from "./m5-provider-error";
 
-const DEEPSEEK_BASE_URL = "https://api.deepseek.com";
+const DEFAULT_DEEPSEEK_BASE_URL = "https://api.deepseek.com";
 
 type DeepSeekUsage = {
   prompt_tokens?: number;
@@ -28,14 +28,16 @@ type DeepSeekMessage = {
 export class DeepSeekProviderAdapter implements M5ProviderAdapter {
   readonly providerKey = "deepseek";
   private readonly fetcher: typeof fetch;
+  private readonly baseUrl: string;
   private readonly transientToolRuns = new Map<string, { message: DeepSeekMessage; expiresAt: number }>();
 
-  constructor(options: { fetcher?: typeof fetch } = {}) {
+  constructor(options: { fetcher?: typeof fetch; baseUrl?: string } = {}) {
     this.fetcher = options.fetcher ?? fetch;
+    this.baseUrl = (options.baseUrl ?? DEFAULT_DEEPSEEK_BASE_URL).replace(/\/$/u, "");
   }
 
   async listModels(credential: string, signal: AbortSignal): Promise<string[]> {
-    const response = await this.fetcher(`${DEEPSEEK_BASE_URL}/models`, { headers: authorization(credential), signal });
+    const response = await this.fetcher(`${this.baseUrl}/models`, { headers: authorization(credential), signal });
     if (!response.ok) throw deepSeekHttpError(response, null);
     const payload = await response.json() as { data?: Array<{ id?: string }> };
     return (payload.data ?? []).flatMap((model) => typeof model.id === "string" ? [model.id] : []);
@@ -79,7 +81,7 @@ export class DeepSeekProviderAdapter implements M5ProviderAdapter {
     const { body, capability } = this.requestBody(request, false);
     let response: Response;
     try {
-      response = await this.fetcher(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+      response = await this.fetcher(`${this.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { ...authorization(credential), "Content-Type": "application/json" },
         body: JSON.stringify(body),
@@ -125,7 +127,7 @@ export class DeepSeekProviderAdapter implements M5ProviderAdapter {
     const { body, capability } = this.requestBody(request, true);
     let response: Response;
     try {
-      response = await this.fetcher(`${DEEPSEEK_BASE_URL}/chat/completions`, {
+      response = await this.fetcher(`${this.baseUrl}/chat/completions`, {
         method: "POST",
         headers: { ...authorization(credential), "Content-Type": "application/json" },
         body: JSON.stringify(body),

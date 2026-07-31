@@ -7,6 +7,7 @@ import {
   type M5ActionProposalWorkspace,
   type M5ConversationWorkspace,
 } from "@/app/lib/m5-conversation-agent";
+import type { M5ActionExecutionWorkspace } from "@/app/lib/m5-action-execution";
 import styles from "./RealAiWorkspace.module.css";
 
 type ConversationSkillPrompt = (typeof M5_CONVERSATION_SKILL_PROMPTS)[number];
@@ -19,6 +20,7 @@ type ModelConfig = {
   reasoning_effort: string | null;
   per_turn_budget: number;
   timeout_ms: number;
+  max_output_tokens: number;
 };
 
 type ModelWorkspace = {
@@ -36,9 +38,15 @@ type ApiPayload<T> = {
 export function RealAiWorkspace({
   projectId,
   authorizedMaterialIds,
+  sectionSlug,
+  sectionTitle,
+  baseVersionId,
 }: {
   projectId: string;
   authorizedMaterialIds: string[];
+  sectionSlug: string;
+  sectionTitle: string;
+  baseVersionId: string | null;
 }) {
   const [tab, setTab] = useState<"conversation" | "skills">("conversation");
   const [selectedSkill, setSelectedSkill] = useState<ConversationSkillPrompt>(
@@ -50,6 +58,7 @@ export function RealAiWorkspace({
   const [proposals, setProposals] =
     useState<M5ActionProposalWorkspace | null>(null);
   const [modelWorkspace, setModelWorkspace] = useState<ModelWorkspace | null>(null);
+  const [execution, setExecution] = useState<M5ActionExecutionWorkspace | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("正在读取长期会话……");
 
@@ -76,7 +85,16 @@ export function RealAiWorkspace({
           const nextProposals = await apiRequest<M5ActionProposalWorkspace>(
             `/api/m5/projects/${encodeURIComponent(projectId)}/conversations/proposals?session_id=${encodeURIComponent(nextConversation.selectedSession.id)}`,
           );
-          if (!cancelled) setProposals(nextProposals);
+          if (!cancelled) {
+            setProposals(nextProposals);
+            const proposal = nextProposals.proposals.at(-1);
+            if (proposal?.status === "CONFIRMED") {
+              const nextExecution = await apiRequest<M5ActionExecutionWorkspace>(
+                `/api/m5/projects/${encodeURIComponent(projectId)}/conversations/proposals/execution?session_id=${encodeURIComponent(nextConversation.selectedSession.id)}&proposal_id=${encodeURIComponent(proposal.id)}`,
+              );
+              if (!cancelled) setExecution(nextExecution);
+            }
+          }
         }
       })
       .catch((error) => {
@@ -101,10 +119,19 @@ export function RealAiWorkspace({
       )?.model_key ?? null,
     [conversationConfig, modelWorkspace],
   );
+  const reviserConfig = useMemo(
+    () => modelWorkspace?.configs.find((config) => config.agent_role === "REVISER") ?? null,
+    [modelWorkspace],
+  );
+  const reviserModel = useMemo(
+    () => modelWorkspace?.capabilities.find((capability) => capability.model_id === reviserConfig?.model_id)?.model_key ?? null,
+    [modelWorkspace, reviserConfig],
+  );
   const canCallModel = Boolean(
     conversationConfig && modelWorkspace?.platformCredentialConfigured,
   );
   const latestProposal = proposals?.proposals.at(-1) ?? null;
+  const latestIntent = proposals?.intents.find((intent) => intent.id === latestProposal?.toolIntentId) ?? null;
 
   async function request<T>(url: string, init?: RequestInit): Promise<T> {
     return apiRequest<T>(url, init);
@@ -126,14 +153,22 @@ export function RealAiWorkspace({
 
   async function loadProposals(sessionId: string) {
     try {
-      setProposals(
-        await request<M5ActionProposalWorkspace>(
+      const next = await request<M5ActionProposalWorkspace>(
           `/api/m5/projects/${encodeURIComponent(projectId)}/conversations/proposals?session_id=${encodeURIComponent(sessionId)}`,
-        ),
-      );
+        );
+      setProposals(next);
+      const proposal = next.proposals.at(-1);
+      if (proposal?.status === "CONFIRMED") await loadExecution(sessionId, proposal.id);
+      else setExecution(null);
     } catch (error) {
       setNotice(errorMessage(error));
     }
+  }
+
+  async function loadExecution(sessionId: string, proposalId: string) {
+    setExecution(await request<M5ActionExecutionWorkspace>(
+      `/api/m5/projects/${encodeURIComponent(projectId)}/conversations/proposals/execution?session_id=${encodeURIComponent(sessionId)}&proposal_id=${encodeURIComponent(proposalId)}`,
+    ));
   }
 
   async function ensureSession(): Promise<string> {
@@ -210,12 +245,69 @@ export function RealAiWorkspace({
             title: `准备执行：${selectedSkill.title}`,
             effect: "确认后只进入待执行状态；不会自动覆盖正文或采用候选版本。",
             warnings,
+            scopeSectionSlug: selectedSkill.productSkill === "general_revision" ? sectionSlug : null,
+            baseVersionId: selectedSkill.productSkill === "general_revision" ? baseVersionId : null,
+            excludedScope: "当前章节以外内容；未明确要求修改的事实、数据、术语和引用。",
             idempotencyKey: `proposal-${crypto.randomUUID()}`,
           }),
         },
       );
       await loadProposals(sessionId);
       setNotice("操作提案已保存，必须由你确认后才能进入执行阶段。");
+    } catch (error) {
+      setNotice(errorMessage(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function executeProposal() {
+    const sessionId = conversation?.selectedSession?.id;
+    if (!sessionId || !latestProposal || !reviserConfig || !reviserModel || busy) return;
+    setBusy(true);
+    try {
+      const next = await request<M5ActionExecutionWorkspace>(
+        `/api/m5/projects/${encodeURIComponent(projectId)}/conversations/proposals/execution`,
+        {
+          method: "POST",
+          body: JSON.stringify({
+            action: "execute",
+            confirmedExecution: true,
+            conversationSessionId: sessionId,
+            proposalId: latestProposal.id,
+            configId: reviserConfig.id,
+            provider: "DEEPSEEK",
+            model: reviserModel,
+            agentRole: "REVISER",
+            thinkingMode: reviserConfig.thinking_mode,
+            reasoningEffort: reviserConfig.reasoning_effort,
+            maxOutputTokens: reviserConfig.max_output_tokens,
+            budget: reviserConfig.per_turn_budget,
+            expectedCalls: 1,
+          }),
+        },
+      );
+      setExecution(next);
+      setNotice("单次 Reviser 调用已完成，候选版本尚未采用。");
+    } catch (error) {
+      setNotice(errorMessage(error));
+      await loadExecution(sessionId, latestProposal.id).catch(() => undefined);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function decideCandidate(action: "reject_candidate" | "adopt_candidate") {
+    const sessionId = conversation?.selectedSession?.id;
+    if (!sessionId || !latestProposal || busy) return;
+    setBusy(true);
+    try {
+      const next = await request<M5ActionExecutionWorkspace>(
+        `/api/m5/projects/${encodeURIComponent(projectId)}/conversations/proposals/execution`,
+        { method: "POST", body: JSON.stringify({ action, conversationSessionId: sessionId, proposalId: latestProposal.id, idempotencyKey: `${action}-${latestProposal.id}` }) },
+      );
+      setExecution(next);
+      setNotice(action === "adopt_candidate" ? "候选内容已作为新的正式不可变版本采用。" : "候选版本已拒绝，原正式版本保持不变。 ");
     } catch (error) {
       setNotice(errorMessage(error));
     } finally {
@@ -332,6 +424,51 @@ export function RealAiWorkspace({
               {latestProposal.status === "AWAITING_USER_CONFIRMATION" ? (
                 <div><button disabled={busy} onClick={() => decideProposal("CONFIRM")} type="button">确认提案</button><button disabled={busy} onClick={() => decideProposal("REJECT")} type="button">暂不执行</button></div>
               ) : null}
+              {latestProposal.status === "CONFIRMED" && latestIntent?.productSkill === "general_revision" ? (
+                <div className={styles.executionGate}>
+                  <dl>
+                    <div><dt>修改范围</dt><dd>{execution?.intent.sectionTitle ?? sectionTitle}</dd></div>
+                    <div><dt>基础版本</dt><dd>{execution?.intent.baseVersionId ?? baseVersionId ?? "未绑定"}</dd></div>
+                    <div><dt>材料范围</dt><dd>{authorizedMaterialIds.length ? `${authorizedMaterialIds.length} 份已授权材料` : "不发送材料"}</dd></div>
+                    <div><dt>Agent Role</dt><dd>REVISER</dd></div>
+                    <div><dt>Provider / Model</dt><dd>{reviserModel ? `DeepSeek / ${reviserModel}` : "未配置"}</dd></div>
+                    <div><dt>Thinking Mode</dt><dd>{reviserConfig?.thinking_mode ?? "未配置"}</dd></div>
+                    <div><dt>Reasoning Effort</dt><dd>{reviserConfig?.reasoning_effort ?? "不适用"}</dd></div>
+                    <div><dt>最大输出</dt><dd>{reviserConfig ? `${reviserConfig.max_output_tokens} tokens` : "未配置"}</dd></div>
+                    <div><dt>预计调用</dt><dd>1 次；无自动重试或 Fallback</dd></div>
+                    <div><dt>预算上限</dt><dd>{reviserConfig ? String(reviserConfig.per_turn_budget) : "未配置"}</dd></div>
+                  </dl>
+                  {!execution?.task ? <button disabled={busy || !reviserConfig || !reviserModel || !modelWorkspace?.platformCredentialConfigured || !baseVersionId} onClick={executeProposal} type="button">确认配置并执行 1 次</button> : null}
+                </div>
+              ) : null}
+            </article>
+          ) : null}
+
+          {execution?.task ? (
+            <article className={styles.executionResult}>
+              <span>任务 {execution.task.status} · 调用 {execution.task.callsUsed}/{execution.task.maxCalls}</span>
+              <strong>AITask {execution.task.id}</strong>
+              {execution.candidate ? (
+                <>
+                  <p>基础版本：{execution.intent.baseVersionId}</p>
+                  <p>候选版本：{execution.candidate.id}</p>
+                  <div className={styles.diff} aria-label="原版本与候选版本差异">
+                    {execution.diff.map((item, index) => (
+                      <div data-kind={item.kind} key={`${item.kind}-${index}`}>
+                        <b>{item.kind}</b>
+                        {item.before !== null ? <del>{item.before}</del> : null}
+                        {item.after !== null ? <ins>{item.after}</ins> : null}
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <button disabled={busy || execution.candidate.rejected || execution.candidate.adopted} onClick={() => decideCandidate("reject_candidate")} type="button">拒绝候选版本</button>
+                    <button disabled={busy || execution.candidate.adopted} onClick={() => decideCandidate("adopt_candidate")} type="button">确认采用</button>
+                  </div>
+                  {execution.candidate.rejected ? <small>已拒绝；原版本未改变。仍可采用同一候选，不会再次调用模型。</small> : null}
+                  {execution.candidate.adopted ? <small>已采用为正式版本：{execution.candidate.formalVersionId}</small> : null}
+                </>
+              ) : <p>尚未生成候选版本；失败不会修改基础版本。</p>}
             </article>
           ) : null}
         </div>

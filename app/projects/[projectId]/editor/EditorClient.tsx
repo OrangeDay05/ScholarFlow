@@ -947,7 +947,10 @@ export default function EditorClient({ projectId }: EditorClientProps) {
       return (
         <RealAiWorkspace
           authorizedMaterialIds={selectedMaterialIds}
+          baseVersionId={versions[0]?.id ?? null}
           projectId={projectId}
+          sectionSlug={selectedSection.id}
+          sectionTitle={selectedSection.title}
         />
       );
     }

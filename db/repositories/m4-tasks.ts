@@ -35,8 +35,17 @@ type ModelRow = {
 };
 
 export class M4TaskRepositoryError extends Error {
+  readonly code:
+    | "PROJECT_NOT_FOUND"
+    | "TASK_NOT_FOUND"
+    | "VERSION_NOT_FOUND"
+    | "REPORT_NOT_FOUND"
+    | "ISSUE_NOT_FOUND"
+    | "INVALID_TRANSITION"
+    | "CALL_LIMIT_REACHED";
+
   constructor(
-    readonly code:
+    code:
       | "PROJECT_NOT_FOUND"
       | "TASK_NOT_FOUND"
       | "VERSION_NOT_FOUND"
@@ -47,6 +56,7 @@ export class M4TaskRepositoryError extends Error {
     message: string,
   ) {
     super(message);
+    this.code = code;
   }
 }
 

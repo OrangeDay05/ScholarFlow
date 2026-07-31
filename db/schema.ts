@@ -1006,6 +1006,9 @@ export const conversationToolIntents = sqliteTable(
     authorizedMaterialIdsJson: text("authorized_material_ids_json")
       .notNull()
       .default("[]"),
+    sectionId: text("section_id"),
+    baseVersionId: text("base_version_id"),
+    excludedScope: text("excluded_scope"),
     state: text("state", { enum: ["PROPOSED"] }).notNull().default("PROPOSED"),
     idempotencyKey: text("idempotency_key").notNull(),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
@@ -2642,6 +2645,51 @@ export const slides = sqliteTable(
   (table) => [
     uniqueIndex("slides_version_position_uq").on(table.presentationVersionId, table.position),
     index("slides_owner_project_idx").on(table.ownerUserId, table.projectId),
+  ],
+);
+
+export const sectionCandidateDecisions = sqliteTable(
+  "section_candidate_decisions",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    sectionId: text("section_id")
+      .notNull()
+      .references(() => sections.id, { onDelete: "cascade" }),
+    candidateVersionId: text("candidate_version_id")
+      .notNull()
+      .references(() => sectionVersions.id, { onDelete: "cascade" }),
+    baseVersionId: text("base_version_id")
+      .notNull()
+      .references(() => sectionVersions.id, { onDelete: "restrict" }),
+    decision: text("decision", { enum: ["REJECT", "ADOPT"] }).notNull(),
+    resultVersionId: text("result_version_id").references(() => sectionVersions.id, {
+      onDelete: "set null",
+    }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    decidedAt: text("decided_at").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("section_candidate_decisions_version_decision_uq").on(
+      table.candidateVersionId,
+      table.decision,
+    ),
+    uniqueIndex("section_candidate_decisions_owner_project_idempotency_uq").on(
+      table.ownerUserId,
+      table.projectId,
+      table.idempotencyKey,
+    ),
+    index("section_candidate_decisions_owner_section_idx").on(
+      table.ownerUserId,
+      table.sectionId,
+      table.decidedAt,
+    ),
   ],
 );
 

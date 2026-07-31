@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { env as workerEnv } from "./cloudflare-workers-shim.mjs";
@@ -13,19 +13,11 @@ import {
   createM5ConversationForActor,
 } from "../db/repositories/m5-conversations.ts";
 
-const migrations = [
-  "0000_swift_blue_shield.sql",
-  "0001_vengeful_tigra.sql",
-  "0002_petite_sir_ram.sql",
-  "0003_condemned_magik.sql",
-  "0004_nervous_maddog.sql",
-  "0005_freezing_nextwave.sql",
-  "0006_hot_professor_monster.sql",
-  "0007_silky_power_man.sql",
-  "0008_common_swordsman.sql",
-];
+const migrations = (await readdir(new URL("../drizzle/", import.meta.url)))
+  .filter((name) => /^\d{4}_.+\.sql$/u.test(name))
+  .sort();
 
-test("0008 is additive and preserves the explicit confirmation gate", async () => {
+test("proposal migrations are additive and preserve the explicit confirmation gate", async () => {
   const migration = await readFile(
     new URL("../drizzle/0008_common_swordsman.sql", import.meta.url),
     "utf8",
@@ -43,7 +35,7 @@ test("0008 is additive and preserves the explicit confirmation gate", async () =
         "SELECT count(*) AS total FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%'",
       )
       .get().total,
-    66,
+    84,
   );
   db.close();
 });
@@ -59,6 +51,7 @@ test("proposal decisions are isolated, idempotent and never execute a task", asy
     activeProductSkill: "chapter_writing",
     idempotencyKey: "proposal-session-1",
   });
+  seedSection(db);
 
   const created = await createM5ActionProposalForActor(ownerA, "project-a", {
     conversationSessionId: session.session.id,
@@ -70,11 +63,16 @@ test("proposal decisions are isolated, idempotent and never execute a task", asy
     effect: "确认后只进入待执行队列。",
     warnings: ["尚未执行真实模型。"],
     idempotencyKey: "proposal-create-1",
+    scopeSectionSlug: "introduction",
+    baseVersionId: "version-a",
+    excludedScope: "当前章节以外内容",
   });
   assert.equal(created.replayed, false);
   assert.equal(created.proposal.status, "AWAITING_USER_CONFIRMATION");
   assert.equal(created.proposal.recoveryStatus, "WAITING_FOR_USER");
   assert.deepEqual(created.intent.authorizedMaterialIds, ["material-a"]);
+  assert.equal(created.intent.sectionId, "section-a");
+  assert.equal(created.intent.baseVersionId, "version-a");
   assert.equal(db.prepare("SELECT count(*) AS total FROM ai_tasks").get().total, 0);
   const waiting = await loadM5ActionProposalWorkspace(
     ownerA,
@@ -246,6 +244,13 @@ function seed(db) {
        ) VALUES (?, ?, ?, 'note', ?, 'text/plain', 10, 'awaiting_parse', ?, ?)`,
     ).run(id, owner, project, `${id}.txt`, now, now);
   }
+}
+
+function seedSection(db) {
+  db.prepare("INSERT INTO diagnosis_cards (id, owner_user_id, project_id, version_number, status, title, paper_type, language) VALUES (?, ?, ?, 1, 'confirmed', 'P', 'course_paper', 'zh')").run("diagnosis-a", "user-a", "project-a");
+  db.prepare("INSERT INTO outlines (id, owner_user_id, project_id, diagnosis_card_id, version_number, status) VALUES (?, ?, ?, ?, 1, 'confirmed')").run("outline-a", "user-a", "project-a", "diagnosis-a");
+  db.prepare("INSERT INTO sections (id, owner_user_id, project_id, outline_id, slug, title, position) VALUES (?, ?, ?, ?, 'introduction', '引言', 1)").run("section-a", "user-a", "project-a", "outline-a");
+  db.prepare("INSERT INTO section_versions (id, owner_user_id, project_id, section_id, version_number, source, content, content_hash) VALUES (?, ?, ?, ?, 1, 'manual', '原始章节', 'hash')").run("version-a", "user-a", "project-a", "section-a");
 }
 
 class PreparedStatement {
