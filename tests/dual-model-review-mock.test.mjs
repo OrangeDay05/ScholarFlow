@@ -61,7 +61,7 @@ test("keeps review evidence-bound, user-controlled, and append-only", async () =
   assert.match(editor, /REVIEW_FAILED/);
 });
 
-test("keeps the capability behind one front-end mock switch", async () => {
+test("keeps the legacy capability explicitly enabled and out of production", async () => {
   const [feature, mock, editor] = await Promise.all([
     source("../app/lib/dual-model-review-features.ts"),
     source("../app/lib/dual-model-review-mock.ts"),
@@ -69,7 +69,8 @@ test("keeps the capability behind one front-end mock switch", async () => {
   ]);
 
   assert.match(feature, /NEXT_PUBLIC_DUAL_MODEL_REVIEW_MOCK/);
-  assert.match(feature, /!== "false"/);
+  assert.match(feature, /NODE_ENV !== "production"/);
+  assert.match(feature, /=== "true"/);
   assert.match(editor, /DUAL_MODEL_REVIEW_MOCK_ENABLED/);
   assert.doesNotMatch(`${feature}\n${mock}`, /db\/|drizzle|cloudflare:workers|\/api\//);
 });

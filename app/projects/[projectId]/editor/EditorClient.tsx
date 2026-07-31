@@ -35,6 +35,7 @@ import {
 } from "@/app/lib/MockWorkspaceContext";
 import { PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED } from "@/app/lib/progressive-diagnosis-features";
 import { V042_INCREMENTAL_MOCK_ENABLED } from "@/app/lib/v042-features";
+import { RealAiWorkspace } from "./RealAiWorkspace";
 import styles from "./Editor.module.css";
 
 type EditorClientProps = {
@@ -44,84 +45,6 @@ type EditorClientProps = {
 type VisibleTaskStatus = TaskStatus | "queued";
 type AssistantTab = "materials" | "evidence" | "review" | "tasks";
 type WorkspaceMode = "conversation" | "skills";
-
-const sectionCopy: Record<
-  string,
-  {
-    kicker: string;
-    lead: string;
-    paragraphs: string[];
-    subheading: string;
-    note: string;
-  }
-> = {
-  abstract: {
-    kicker: "ABSTRACT",
-    lead:
-      "本文关注数字平台如何改变跨机构研究团队的知识协作，并以可追溯性、反馈可见性与知识重组为分析切口。",
-    paragraphs: [
-      "研究使用用户上传的访谈编码与平台协作文献作为当前证据边界，不扩展到尚未核验的外部来源。",
-      "当前摘要仍需等待结果材料确认，因此结论性表述被保留为待补充状态。",
-    ],
-    subheading: "摘要状态",
-    note: "结果材料尚未确认，系统不会生成具体研究结果或统计数值。",
-  },
-  introduction: {
-    kicker: "INTRODUCTION",
-    lead:
-      "数字平台正在重塑知识生产与组织协作的基本方式。与传统的信息系统不同，平台不仅承载内容，也通过权限、接口与互动规则重新分配知识的可见性和流动路径。",
-    paragraphs: [
-      "现有研究分别从技术采纳、组织学习与在线协作解释这一变化，但对于平台机制如何在跨团队情境中形成可持续的知识协作，仍缺少能够连接规则设计、参与行为与协作结果的整合性讨论。",
-      "本文以数字平台中的项目团队为研究对象，尝试回答两个相互关联的问题：平台规则如何影响成员贡献与复用知识的意愿；不同协作情境下，哪些机制能够降低协调成本并维持知识质量。",
-    ],
-    subheading: "研究切口",
-    note: "此处需要补充研究对象的具体范围，并回到上传原文核对“协调成本”的定义。",
-  },
-  literature: {
-    kicker: "LITERATURE REVIEW",
-    lead:
-      "现有文献主要从平台治理、组织学习与协同知识生产三条路径解释数字平台中的合作关系。",
-    paragraphs: [
-      "平台治理研究强调规则与权限设计，组织学习研究关注知识如何被吸收与重用，协同知识生产则讨论参与者如何在互动中建立共同理解。",
-      "三类研究的概念边界并不完全一致，当前版本只保留已上传原文能够直接或间接支持的综合判断。",
-    ],
-    subheading: "综述缺口",
-    note: "文献矩阵仍在整理。未核验来源不会被写入正式引用。",
-  },
-  method: {
-    kicker: "METHOD",
-    lead:
-      "本研究拟采用质性内容分析，考察跨机构远程研究团队如何在平台互动中形成可追溯的协作实践。",
-    paragraphs: [
-      "分析单位暂定为团队讨论记录中的任务协调、证据交换与决策确认片段。",
-      "方法描述仍等待用户确认样本来源、筛选标准和编码流程，系统不会补写不存在的访谈或样本。",
-    ],
-    subheading: "方法边界",
-    note: "诊断卡中的研究方法尚未完整确认，正式生成前需要补充。",
-  },
-  results: {
-    kicker: "RESULTS & DISCUSSION",
-    lead:
-      "当前结果章节只有讨论框架，没有足够数据支持任何经验性结论。",
-    paragraphs: [
-      "可追溯性、反馈可见性和知识重组是待检验的三个分析维度，而不是已经得到数据验证的结果。",
-      "在访谈编码文件解析成功并经用户授权前，本节只展示缺失信息与分析计划。",
-    ],
-    subheading: "缺少数据",
-    note: "interview-coding.csv 当前解析失败。系统不会编造结果、比例、样本量或访谈原话。",
-  },
-  conclusion: {
-    kicker: "CONCLUSION",
-    lead:
-      "结论章节将在研究问题、方法与结果均获得材料支持后再生成。",
-    paragraphs: [
-      "当前只能回顾研究目标与预期贡献，不能提前宣称研究发现。",
-      "后续需要检查结论是否逐项回应研究问题，并与结果章节使用一致的概念范围。",
-    ],
-    subheading: "结论前置条件",
-    note: "结果章节未完成，结论性主张暂不可生成。",
-  },
-};
 
 const evidenceItems = [
   {
@@ -217,16 +140,6 @@ function nextVersionLabel(
   return `v${nextNumber}`;
 }
 
-function contentForVersion(id: string, summary: string) {
-  if (id.includes("1")) {
-    return "平台是团队协作的重要工具。它能够帮助成员交流信息，并在一定程度上提高工作效率。";
-  }
-  if (id.includes("2")) {
-    return "数字平台通过信息共享与反馈机制支持团队协作，但其作用取决于具体规则与参与情境。";
-  }
-  return `数字平台通过可追溯性、反馈可见性与知识重组三类机制影响跨团队协作。${summary}`;
-}
-
 function statusMessage(
   status: VisibleTaskStatus,
   selectedSkillId: string,
@@ -268,6 +181,7 @@ function statusMessage(
 export default function EditorClient({ projectId }: EditorClientProps) {
   const {
     dataSource,
+    diagnosis,
     files,
     diagnosisStatus,
     outline,
@@ -285,6 +199,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     cancelMockTask,
     failMockTask,
     versions,
+    sectionContents,
     appendMockVersion,
     restoreVersion,
     saveCurrentSection,
@@ -344,6 +259,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const reportTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const reviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const documentScrollRef = useRef<HTMLElement | null>(null);
+  const sectionBodyRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const outlineDrawerRef = useRef<HTMLDetailsElement | null>(null);
   const assistantDrawerRef = useRef<HTMLDetailsElement | null>(null);
   const sectionRefs = useRef<Record<string, HTMLElement | null>>({});
@@ -544,24 +460,6 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     nextUrl.searchParams.set("section", id);
     window.history.replaceState(null, "", nextUrl);
     sectionRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }
-
-  function focusEvidence(evidenceId: string) {
-    setSelectedSkillId("evidence");
-    setAssistantTab("evidence");
-    setActiveEvidenceId(evidenceId);
-    setFocusMode(false);
-    setRightCollapsed(false);
-    setNotice("已在 AI 工作台中定位对应证据卡。");
-    requestAnimationFrame(() => {
-      const cards = Array.from(
-        document.querySelectorAll<HTMLElement>(`[data-evidence-id="${evidenceId}"]`),
-      );
-      cards.find((card) => card.getClientRects().length > 0)?.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-      });
-    });
   }
 
   function focusClaim(evidenceId: string) {
@@ -1042,6 +940,17 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   }
 
   function renderAssistantPanel() {
+    if (
+      !MODEL_ORCHESTRATION_MOCK_ENABLED &&
+      !DUAL_MODEL_REVIEW_MOCK_ENABLED
+    ) {
+      return (
+        <RealAiWorkspace
+          authorizedMaterialIds={selectedMaterialIds}
+          projectId={projectId}
+        />
+      );
+    }
     const canCancel = visibleTaskStatus === "queued" || visibleTaskStatus === "running";
     const taskFailed = visibleTaskStatus === "failed";
     const primaryLabel = isReportOnly
@@ -1092,25 +1001,27 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           <span>AI 将读取当前项目上下文和你本次授权的材料。</span>
         </div>
 
-        {V042_INCREMENTAL_MOCK_ENABLED ? (
-          <details className={styles.extensionEntry} data-v042-extension-entry>
+          <details className={styles.extensionEntry} data-research-output-entry>
             <summary>
               <span>
-                <strong>研究扩展</strong>
-                <small>独立研究工作区 · 科研图件进入 M8.1</small>
+                <strong>研究产出</strong>
+                <small>绑定当前项目的科研图件与 PPTX</small>
               </span>
               <span aria-hidden="true">＋</span>
             </summary>
             <div>
-              <Link href="/extensions/idea-exploration">Idea 探索</Link>
-              <Link href="/extensions/external-literature">外部文献</Link>
-              <Link href="/extensions/advanced-review">高级审稿</Link>
-              <Link href="/extensions/submission-revision">投稿返修</Link>
-              <Link href="/extensions/research-figures">科研图件</Link>
-              <Link href="/extensions/presentations">PPT</Link>
+              <Link href={`/projects/${projectId}/figures`}>科研图件</Link>
+              <Link href={`/projects/${projectId}/presentations`}>PPT</Link>
+              {V042_INCREMENTAL_MOCK_ENABLED ? (
+                <>
+                  <Link href="/extensions/idea-exploration">Idea 探索</Link>
+                  <Link href="/extensions/external-literature">外部文献</Link>
+                  <Link href="/extensions/advanced-review">高级审稿</Link>
+                  <Link href="/extensions/submission-revision">投稿返修</Link>
+                </>
+              ) : null}
             </div>
           </details>
-        ) : null}
 
         <section className={styles.skillSection} aria-labelledby="skill-title">
           <div className={styles.sectionLabel} id="skill-title">
@@ -1859,6 +1770,25 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     );
   }
 
+  if (persistenceStatus !== "ready" || dataSource !== "d1") {
+    const loading = persistenceStatus === "loading";
+    return (
+      <main className={styles.editorStatePage}>
+        <section className={styles.editorStateCard} role={loading ? "status" : "alert"}>
+          <span>{loading ? "正在读取项目" : "项目暂时不可用"}</span>
+          <h1>{loading ? "正在准备论文编辑器……" : "无法打开论文编辑器"}</h1>
+          <p>
+            {loading
+              ? "正在读取当前项目、章节版本和材料授权范围。"
+              : persistenceError ||
+                "当前环境未启用项目持久化。为避免显示演示数据，编辑器已停止加载。"}
+          </p>
+          {!loading ? <Link href="/projects">返回项目列表</Link> : null}
+        </section>
+      </main>
+    );
+  }
+
   return (
     <div className={styles.editorPage}>
       <header className={styles.topbar}>
@@ -1870,7 +1800,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             <p>
               <Link href="/projects">我的项目</Link>
               <span>/</span>
-              <Link href={`/projects/${projectId}`}>数字平台中的知识协作机制研究</Link>
+              <Link href={`/projects/${projectId}`}>{diagnosis.title}</Link>
               <span>/</span>
               <strong>{selectedSection.title}</strong>
             </p>
@@ -1890,7 +1820,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             onClick={async () => {
               try {
                 const content =
-                  sectionRefs.current[selectedSectionId]?.innerText ?? "";
+                  sectionBodyRefs.current[selectedSectionId]?.innerText ?? "";
                 await saveCurrentSection(content);
                 setNotice(
                   dataSource === "d1"
@@ -1919,18 +1849,10 @@ export default function EditorClient({ projectId }: EditorClientProps) {
       </header>
 
       <div className={styles.mockBanner}>
-        <span>
-          {dataSource === "d1"
-            ? "M3 基础持久化 · D1"
-            : persistenceStatus === "loading"
-              ? "正在读取 M3 基础数据"
-              : "演示模式 · Mock"}
-        </span>
+        <span>项目持久化 · D1</span>
         <p>
-          {dataSource === "d1"
-            ? "项目、诊断、提纲与章节版本使用真实基础数据；AI、材料解析、证据与 DOCX 仍为 Mock。"
-            : persistenceError ||
-              "所有任务、模型结果、材料解析、证据与版本均为内存演示，不会调用真实服务。"}
+          项目、诊断、提纲、章节版本、材料、证据与 DOCX 使用持久化服务；AI
+          执行仍取决于当前环境的模型配置。
         </p>
       </div>
 
@@ -2070,8 +1992,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
 
           <div className={styles.paperStack}>
             {outline.map((section) => {
-              const copy = sectionCopy[section.id] ?? sectionCopy.introduction;
-              const isIntroduction = section.id === "introduction";
+              const persistedContent = sectionContents[section.id] ?? "";
               return (
                 <div className={styles.paperPageGroup} key={section.id}>
                   <article
@@ -2088,82 +2009,19 @@ export default function EditorClient({ projectId }: EditorClientProps) {
                   >
                     <div className={styles.paperMeta} contentEditable={false}>
                       <span>{section.index}</span>
-                      <span>{copy.kicker}</span>
+                      <span>{section.id.replaceAll("-", " ").toUpperCase()}</span>
                     </div>
                     <h1>{section.title}</h1>
-                    <p className={styles.lead}>{copy.lead}</p>
-                    <p
-                      className={
-                        activeEvidenceId === "evidence-direct" && isIntroduction
-                          ? styles.claimHighlighted
-                          : ""
-                      }
+                    <div
+                      aria-label={`${section.title}正文`}
+                      className={styles.paperBody}
+                      data-placeholder="当前章节尚无正文，可在此开始写作。"
                       ref={(node) => {
-                        if (isIntroduction) claimRefs.current["evidence-direct"] = node;
+                        sectionBodyRefs.current[section.id] = node;
                       }}
                     >
-                      {copy.paragraphs[0]}
-                      {isIntroduction ? (
-                        <button
-                          className={styles.evidenceAnchor}
-                          contentEditable={false}
-                          onClick={() => focusEvidence("evidence-direct")}
-                          type="button"
-                        >
-                          证据 01
-                        </button>
-                      ) : null}
-                    </p>
-                    <p
-                      className={
-                        activeEvidenceId === "evidence-indirect" && isIntroduction
-                          ? styles.claimHighlighted
-                          : ""
-                      }
-                      ref={(node) => {
-                        if (isIntroduction) claimRefs.current["evidence-indirect"] = node;
-                      }}
-                    >
-                      {copy.paragraphs[1]}
-                      {isIntroduction ? (
-                        <button
-                          className={styles.evidenceAnchor}
-                          contentEditable={false}
-                          onClick={() => focusEvidence("evidence-indirect")}
-                          type="button"
-                        >
-                          证据 02
-                        </button>
-                      ) : null}
-                    </p>
-                    <h2>{copy.subheading}</h2>
-                    <p
-                      className={
-                        activeEvidenceId === "evidence-unverified" && isIntroduction
-                          ? styles.claimHighlighted
-                          : ""
-                      }
-                      ref={(node) => {
-                        if (isIntroduction) claimRefs.current["evidence-unverified"] = node;
-                      }}
-                    >
-                      本节写作边界由已确认诊断卡、用户明确授权材料和前文章节共同决定。任何无法确认
-                      的判断都会保留为警告，不会伪装成可核验事实。
-                      {isIntroduction ? (
-                        <button
-                          className={styles.evidenceAnchor}
-                          contentEditable={false}
-                          onClick={() => focusEvidence("evidence-unverified")}
-                          type="button"
-                        >
-                          证据 03
-                        </button>
-                      ) : null}
-                    </p>
-                    <aside className={styles.paperNote} contentEditable={false}>
-                      <strong>编辑提示 · Mock</strong>
-                      <span>{copy.note}</span>
-                    </aside>
+                      {persistedContent}
+                    </div>
                   </article>
 
                   <footer className={styles.documentFooter}>
@@ -2171,7 +2029,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
                       第 {section.index.replace(/^0/, "")} / {outline.length} 章
                     </span>
                     <span>{section.words.toLocaleString()} 字</span>
-                    <span>中文 · APA 7th</span>
+                    <span>{diagnosis.language}</span>
                   </footer>
                 </div>
               );
@@ -2194,7 +2052,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           >
             <header className={styles.historyHeader}>
               <div>
-                <p>VERSION CONTROL · MOCK</p>
+                <p>VERSION CONTROL</p>
                 <h2>版本历史与比较</h2>
                 <span>恢复旧版只会创建新版本，任何历史内容都不会被覆盖。</span>
               </div>
@@ -2248,7 +2106,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
                       <article key={version.id}>
                         <span>{version.label}</span>
                         <strong>{index === 0 ? "较早版本" : "较新版本"}</strong>
-                        <p>{contentForVersion(version.id, version.summary)}</p>
+                        <p>{version.content || "该版本没有正文内容。"}</p>
                       </article>
                     ))}
                   </div>
@@ -2258,12 +2116,8 @@ export default function EditorClient({ projectId }: EditorClientProps) {
                   </div>
                 )}
                 <div className={styles.diffSummary}>
-                  <strong>变化摘要 · Mock</strong>
-                  <ul>
-                    <li>研究对象由一般团队收窄为跨机构远程研究团队。</li>
-                    <li>增加可追溯性、反馈可见性与知识重组三个分析维度。</li>
-                    <li>未改变原始上传版本；引用仍需回到上传材料核验。</li>
-                  </ul>
+                  <strong>版本边界</strong>
+                  <p>比较区只展示已保存的两个不可变版本；恢复操作会另建新版本。</p>
                 </div>
               </div>
             </div>

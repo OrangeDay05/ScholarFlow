@@ -209,6 +209,128 @@
   font-size: 10px;
 }
 
+.successNotice a {
+  color: var(--forest);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.sectionSelector {
+  margin-top: 24px;
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+}
+
+.sectionSelector > header {
+  display: flex;
+  padding: 20px 22px;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.sectionSelector header span,
+.sectionSelector header strong,
+.sectionSelector header h2 {
+  margin: 0;
+}
+
+.sectionSelector header span {
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.sectionSelector header h2 {
+  margin-top: 5px;
+  font-family: var(--font-serif);
+  font-size: 21px;
+  font-weight: 500;
+}
+
+.sectionSelector > div {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.sectionToggle {
+  display: flex;
+  min-width: 0;
+  padding: 16px 20px;
+  align-items: flex-start;
+  gap: 12px;
+  border-bottom: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.sectionToggle:nth-child(odd) {
+  border-right: 1px solid var(--line);
+}
+
+.sectionToggle:has(input:disabled) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.sectionToggle input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--forest);
+}
+
+.sectionToggle span,
+.sectionToggle strong,
+.sectionToggle small {
+  display: block;
+  min-width: 0;
+}
+
+.sectionToggle strong {
+  font-family: var(--font-serif);
+  font-size: 14px;
+}
+
+.sectionToggle small {
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.exportHistory {
+  margin-top: 16px;
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+}
+
+.exportHistory summary,
+.exportHistory div {
+  padding: 13px 16px;
+}
+
+.exportHistory summary {
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.exportHistory div {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 14px;
+  border-top: 1px solid var(--line);
+  align-items: center;
+  font-size: 9px;
+}
+
+.exportHistory a {
+  color: var(--forest);
+  font-weight: 800;
+}
+
 @media (max-width: 700px) {
   .summary {
     align-items: flex-start;
@@ -241,5 +363,17 @@
   .successNotice span {
     display: block;
     margin-top: 7px;
+  }
+
+  .sectionSelector > div {
+    grid-template-columns: 1fr;
+  }
+
+  .sectionToggle:nth-child(odd) {
+    border-right: 0;
+  }
+
+  .exportHistory div {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 }

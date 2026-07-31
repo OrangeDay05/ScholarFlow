@@ -2,7 +2,6 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMockWorkspace } from "@/app/lib/MockWorkspaceContext";
 import {
   CreationReview,
   Field,
@@ -70,7 +69,7 @@ const copy = {
     description:
       "上传字段表、问卷、访谈、实验数据、语料或图片，先建立结构概览与缺失项清单。",
     noteTitle: "不会执行任意代码",
-    note: "M2 不分析任何真实数据。后续也只在明确范围内读取材料，不会自动运行文件中的宏、脚本或外部代码。",
+    note: "系统只在用户明确授权的范围内读取材料，不会自动运行文件中的宏、脚本或外部代码。",
     pathLabel: "上传数据与研究材料",
     uploadTitle: "加入数据或研究材料",
     uploadHint: "支持 XLSX、CSV、TXT、JPG、JPEG、PNG",
@@ -95,7 +94,7 @@ const copy = {
 
 export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }) {
   const router = useRouter();
-  const { draftSaved, saveCreationDraft } = useMockWorkspace();
+  const [draftSaved, setDraftSaved] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [projectTitle, setProjectTitle] = useState(copy[kind].defaultTitle);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
@@ -492,7 +491,7 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
         }
         onBack={goBack}
         onNext={goNext}
-        onSave={saveCreationDraft}
+        onSave={() => setDraftSaved(true)}
         onCreate={createProject}
       />
     </FormScaffold>

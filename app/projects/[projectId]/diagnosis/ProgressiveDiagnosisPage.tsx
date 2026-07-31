@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import { AppShell, MockBadge } from "@/app/components/AppShell";
+import { AppShell } from "@/app/components/AppShell";
 import {
   loadM4Diagnosis,
   mutateM4Diagnosis,
@@ -116,21 +116,25 @@ export default function ProgressiveDiagnosisPage({
     ...diagnosisAuditItems,
   ]);
   const [persistenceBusy, setPersistenceBusy] = useState(false);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
+    persistenceEnabled ? "loading" : "error",
+  );
+  const [loadError, setLoadError] = useState("");
 
   useEffect(() => {
     if (!persistenceEnabled) return;
     let cancelled = false;
     loadM4Diagnosis(projectId)
       .then((workspace) => {
-        if (!cancelled) applyWorkspace(workspace);
+        if (!cancelled) {
+          applyWorkspace(workspace);
+          setLoadState("ready");
+        }
       })
       .catch((error: unknown) => {
         if (!cancelled) {
-          setNotice(
-            error instanceof Error
-              ? `M4 数据读取失败：${error.message}`
-              : "M4 数据读取失败。",
-          );
+          setLoadState("error");
+          setLoadError(error instanceof Error ? error.message : "诊断数据读取失败。");
         }
       });
     return () => {
@@ -221,7 +225,7 @@ export default function ProgressiveDiagnosisPage({
         id: version.id,
         label: `D${version.version_number}`,
         status: version.status.toUpperCase() as DiagnosisVersionStatus,
-        source: "M4 D1 持久化",
+        source: "D1 持久化",
         detail: version.confirmed_at
           ? `用户确认于 ${version.confirmed_at}`
           : `创建于 ${version.created_at}`,
@@ -255,7 +259,7 @@ export default function ProgressiveDiagnosisPage({
         depth: selectedDepth,
       });
       applyWorkspace(workspace);
-      setNotice("M4 诊断会话已保存到 D1。");
+      setNotice("诊断会话已保存到 D1。");
       return workspace.session?.id ?? null;
     } catch (error) {
       setNotice(
@@ -306,8 +310,8 @@ export default function ProgressiveDiagnosisPage({
         requires_confirmation:
           status === "AI_INFERRED" || status === "PENDING_CONFIRMATION",
         rationale:
-          status === "AI_INFERRED"
-            ? question?.recommendation_reason ?? "AI 推荐，等待用户确认。"
+          status === "AI_INFERRED" || status === "PENDING_CONFIRMATION"
+            ? question?.recommendation_reason ?? "规则候选，等待用户确认。"
             : existing?.rationale ?? "由本次引导回答更新。",
       };
       return existing
@@ -322,7 +326,7 @@ export default function ProgressiveDiagnosisPage({
     setNotice(
       persistenceEnabled
         ? "正在创建新的持久化诊断草稿；历史版本不会被覆盖。"
-        : "已生成新的暂定诊断草稿 D2 · Mock；没有覆盖 D1。",
+        : "诊断持久化当前未启用，未创建诊断草稿。",
     );
     if (persistenceEnabled && sessionId) {
       void finishPersistentSession(sessionId, reason);
@@ -410,8 +414,8 @@ export default function ProgressiveDiagnosisPage({
         value: "暂时跳过",
       },
       ai: {
-        status: "AI_INFERRED",
-        source: "AI_RECOMMENDED",
+        status: "PENDING_CONFIRMATION",
+        source: "SYSTEM_DERIVED",
         value: currentQuestion.recommended_answer,
       },
       later: {
@@ -549,7 +553,7 @@ export default function ProgressiveDiagnosisPage({
         id: "diagnosis-v3",
         label: "D3",
         status: "CONFIRMED",
-        source: "用户确认 · Mock",
+        source: "用户确认",
         detail:
           "确认当前已知内容；AI 推测和待确认字段仍保留原状态，不会被静默改成用户事实。",
       },
@@ -559,7 +563,7 @@ export default function ProgressiveDiagnosisPage({
           : version,
       ),
     ]);
-    setNotice("已创建确认版本 D3 · Mock；D1、D2 和字段来源历史均已保留。");
+    setNotice("已创建确认版本 D3；D1、D2 和字段来源历史均已保留。");
   }
 
   function renderHome() {
@@ -567,7 +571,7 @@ export default function ProgressiveDiagnosisPage({
       <>
         <section className={styles.introBand}>
           <div>
-            <span>PROJECT DIAGNOSIS · M3 MOCK</span>
+            <span>PROJECT DIAGNOSIS</span>
             <h2>你不需要先懂所有专业问题。</h2>
             <p>
               从你已经知道的部分开始。系统先读已有信息和本次授权材料，再一次解决一个最重要的问题。
@@ -674,8 +678,8 @@ export default function ProgressiveDiagnosisPage({
             <span>不知道、跳过、不适用和稍后补充都是有效状态。</span>
           </div>
           <div>
-            <strong>AI 推荐不是事实</strong>
-            <span>所有推测都标注依据、来源、置信度和确认入口。</span>
+            <strong>系统候选不是事实</strong>
+            <span>规则候选会标注依据、来源、置信度和确认入口。</span>
           </div>
           <div>
             <strong>按任务判断是否足够</strong>
@@ -742,7 +746,7 @@ export default function ProgressiveDiagnosisPage({
 
             <section className={styles.recommendation}>
               <div className={styles.recommendationLabel}>
-                <strong>AI 推荐 · 待用户确认</strong>
+                <strong>规则候选 · 待用户确认</strong>
                 <span>置信度 {confidenceCopy(currentQuestion.confidence)}</span>
               </div>
               <h3>{currentQuestion.recommended_answer}</h3>
@@ -769,7 +773,7 @@ export default function ProgressiveDiagnosisPage({
                 type="button"
                 onClick={() => submitAnswer("ai")}
               >
-                先保留为 AI 推测
+                先保留为待确认候选
               </button>
             </section>
 
@@ -839,7 +843,7 @@ export default function ProgressiveDiagnosisPage({
                 <li>用户已填写信息</li>
                 <li>本次授权材料 2 份</li>
                 <li>已有诊断草稿 D1</li>
-                <li>项目历史版本 · Mock</li>
+                <li>项目历史诊断版本</li>
               </ul>
             </section>
             <section className={styles.stopPanel}>
@@ -870,7 +874,7 @@ export default function ProgressiveDiagnosisPage({
           <button className={styles.textButton} type="button" onClick={() => setView("home")}>
             ← 返回四种方式
           </button>
-          <span>从材料自动提取 · Mock</span>
+          <span>从材料自动提取</span>
           <h2>先看来源，再决定是否写入诊断草稿。</h2>
           <p>以下内容来自本次授权材料。提取成功不等于用户已经确认。</p>
         </section>
@@ -978,7 +982,7 @@ export default function ProgressiveDiagnosisPage({
           <button className={styles.textButton} type="button" onClick={() => setView("home")}>
             ← 返回四种方式
           </button>
-          <span>完整专业填写 · Mock</span>
+          <span>完整专业填写</span>
           <h2>知道多少填多少，状态比“填满”更重要。</h2>
           <p>每个字段的内容、确认状态和来源独立记录；未确定内容不会成为正式事实。</p>
         </section>
@@ -1267,6 +1271,56 @@ export default function ProgressiveDiagnosisPage({
     );
   }
 
+  if (!persistenceEnabled) {
+    return (
+      <AppShell
+        compact
+        eyebrow="项目诊断与提纲"
+        title="AI 引导梳理"
+        description="当前环境尚未启用诊断持久化，系统不会用临时前端数据替代真实诊断记录。"
+        action={
+          <Link className={styles.backLink} href="/projects">
+            ← 项目列表
+          </Link>
+        }
+      >
+        <div className={styles.mockNotice} role="alert">
+          <strong>诊断服务当前不可用</strong>
+          <span>诊断持久化当前不可用，请稍后重试；当前页面不会创建或确认任何诊断版本。</span>
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (loadState !== "ready") {
+    return (
+      <AppShell
+        compact
+        eyebrow="项目诊断与提纲"
+        title={loadState === "loading" ? "正在读取诊断记录" : "诊断记录暂时不可用"}
+        description={
+          loadState === "loading"
+            ? "正在读取当前项目的诊断会话、字段来源、版本与任务就绪状态。"
+            : loadError || "无法读取当前项目的诊断记录。"
+        }
+        action={
+          <Link className={styles.backLink} href="/projects">
+            ← 项目列表
+          </Link>
+        }
+      >
+        <div className={styles.mockNotice} role={loadState === "loading" ? "status" : "alert"}>
+          <strong>{loadState === "loading" ? "正在连接项目数据" : "加载失败"}</strong>
+          <span>
+            {loadState === "loading"
+              ? "加载完成前不会显示临时示例数据。"
+              : "请返回项目列表后重试；当前页面不会创建或确认任何诊断版本。"}
+          </span>
+        </div>
+      </AppShell>
+    );
+  }
+
   return (
     <AppShell
       compact
@@ -1280,13 +1334,9 @@ export default function ProgressiveDiagnosisPage({
       }
     >
       <div className={styles.mockNotice}>
-        <MockBadge>
-          {persistenceEnabled ? "M4 D1 持久化" : "M3 前端 Mock"}
-        </MockBadge>
+        <strong>诊断记录已启用持久化</strong>
         <span>
-          {persistenceEnabled
-            ? "会话、回答、字段来源、版本、任务就绪和审计写入 D1；AI 推荐仍为 Mock，不调用真实模型。"
-            : "不调用真实动态模型，不安装第三方 Skill，不写入正式数据库；前端仍只展示六个产品级 Skill。"}
+          会话、回答、字段来源、版本、任务就绪和审计写入 D1；当前候选来自固定问题树与规则，不会伪装成模型结论。
         </span>
       </div>
       {view === "home" ? renderHome() : null}
@@ -1296,7 +1346,7 @@ export default function ProgressiveDiagnosisPage({
       {view === "summary" ? renderSummary() : null}
 
       <details className={styles.contractNote}>
-        <summary>查看本次 Mock 的停止规则与数据边界</summary>
+        <summary>查看停止规则与数据边界</summary>
         <div>
           <ul>
             {stopConditions.map((condition) => (
@@ -1304,9 +1354,7 @@ export default function ProgressiveDiagnosisPage({
             ))}
           </ul>
           <p>
-            {persistenceEnabled
-              ? "问题、字段状态、来源、置信度、回答、版本和审计由 D1 保存；刷新或重启后仍可恢复。"
-              : "问题、字段状态、来源、材料位置、置信度、回答、版本和审计均为前端数据契约展示；刷新后会重置。"}
+            问题、字段状态、来源、置信度、回答、版本和审计由 D1 保存；刷新或重启后仍可恢复。
           </p>
         </div>
       </details>

@@ -71,3 +71,13 @@
 ## 下一步
 
 进入 M10 管理员、指标、测试与发布候选；不执行 M11 生产部署。
+
+## 2026-07-31 M10/M11 发布门更新
+
+- 当前分支：`m8-m11/delivery-readiness`
+- 当前状态：`M10_BLOCKED`
+- M10 管理、运维、测试和 Release Candidate 基础已经实现并通过本地自动检查。
+- 真实 DeepSeek 凭据尚未配置，真实单模型连接测试未运行，运行时状态为 `CREDENTIAL_REQUIRED`。
+- AI 工作台从 Action Proposal 确认到真实 AITask、候选版本、差异和采用/拒绝的生产 UI 闭环仍为 `PARTIAL`。
+- `.openai/hosting.json` 尚无 `project_id`，R2 仍为 `null`；M11 生产迁移和部署未执行。
+- 在上述阻塞项关闭前，不创建 `v1.0.0-rc.1` 或 `v1.0.0` 标签，不声明 M10/M11 完成。

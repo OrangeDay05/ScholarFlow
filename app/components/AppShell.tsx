@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { MODEL_ORCHESTRATION_MOCK_ENABLED } from "../lib/model-orchestration-features";
 import { V042_INCREMENTAL_MOCK_ENABLED } from "../lib/v042-features";
 import LogoutButton from "./LogoutButton";
 import styles from "./AppShell.module.css";
@@ -46,19 +45,14 @@ export function AppShell({
           <Link href="/projects/new">新建项目</Link>
           {V042_INCREMENTAL_MOCK_ENABLED ? (
             <Link className={styles.extensionNav} href="/extensions">
-              研究扩展 <small>M8</small>
+              研究扩展
             </Link>
           ) : null}
-          {MODEL_ORCHESTRATION_MOCK_ENABLED ? (
-            <Link className={styles.extensionNav} href="/settings/models">
-              模型与 API <small>M3</small>
-            </Link>
-          ) : null}
-          <Link href="/admin/users">管理演示</Link>
+          <Link className={styles.extensionNav} href="/settings/models">
+            模型与 API
+          </Link>
         </nav>
         <div className={styles.account}>
-          <MockBadge />
-          <span className={styles.avatar}>林</span>
           <LogoutButton />
         </div>
       </header>

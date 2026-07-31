@@ -5,7 +5,11 @@ import test from "node:test";
 import { strFromU8, unzipSync } from "fflate";
 import { createM6Docx } from "../app/lib/m6-docx.ts";
 import { InMemoryStorageAdapter } from "../app/lib/storage/storage-adapter.ts";
-import { createM6DocxExport } from "../db/repositories/m6-exports.ts";
+import {
+  createM6DocxExport,
+  getM6DocxExport,
+  loadM6ExportWorkspace,
+} from "../db/repositories/m6-exports.ts";
 import { env as workerEnv } from "./cloudflare-workers-shim.mjs";
 
 test("DOCX is a valid OOXML package with sections and references", () => {
@@ -26,12 +30,22 @@ test("export stores one immutable DOCX and records exact source versions", async
   assert.match(strFromU8(unzipSync(new Uint8Array(bytes))["word/document.xml"]), /Draft content/u);
   const record = database.prepare("SELECT format,status,source_version_ids_json FROM export_records WHERE id = ?").get(result.id);
   assert.equal(record.format, "docx"); assert.equal(record.status, "ready"); assert.deepEqual(JSON.parse(record.source_version_ids_json), ["version-a"]);
+
+  const workspace = await loadM6ExportWorkspace(actor, "project-a");
+  assert.equal(workspace.sections[0].versionId, "version-a");
+  assert.equal(workspace.exports[0].id, result.id);
+  assert.ok(await getM6DocxExport(actor, "project-a", result.id, storage));
+  await assert.rejects(
+    getM6DocxExport({ userId: "user-b", displayName: "B", role: "user" }, "project-a", result.id, storage),
+    /项目不存在或不属于当前用户/u,
+  );
 });
 
 const actor = { userId: "user-a", displayName: "A", role: "user" };
 async function migratedDatabase() { const database = new DatabaseSync(":memory:"); database.exec("PRAGMA foreign_keys = ON"); const directory = new URL("../drizzle/", import.meta.url); const files = (await readdir(directory)).filter((name) => /^\d{4}_.+\.sql$/u.test(name)).sort(); for (const file of files) database.exec((await readFile(new URL(file, directory), "utf8")).replaceAll("--> statement-breakpoint", "")); return database; }
 function seed(database) {
   database.prepare("INSERT INTO users (id,email,display_name) VALUES (?,?,?)").run("user-a", "a@example.test", "A");
+  database.prepare("INSERT INTO users (id,email,display_name) VALUES (?,?,?)").run("user-b", "b@example.test", "B");
   database.prepare("INSERT INTO projects (id,owner_user_id,title,paper_type,language,primary_creation_method,status) VALUES (?,?,?,?,?,?,?)").run("project-a", "user-a", "Research", "course_paper", "zh-CN", "idea", "active");
   database.prepare("INSERT INTO diagnosis_cards (id,owner_user_id,project_id,version_number,status,title,paper_type,language) VALUES (?,?,?,?,?,?,?,?)").run("diagnosis-a", "user-a", "project-a", 1, "confirmed", "P", "course_paper", "zh-CN");
   database.prepare("INSERT INTO outlines (id,owner_user_id,project_id,diagnosis_card_id,version_number,status) VALUES (?,?,?,?,?,?)").run("outline-a", "user-a", "project-a", "diagnosis-a", 1, "confirmed");

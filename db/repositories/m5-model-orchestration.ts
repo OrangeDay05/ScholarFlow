@@ -55,6 +55,141 @@ export async function loadM5ModelOrchestration(actor: M3Actor, requestedProjectI
   return { projectId, configs: configs.results ?? [], capabilities: capabilities.results ?? [], pricing: prices.results ?? [], lastSync: lastSync ?? null };
 }
 
+export type M5ActiveAgentRoleConfig = {
+  id: string;
+  projectId: string;
+  agentRole: M5AgentRole;
+  providerKey: string;
+  providerModelId: string;
+  modelKey: string;
+  capabilityVersion: string;
+  credentialType: "PLATFORM_CREDENTIAL" | "USER_CREDENTIAL";
+  credentialReference: string;
+  inference: M5InferenceConfiguration;
+  perTurnBudget: number;
+  toolsAllowed: boolean;
+};
+
+export async function loadM5ActiveAgentRoleConfig(
+  actor: M3Actor,
+  requestedProjectId: string,
+  agentRole: M5AgentRole,
+): Promise<M5ActiveAgentRoleConfig | null> {
+  const db = getD1();
+  const projectId = await ownedProject(db, actor.userId, requestedProjectId);
+  const row = await db.prepare(`
+    SELECT c.*, p.provider_key, pm.model_key, mc.capability_version
+    FROM agent_role_model_configs c
+    JOIN model_providers p ON p.id = c.provider_id
+    JOIN provider_models pm ON pm.id = c.model_id
+    JOIN model_capability_versions mc ON mc.model_id = c.model_id
+    WHERE c.owner_user_id = ? AND c.project_id = ?
+      AND c.agent_role = ? AND c.status = 'ACTIVE'
+      AND mc.lifecycle_status = 'ACTIVE'
+    ORDER BY c.updated_at DESC, mc.effective_from DESC
+    LIMIT 1
+  `).bind(actor.userId, projectId, agentRole).first<Record<string, unknown>>();
+  if (!row) return null;
+  return {
+    id: String(row.id),
+    projectId,
+    agentRole,
+    providerKey: String(row.provider_key),
+    providerModelId: String(row.model_id),
+    modelKey: String(row.model_key),
+    capabilityVersion: String(row.capability_version),
+    credentialType: row.credential_type as M5ActiveAgentRoleConfig["credentialType"],
+    credentialReference: String(row.credential_reference),
+    inference: {
+      thinkingMode: row.thinking_mode as M5InferenceConfiguration["thinkingMode"],
+      reasoningEffort: (row.reasoning_effort ?? null) as M5InferenceConfiguration["reasoningEffort"],
+      maxOutputTokens: Number(row.max_output_tokens),
+      responseFormat: "TEXT",
+      timeoutMs: Number(row.timeout_ms),
+      streaming: false,
+      tools: [],
+    },
+    perTurnBudget: Number(row.per_turn_budget),
+    toolsAllowed: Boolean(row.tools_allowed),
+  };
+}
+
+export async function startM5ProviderRun(
+  actor: M3Actor,
+  requestedProjectId: string,
+  input: { snapshotId: string; usageCategory: string },
+) {
+  const db = getD1();
+  const projectId = await ownedProject(db, actor.userId, requestedProjectId);
+  const snapshot = await db.prepare(
+    "SELECT id FROM resolved_model_config_snapshots WHERE id = ? AND owner_user_id = ? AND project_id = ?",
+  ).bind(input.snapshotId, actor.userId, projectId).first();
+  if (!snapshot) throw new M5ModelOrchestrationError("CONFIG_NOT_FOUND", "模型配置快照不存在或不属于当前项目。");
+  const id = crypto.randomUUID();
+  const startedAt = new Date().toISOString();
+  await db.prepare(`
+    INSERT INTO provider_run_records (
+      id, owner_user_id, project_id, snapshot_id, usage_category, status, started_at
+    ) VALUES (?, ?, ?, ?, ?, 'RUNNING', ?)
+  `).bind(id, actor.userId, projectId, input.snapshotId, input.usageCategory, startedAt).run();
+  return { id, projectId, startedAt };
+}
+
+export async function finishM5ProviderRun(
+  actor: M3Actor,
+  requestedProjectId: string,
+  input: {
+    runId: string;
+    status: "SUCCEEDED" | "FAILED" | "CANCELLED" | "BUDGET_PAUSED";
+    promptTokens?: number | null;
+    cacheHitTokens?: number | null;
+    cacheMissTokens?: number | null;
+    completionTokens?: number | null;
+    reasoningTokens?: number | null;
+    reasoningContentProduced?: boolean;
+    reasoningContentCharacters?: number;
+    toolCallNames?: string[];
+    finishReason?: string | null;
+    errorCode?: string | null;
+    retryable?: boolean | null;
+    providerRequestId?: string | null;
+  },
+) {
+  const db = getD1();
+  const projectId = await ownedProject(db, actor.userId, requestedProjectId);
+  const finishedAt = new Date().toISOString();
+  const result = await db.prepare(`
+    UPDATE provider_run_records SET
+      status = ?, prompt_tokens = ?, cache_hit_tokens = ?, cache_miss_tokens = ?,
+      completion_tokens = ?, reasoning_tokens = ?, reasoning_content_produced = ?,
+      reasoning_content_characters = ?, tool_call_names_json = ?, finish_reason = ?,
+      error_code = ?, retryable = ?, provider_request_id = ?, finished_at = ?
+    WHERE id = ? AND owner_user_id = ? AND project_id = ?
+  `).bind(
+    input.status,
+    input.promptTokens ?? null,
+    input.cacheHitTokens ?? null,
+    input.cacheMissTokens ?? null,
+    input.completionTokens ?? null,
+    input.reasoningTokens ?? null,
+    input.reasoningContentProduced ? 1 : 0,
+    input.reasoningContentCharacters ?? 0,
+    JSON.stringify(input.toolCallNames ?? []),
+    input.finishReason ?? null,
+    input.errorCode ?? null,
+    input.retryable === null || input.retryable === undefined ? null : input.retryable ? 1 : 0,
+    input.providerRequestId ?? null,
+    finishedAt,
+    input.runId,
+    actor.userId,
+    projectId,
+  ).run();
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    throw new M5ModelOrchestrationError("CONFIG_NOT_FOUND", "Provider 运行记录不存在或不属于当前项目。");
+  }
+  return { id: input.runId, finishedAt };
+}
+
 export async function saveM5AgentRoleConfig(actor: M3Actor, requestedProjectId: string, input: { agentRole: M5AgentRole; modelId: string; credentialType: "PLATFORM_CREDENTIAL" | "USER_CREDENTIAL"; credentialReference: string; inference: M5InferenceConfiguration; perTurnBudget: number; toolsAllowed: boolean; fallbackConfigId: string | null }) {
   if (!roleSet.has(input.agentRole) || input.perTurnBudget < 0) throw invalid("Agent 角色或预算无效。");
   const db = getD1(); const projectId = await ownedProject(db, actor.userId, requestedProjectId); const catalog = await ensureM5DeepSeekCatalog(db); const providerModelId = catalog.modelIds[input.modelId];

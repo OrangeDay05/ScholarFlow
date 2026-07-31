@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Brand, MockBadge } from "./AppShell";
+import { Brand } from "./AppShell";
 import styles from "./AdminShell.module.css";
 
 const adminLinks = [
@@ -7,6 +7,7 @@ const adminLinks = [
   { href: "/admin/projects-files", label: "项目与文件", index: "02" },
   { href: "/admin/tasks", label: "AI 任务", index: "03" },
   { href: "/admin/models-skills", label: "模型与 Skill", index: "04" },
+  { href: "/admin/operations", label: "运营与发布", index: "05" },
 ];
 
 export function AdminShell({
@@ -27,7 +28,7 @@ export function AdminShell({
       <header className={styles.topbar}>
         <Brand />
         <div className={styles.topbarMeta}>
-          <MockBadge>管理员原型 · Mock</MockBadge>
+          <span>受限管理入口</span>
           <Link href="/projects">返回用户端</Link>
         </div>
       </header>
@@ -35,9 +36,9 @@ export function AdminShell({
       <div className={styles.layout}>
         <aside className={styles.sidebar}>
           <div className={styles.sidebarHeading}>
-            <span>ADMIN / M2</span>
-            <strong>简易管理台</strong>
-            <p>只保留首版排障所需的四个模块。</p>
+            <span>ADMIN / OPERATIONS</span>
+            <strong>运营管理台</strong>
+            <p>查看当前数据库、任务、模型、输出和发布状态。</p>
           </div>
           <nav aria-label="管理员导航">
             {adminLinks.map((item) => (
@@ -52,8 +53,8 @@ export function AdminShell({
             ))}
           </nav>
           <div className={styles.boundary}>
-            <strong>原型边界</strong>
-            <p>操作只改变当前浏览器中的 Mock 状态，不触发真实账号、文件或模型。</p>
+            <strong>安全边界</strong>
+            <p>不展示密码、Session、API Key、论文正文或模型推理内容；管理变更必须留痕。</p>
           </div>
         </aside>
 

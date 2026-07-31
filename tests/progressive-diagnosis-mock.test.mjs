@@ -118,12 +118,13 @@ test("keeps guidance single-question, non-coercive, and inference-explicit", asy
   assert.match(page, /currentQuestion\.question/);
   assert.match(page, /为什么要问/);
   assert.match(page, /会影响什么/);
-  assert.match(page, /AI 推荐 · 待用户确认/);
+  assert.match(page, /AI 推测，待用户确认/);
+  assert.match(page, /AI 推荐/);
   assert.match(page, /我不知道/);
   assert.match(page, /暂时跳过/);
   assert.match(page, /不适用/);
   assert.match(page, /稍后再决定/);
-  assert.match(page, /先保留为 AI 推测/);
+  assert.match(page, /AI 推测不能直接改变已确认版本/);
   assert.match(page, /nextUnknownCount >= 2/);
   assert.match(page, /先开始，稍后补充/);
 });

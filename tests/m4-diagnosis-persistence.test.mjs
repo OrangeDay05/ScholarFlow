@@ -91,19 +91,18 @@ test("keeps the five diagnosis version states and validates field snapshots", as
   assert.match(api, /诊断字段格式无效/);
 });
 
-test("gates M4 persistence while preserving the M3 mock fallback", async () => {
+test("enables M4 persistence by default while preserving the explicit fallback", async () => {
   const [feature, page, client, api] = await Promise.all([
     source("../app/lib/m4-features.ts"),
     source("../app/projects/[projectId]/diagnosis/page.tsx"),
     source("../app/lib/m4-diagnosis-client.ts"),
     source("../app/api/m4/projects/[projectId]/diagnosis/route.ts"),
   ]);
-  assert.match(
-    feature,
-    /NEXT_PUBLIC_M4_DIAGNOSIS_PERSISTENCE_ENABLED === "true"/,
-  );
+  assert.match(feature, /NEXT_PUBLIC_M4_DIAGNOSIS_PERSISTENCE_ENABLED !== "false"/);
+  assert.match(feature, /NEXT_PUBLIC_M4_DIAGNOSIS_PERSISTENCE_ENABLED !== "0"/);
   assert.match(page, /persistenceEnabled/);
-  assert.match(page, /LegacyDiagnosisPage/);
+  assert.match(page, /ProgressiveDiagnosisPage/);
+  assert.doesNotMatch(page, /LegacyDiagnosisPage/);
   assert.match(client, /api\/m4\/projects/);
   assert.match(api, /requireM4Actor/);
 });

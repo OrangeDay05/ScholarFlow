@@ -1,8 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useMockWorkspace } from "@/app/lib/MockWorkspaceContext";
 import {
   CreationReview,
   EmptyMaterialQueue,
@@ -15,7 +14,10 @@ import {
 
 export default function IdeaProjectPage() {
   const router = useRouter();
-  const { draftSaved, saveCreationDraft } = useMockWorkspace();
+  const [draftSaved, setDraftSaved] = useState(false);
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState("");
+  const idempotencyKey = useRef(`idea-project:${crypto.randomUUID()}`);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [title, setTitle] = useState(
     "数字平台中的知识协作机制：远程研究团队如何形成共同理解？",
@@ -33,6 +35,37 @@ export default function IdeaProjectPage() {
 
   function goNext() {
     setStep((current) => (current === 1 ? 2 : 3));
+  }
+
+  async function createProject() {
+    if (creating) return;
+    setCreating(true);
+    setCreateError("");
+    try {
+      const response = await fetch("/api/m4/projects", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey.current,
+        },
+        body: JSON.stringify({
+          primaryCreationMethod: "idea",
+          goal: title,
+          materialsSummary: existingMaterials,
+          firstAiHelp: firstHelp,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) {
+        throw new Error(payload?.error?.message ?? "项目创建失败。");
+      }
+      const projectId = payload?.data?.project?.id;
+      if (typeof projectId !== "string") throw new Error("项目接口没有返回有效 ID。");
+      router.push(`/projects/${projectId}/diagnosis`);
+    } catch (error) {
+      setCreateError(error instanceof Error ? error.message : "项目创建失败。");
+      setCreating(false);
+    }
   }
 
   return (
@@ -101,20 +134,30 @@ export default function IdeaProjectPage() {
       ) : null}
 
       {step === 3 ? (
-        <CreationReview
-          pathLabel="从一个 Idea 开始"
-          title={title}
-          materialSummary={`${existingMaterials} 首要帮助：${firstHelp}`}
-        />
+        <>
+          <CreationReview
+            pathLabel="从一个 Idea 开始"
+            title={title}
+            materialSummary={`${existingMaterials} 首要帮助：${firstHelp}`}
+          />
+          {createError ? (
+            <div className={formStyles.warningBox} role="alert">
+              <span className={formStyles.warningIcon} aria-hidden="true">!</span>
+              <div><strong>项目创建失败</strong><span>{createError}</span></div>
+            </div>
+          ) : null}
+        </>
       ) : null}
 
       <FormActions
         step={step}
         draftSaved={draftSaved}
+        createDisabled={creating}
+        createDisabledLabel="正在创建…"
         onBack={goBack}
         onNext={goNext}
-        onSave={saveCreationDraft}
-        onCreate={() => router.push("/projects/demo/diagnosis")}
+        onSave={() => setDraftSaved(true)}
+        onCreate={() => void createProject()}
       />
     </FormScaffold>
   );

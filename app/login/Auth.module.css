@@ -62,10 +62,16 @@
   justify-content: space-between;
 }
 
-.heroTop :global(span:first-child) {
+.heroPill {
+  padding: 7px 10px;
   border-color: rgb(255 251 226 / 26%);
+  border-style: solid;
+  border-width: 1px;
   background: rgb(255 251 226 / 9%);
   color: var(--cream);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
 }
 
 .heroIndex {

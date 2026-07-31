@@ -284,3 +284,16 @@
 | M7-04 | 回复与修改核对 | Response Draft 追加版本；用户确认后才可完成修改核对 | `tests/m7-revision-workflow.test.mjs` | 通过 |
 | M7-05 | Response Letter | 仅已验证返修与用户确认回复可导出 DOCX，绑定任务和结果版本 | `tests/m7-revision-workflow.test.mjs` | 通过 |
 | M7-GATE | 阶段边界 | 未进入 M8/M9/M10/M11；未生成图件/PPTX，未部署 | Git diff、路由/构建扫描 | 通过 |
+
+## 14. M10/M11 发布门
+
+| ID | 验收项 | 状态 | 证据/备注 |
+|---|---|---|---|
+| M10-RC-01 | 管理员授权、操作审计、功能开关与实验 | PASS | 管理 API/Repository 与 30 项显式集成测试 |
+| M10-RC-02 | 迁移链和增量边界 | PASS | 0000→0017 全新库重放；0017 additive |
+| M10-RC-03 | 类型、Lint、构建、依赖与 Secret 扫描 | PASS | TypeScript、ESLint、Vinext build、audit、release audit |
+| M10-RC-04 | 完整回归 | PASS_WITH_NOTE | 192 项：183 通过、0 失败、9 环境门跳过 |
+| M10-RC-05 | 真实 DeepSeek 单模型测试 | BLOCKED | 用户尚未配置 Key；不得用 Fake Adapter 冒充 |
+| M10-RC-06 | 提案到候选版本采用/拒绝的生产闭环 | PARTIAL | 会话/ToolIntent/提案已持久化；生产 UI 串联未完成 |
+| M11-REL-01 | 生产 Sites 目标与绑定 | BLOCKED | hosting.json 缺少 project_id，R2=null |
+| M11-REL-02 | 生产备份、迁移、部署与 Smoke Test | NOT_STARTED | 前置发布门未通过 |

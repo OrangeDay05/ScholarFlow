@@ -16,7 +16,7 @@ export type M5ProviderRequest = {
   requestId: string;
   modelKey: string;
   modelVersion: string;
-  taskRole: M4TaskRole;
+  taskRole: M4TaskRole | "CONVERSATION_AGENT";
   messages: M5ProviderMessage[];
   maxOutputTokens: number;
   timeoutSeconds: number;

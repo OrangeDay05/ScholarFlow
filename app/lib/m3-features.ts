@@ -1,2 +1,3 @@
 export const M3_PERSISTENCE_ENABLED =
-  process.env.NEXT_PUBLIC_M3_PERSISTENCE_ENABLED === "true";
+  process.env.NEXT_PUBLIC_M3_PERSISTENCE_ENABLED !== "false" &&
+  process.env.NEXT_PUBLIC_M3_PERSISTENCE_ENABLED !== "0";

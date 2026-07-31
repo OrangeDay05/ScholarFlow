@@ -2668,3 +2668,75 @@ export const presentationExports = sqliteTable(
     uniqueIndex("presentation_exports_version_hash_uq").on(table.presentationVersionId, table.contentHash),
   ],
 );
+
+export const operationalEvents = sqliteTable(
+  "operational_events",
+  {
+    id: text("id").primaryKey(),
+    actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+    projectId: text("project_id").references(() => projects.id, { onDelete: "set null" }),
+    category: text("category", {
+      enum: ["NAVIGATION", "TASK", "PARSER", "EXPORT", "SECURITY", "FRONTEND"],
+    }).notNull(),
+    eventName: text("event_name").notNull(),
+    success: integer("success", { mode: "boolean" }).notNull().default(true),
+    durationMs: integer("duration_ms"),
+    metadataJson: text("metadata_json").notNull().default("{}"),
+    occurredAt: text("occurred_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("operational_events_category_time_idx").on(table.category, table.occurredAt),
+    index("operational_events_actor_time_idx").on(table.actorUserId, table.occurredAt),
+  ],
+);
+
+export const featureFlags = sqliteTable(
+  "feature_flags",
+  {
+    key: text("key").primaryKey(),
+    description: text("description").notNull(),
+    enabled: integer("enabled", { mode: "boolean" }).notNull().default(false),
+    rolloutPercentage: integer("rollout_percentage").notNull().default(0),
+    audienceJson: text("audience_json").notNull().default("{}"),
+    updatedByUserId: text("updated_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+);
+
+export const experiments = sqliteTable(
+  "experiments",
+  {
+    id: text("id").primaryKey(),
+    key: text("key").notNull().unique(),
+    name: text("name").notNull(),
+    status: text("status", { enum: ["DRAFT", "RUNNING", "PAUSED", "COMPLETED"] })
+      .notNull()
+      .default("DRAFT"),
+    controlVariant: text("control_variant").notNull().default("control"),
+    treatmentVariant: text("treatment_variant").notNull().default("treatment"),
+    treatmentPercentage: integer("treatment_percentage").notNull().default(50),
+    updatedByUserId: text("updated_by_user_id").references(() => users.id, { onDelete: "set null" }),
+    startedAt: text("started_at"),
+    endedAt: text("ended_at"),
+    updatedAt: text("updated_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+);
+
+export const experimentAssignments = sqliteTable(
+  "experiment_assignments",
+  {
+    id: text("id").primaryKey(),
+    experimentId: text("experiment_id")
+      .notNull()
+      .references(() => experiments.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    variant: text("variant").notNull(),
+    assignedAt: text("assigned_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("experiment_assignments_experiment_user_uq").on(table.experimentId, table.userId),
+    index("experiment_assignments_user_idx").on(table.userId),
+  ],
+);

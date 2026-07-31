@@ -1,0 +1,17 @@
+packages:
+  - .
+
+overrides:
+  postcss: 8.5.22
+  sharp: 0.35.0
+
+onlyBuiltDependencies:
+  - esbuild
+  - sharp
+  - unrs-resolver
+  - workerd
+
+allowBuilds:
+  esbuild: true
+  unrs-resolver: true
+  workerd: true

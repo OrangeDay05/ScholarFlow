@@ -56,7 +56,7 @@ test("keeps owner isolation and append-only section restoration", async () => {
   assert.match(repository, /source_version_id/);
 });
 
-test("keeps M3 persistence gated and requires server sessions", async () => {
+test("keeps M3 persistence enabled by default and requires server sessions", async () => {
   const [feature, identity, auth, viteConfig] = await Promise.all([
     source("../app/lib/m3-features.ts"),
     source("../app/lib/m3-server-identity.ts"),
@@ -64,10 +64,8 @@ test("keeps M3 persistence gated and requires server sessions", async () => {
     source("../vite.config.ts"),
   ]);
 
-  assert.match(
-    feature,
-    /NEXT_PUBLIC_M3_PERSISTENCE_ENABLED === "true"/,
-  );
+  assert.match(feature, /NEXT_PUBLIC_M3_PERSISTENCE_ENABLED !== "false"/);
+  assert.match(feature, /NEXT_PUBLIC_M3_PERSISTENCE_ENABLED !== "0"/);
   assert.match(identity, /resolveRequestSession/);
   assert.match(auth, /SESSION_COOKIE_NAME/);
   assert.doesNotMatch(identity, /oai-authenticated-user-email/);

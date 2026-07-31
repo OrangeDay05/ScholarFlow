@@ -143,7 +143,7 @@ export function ResearchFiguresWorkspace({ projectId }: { projectId: string }) {
   return (
     <div className={styles.workspace}>
       <aside className={styles.controls}>
-        <PanelTitle kicker="DATA & FIGURE" title="数据与图型" badge="M8.2" />
+        <PanelTitle kicker="DATA & FIGURE" title="数据与图型" badge="可使用" />
         <label className={styles.fileButton}>导入 CSV<input accept=".csv,text/csv" type="file" onChange={async (event) => { const file = event.target.files?.[0]; if (file) applyCsv(await file.text(), file.name); }} /></label>
         <label>数据表<textarea rows={7} value={sourceText} onChange={(event) => setSourceText(event.target.value)} onBlur={() => applyCsv(sourceText, sourceFilename)} /></label>
         <div className={styles.columns} aria-label="识别的数据列">{columns.map((column) => <span key={column.name}>{column.name}<small>{column.type}</small></span>)}</div>

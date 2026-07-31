@@ -1,8 +1,5 @@
-import { notFound } from "next/navigation";
-import { MODEL_ORCHESTRATION_MOCK_ENABLED } from "@/app/lib/model-orchestration-features";
-import ModelAccessClient from "./ModelAccessClient";
+import RealModelAccessClient from "./RealModelAccessClient";
 
 export default function ModelAccessPage() {
-  if (!MODEL_ORCHESTRATION_MOCK_ENABLED) notFound();
-  return <ModelAccessClient />;
+  return <RealModelAccessClient />;
 }

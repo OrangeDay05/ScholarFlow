@@ -1,12 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { AppShell, MockBadge } from "@/app/components/AppShell";
-import type {
-  FileQueueItem,
-  FileQueueStatus,
-} from "@/app/lib/MockWorkspaceContext";
-import { PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED } from "@/app/lib/progressive-diagnosis-features";
+import { AppShell } from "@/app/components/AppShell";
 import styles from "./forms.module.css";
 
 type FormScaffoldProps = {
@@ -25,37 +20,6 @@ const steps = [
   { index: "02", label: "核对处理队列" },
   { index: "03", label: "确认创建" },
 ] as const;
-
-const queueCopy: Record<
-  FileQueueStatus,
-  { label: string; detail: string; tone: string }
-> = {
-  queued: {
-    label: "等待处理",
-    detail: "材料已进入队列，尚未开始读取",
-    tone: styles.queueWaiting,
-  },
-  parsing: {
-    label: "正在解析",
-    detail: "正在模拟识别结构与字段",
-    tone: styles.queueLoading,
-  },
-  success: {
-    label: "解析成功",
-    detail: "材料可供诊断卡草稿读取",
-    tone: styles.queueSuccess,
-  },
-  failed: {
-    label: "解析失败",
-    detail: "显示失败原因，并允许重试或取消",
-    tone: styles.queueFailure,
-  },
-  cancelled: {
-    label: "已取消",
-    detail: "材料不会进入本次项目",
-    tone: styles.queueCancelled,
-  },
-};
 
 export function FormScaffold({
   eyebrow,
@@ -80,13 +44,10 @@ export function FormScaffold({
       }
     >
       <div className={styles.mockNotice}>
-        <MockBadge />
         <span>
           {realUpload
-            ? "原文件将真实保存到本地开发对象存储，但本批次不会解析正文；其余诊断交互仍保留 Mock 边界。"
-            : PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
-            ? "本页是 M3 增量前端 Mock。只需提供当前知道的部分，文件不会真实上传或解析。"
-            : "本页是 M2 前端演示流程。文件不会上传或解析，项目不会写入数据库。"}
+            ? "原文件将保存到项目对象存储，并保持等待解析状态；解析结果会另建版本，不覆盖原文件。"
+            : "只需提供当前知道的部分。确认创建后，项目与诊断卡草稿会保存到你的工作区。"}
         </span>
       </div>
 
@@ -115,9 +76,7 @@ export function FormScaffold({
           <div className={styles.sideRule}>
             <strong>接下来</strong>
             <span>
-              {PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED
-                ? "创建后可选择快速开始、AI 引导梳理、材料提取或完整填写；诊断不完整不会锁死整个项目。"
-                : "创建后只会生成可修改的诊断卡草稿。确认诊断卡后才进入提纲与章节工作流。"}
+              创建后可选择快速开始、AI 引导梳理、材料提取或完整填写；诊断不完整不会锁死整个项目。
             </span>
           </div>
         </aside>
@@ -175,6 +134,7 @@ export function FormActions({
   step,
   draftSaved,
   createDisabled = false,
+  createDisabledLabel = "请先处理队列",
   onBack,
   onNext,
   onSave,
@@ -183,6 +143,7 @@ export function FormActions({
   step: 1 | 2 | 3;
   draftSaved: boolean;
   createDisabled?: boolean;
+  createDisabledLabel?: string;
   onBack: () => void;
   onNext: () => void;
   onSave: () => void;
@@ -197,7 +158,7 @@ export function FormActions({
           </button>
         ) : null}
         <button className={styles.secondaryButton} type="button" onClick={onSave}>
-          {draftSaved ? "草稿已保存 · Mock" : "保存草稿"}
+          {draftSaved ? "草稿已保留在本页" : "暂存本页草稿"}
         </button>
       </div>
 
@@ -213,7 +174,7 @@ export function FormActions({
           disabled={createDisabled}
           onClick={onCreate}
         >
-          {createDisabled ? "请先处理队列" : "确认创建项目"}
+          {createDisabled ? createDisabledLabel : "确认创建项目"}
           <span>→</span>
         </button>
       )}
@@ -221,128 +182,9 @@ export function FormActions({
   );
 }
 
-export function QueueStateLegend() {
-  return (
-    <div className={styles.stateLegend} aria-label="文件队列五种状态">
-      {(
-        ["queued", "parsing", "success", "failed", "cancelled"] as FileQueueStatus[]
-      ).map((status) => (
-        <div className={styles.stateLegendItem} key={status}>
-          <span className={`${styles.queueState} ${queueCopy[status].tone}`}>
-            {queueCopy[status].label}
-          </span>
-          <small>{queueCopy[status].detail}</small>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-export function UploadQueue({
-  files,
-  onSetStatus,
-  onRetry,
-}: {
-  files: FileQueueItem[];
-  onSetStatus: (id: string, status: FileQueueStatus) => void;
-  onRetry: (id: string) => void;
-}) {
-  return (
-    <div className={styles.queueArea}>
-      <QueueStateLegend />
-      <div className={styles.queue} aria-label="Mock 文件上传队列">
-        <div className={styles.queueHeading}>
-          <div>
-            <strong>本次材料队列</strong>
-            <span>Mock · 不会真实上传</span>
-          </div>
-          <small>{files.length} 个演示文件</small>
-        </div>
-
-        {files.map((file) => {
-          const state = queueCopy[file.status];
-          return (
-            <div className={styles.queueRow} key={file.id}>
-              <span className={styles.fileType}>
-                {file.name.split(".").pop()?.toUpperCase()}
-              </span>
-              <div className={styles.fileCopy}>
-                <strong>{file.name}</strong>
-                <small>
-                  {file.size} · {file.kind}
-                </small>
-                <small>{file.detail}</small>
-              </div>
-              <div className={styles.queueControls}>
-                <span className={`${styles.queueState} ${state.tone}`}>
-                  {state.label}
-                </span>
-                {file.status === "queued" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onSetStatus(file.id, "parsing")}
-                    >
-                      开始解析
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onSetStatus(file.id, "cancelled")}
-                    >
-                      取消
-                    </button>
-                  </>
-                ) : null}
-                {file.status === "parsing" ? (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() => onSetStatus(file.id, "success")}
-                    >
-                      完成解析
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onSetStatus(file.id, "cancelled")}
-                    >
-                      取消
-                    </button>
-                  </>
-                ) : null}
-                {file.status === "failed" ? (
-                  <>
-                    <button type="button" onClick={() => onRetry(file.id)}>
-                      重试
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onSetStatus(file.id, "cancelled")}
-                    >
-                      取消
-                    </button>
-                  </>
-                ) : null}
-                {file.status === "success" || file.status === "cancelled" ? (
-                  <button
-                    type="button"
-                    onClick={() => onSetStatus(file.id, "queued")}
-                  >
-                    重新排队
-                  </button>
-                ) : null}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
 export function EmptyMaterialQueue() {
   return (
     <div className={styles.queueArea}>
-      <QueueStateLegend />
       <div className={styles.emptyQueue}>
         <span aria-hidden="true">○</span>
         <div>
@@ -373,7 +215,7 @@ export function CreationReview({
       <div className={styles.reviewStamp}>确认</div>
       <div>
         <span className={styles.reviewKicker}>
-          {persisted ? "创建前最后核对 · 原文件已存储" : "创建前最后核对 · Mock"}
+          {persisted ? "创建前最后核对 · 原文件已存储" : "创建前最后核对"}
         </span>
         <h2>{title || "未命名论文项目"}</h2>
         <dl>
@@ -393,8 +235,8 @@ export function CreationReview({
             <dt>数据范围</dt>
             <dd>
               {persisted
-                ? "原文件已保存到本地开发对象存储，正文尚未解析"
-                : "仅保存在当前页面内存；刷新后恢复演示数据"}
+                ? "原文件已保存到项目对象存储，正文尚未解析"
+                : "确认创建后写入当前用户的持久化工作区"}
             </dd>
           </div>
         </dl>

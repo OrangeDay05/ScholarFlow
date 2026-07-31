@@ -64,6 +64,7 @@ export type VersionItem = {
   source: string;
   time: string;
   summary: string;
+  content?: string;
 };
 
 type MockWorkspaceValue = {
@@ -98,6 +99,7 @@ type MockWorkspaceValue = {
   cancelMockTask: () => void;
   failMockTask: () => void;
   versions: VersionItem[];
+  sectionContents: Record<string, string>;
   appendMockVersion: (version: Omit<VersionItem, "time">) => void;
   restoreVersion: (id: string) => Promise<void>;
   saveCurrentSection: (content: string) => Promise<void>;
@@ -228,6 +230,9 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
   const [taskStatus, setTaskStatus] = useState<TaskStatus>("idle");
   const [taskMessage, setTaskMessage] = useState("尚未创建任务");
   const [versions, setVersions] = useState(initialVersions);
+  const [sectionVersions, setSectionVersions] = useState<
+    Record<string, VersionItem[]>
+  >({});
   const [unsavedChanges, setUnsavedChanges] = useState(true);
   const taskTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const persistenceProjectIdRef = useRef("demo");
@@ -303,8 +308,22 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
           setOutline(initialOutline);
           setOutlineConfirmed(false);
         }
+        const versionEntries = await Promise.all(
+          (snapshot.outline?.sections ?? []).map(async (sectionItem) => {
+            const sectionSnapshot =
+              sectionItem.slug === snapshot.selectedSectionSlug
+                ? snapshot
+                : await loadM3Workspace(requestedProjectId, sectionItem.slug);
+            return [
+              sectionItem.slug,
+              sectionSnapshot.versions.map(toWorkspaceVersion),
+            ] as const;
+          }),
+        );
+        const nextSectionVersions = Object.fromEntries(versionEntries);
         setSelectedSectionId(snapshot.selectedSectionSlug);
-        setVersions(snapshot.versions.map(toWorkspaceVersion));
+        setSectionVersions(nextSectionVersions);
+        setVersions(nextSectionVersions[snapshot.selectedSectionSlug] ?? []);
         setFiles(
           snapshot.materials.map((item) => ({
             id: item.id,
@@ -491,7 +510,15 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
               summary: `恢复 ${source?.label ?? id}`,
             },
           );
-          setVersions((items) => [toWorkspaceVersion(created), ...items]);
+          const nextVersion = toWorkspaceVersion(created);
+          setVersions((items) => [nextVersion, ...items]);
+          setSectionVersions((current) => ({
+            ...current,
+            [selectedSectionId]: [
+              nextVersion,
+              ...(current[selectedSectionId] ?? []),
+            ],
+          }));
           setPersistenceError("");
           return;
         } catch (error) {
@@ -530,7 +557,15 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
               summary: "人工保存当前章节",
             },
           );
-          setVersions((items) => [toWorkspaceVersion(created), ...items]);
+          const nextVersion = toWorkspaceVersion(created);
+          setVersions((items) => [nextVersion, ...items]);
+          setSectionVersions((current) => ({
+            ...current,
+            [selectedSectionId]: [
+              nextVersion,
+              ...(current[selectedSectionId] ?? []),
+            ],
+          }));
           setPersistenceError("");
         } catch (error) {
           setPersistenceStatus("error");
@@ -543,6 +578,16 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       setUnsavedChanges(false);
     },
     [dataSource, selectedSectionId],
+  );
+
+  const selectSection = useCallback(
+    (id: string) => {
+      setSelectedSectionId(id);
+      if (dataSource === "d1") {
+        setVersions(sectionVersions[id] ?? []);
+      }
+    },
+    [dataSource, sectionVersions],
   );
 
   const value = useMemo<MockWorkspaceValue>(
@@ -570,7 +615,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       moveOutline,
       confirmOutline,
       selectedSectionId,
-      setSelectedSectionId,
+      setSelectedSectionId: selectSection,
       selectedSkillId,
       setSelectedSkillId,
       selectedMaterialIds,
@@ -581,6 +626,12 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       cancelMockTask,
       failMockTask,
       versions,
+      sectionContents: Object.fromEntries(
+        Object.entries(sectionVersions).map(([sectionId, items]) => [
+          sectionId,
+          items[0]?.content ?? "",
+        ]),
+      ),
       appendMockVersion,
       restoreVersion,
       saveCurrentSection,
@@ -605,6 +656,8 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
       runMockTask,
       selectedMaterialIds,
       selectedSectionId,
+      sectionVersions,
+      selectSection,
       selectedSkillId,
       setFileStatus,
       taskMessage,
@@ -655,6 +708,7 @@ function toWorkspaceVersion(version: M3SectionVersion): VersionItem {
           minute: "2-digit",
         }),
     summary: version.summary,
+    content: version.content,
   };
 }
 

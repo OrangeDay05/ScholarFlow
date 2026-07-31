@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { AppShell, MockBadge } from "@/app/components/AppShell";
+import { AppShell } from "@/app/components/AppShell";
 import { creationPaths } from "@/app/lib/m1-mock";
 import styles from "./new.module.css";
 
@@ -16,9 +16,8 @@ export default function NewProjectPage() {
       }
     >
       <section className={styles.intro} aria-label="创建说明">
-        <MockBadge />
         <p>
-          M2 提供完整的前端演示流程：填写、查看 Mock 队列并确认创建。不会真实上传、解析或调用 AI。
+          选择入口后只需提供三个基础回答。项目会保存到你的独立工作区，专业信息和材料可以稍后继续补充。
         </p>
       </section>
 

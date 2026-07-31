@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Brand, MockBadge } from "../components/AppShell";
+import { Brand } from "../components/AppShell";
 import { redirectAuthenticatedUser } from "../lib/page-auth";
 import styles from "../login/Auth.module.css";
 import RegisterForm from "./RegisterForm";
@@ -19,8 +19,8 @@ export default async function RegisterPage() {
       <section className={styles.authGrid}>
         <div className={styles.hero}>
           <div className={styles.heroTop}>
-            <MockBadge>账户安全 · M4</MockBadge>
-            <span className={styles.heroIndex}>M4 / CORE-01</span>
+            <span className={styles.heroPill}>安全账户</span>
+            <span className={styles.heroIndex}>独立研究空间</span>
           </div>
           <div className={styles.heroCopy}>
             <p className={styles.kicker}>A workspace for one author.</p>

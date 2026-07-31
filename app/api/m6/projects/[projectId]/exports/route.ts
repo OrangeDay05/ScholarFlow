@@ -1,6 +1,12 @@
-import { createM6DocxExport, M6ExportError } from "@/db/repositories/m6-exports";
+import { createM6DocxExport, loadM6ExportWorkspace, M6ExportError } from "@/db/repositories/m6-exports";
 import { apiError, apiSuccess, isRecord } from "../../../../m3/_shared";
 import { requireM4Actor } from "../../../../m4/_shared";
+
+export async function GET(request: Request, { params }: { params: Promise<{ projectId: string }> }) {
+  const auth = await requireM4Actor(request); if ("response" in auth) return auth.response;
+  try { return apiSuccess(await loadM6ExportWorkspace(auth.actor, (await params).projectId)); }
+  catch (error) { if (error instanceof M6ExportError) return apiError(404, error.code, error.message); return apiError(500, "EXPORT_WORKSPACE_FAILED", "DOCX 导出信息读取失败。"); }
+}
 
 export async function POST(request: Request, { params }: { params: Promise<{ projectId: string }> }) {
   const auth = await requireM4Actor(request); if ("response" in auth) return auth.response;

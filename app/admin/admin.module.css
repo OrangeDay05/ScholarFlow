@@ -218,6 +218,16 @@
   line-height: 1.6;
 }
 
+.sectionGap {
+  height: 16px;
+}
+
+.actionButton:focus-visible,
+.ghostButton:focus-visible {
+  outline: 3px solid rgb(0 119 70 / 28%);
+  outline-offset: 2px;
+}
+
 @media (max-width: 900px) {
   .stats {
     grid-template-columns: repeat(2, 1fr);

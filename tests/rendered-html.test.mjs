@@ -29,14 +29,10 @@ async function render(pathname) {
   return { response, html: await response.text() };
 }
 
-test("server-renders public authentication and admin routes", async () => {
+test("server-renders public authentication routes", async () => {
   const routes = [
     ["/login", /进入你的论文工作区/],
     ["/register", /开始独立研究工作区/],
-    ["/admin/users", /用户管理/],
-    ["/admin/projects-files", /项目与文件/],
-    ["/admin/tasks", /AI 任务/],
-    ["/admin/models-skills", /模型与 Skill/],
   ];
 
   for (const [pathname, expectation] of routes) {
@@ -44,6 +40,20 @@ test("server-renders public authentication and admin routes", async () => {
     assert.equal(response.status, 200, `${pathname} should render`);
     assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
     assert.match(html, expectation, `${pathname} should contain its page landmark`);
+  }
+});
+
+test("anonymous admin pages redirect to login", async () => {
+  for (const pathname of [
+    "/admin/users",
+    "/admin/projects-files",
+    "/admin/tasks",
+    "/admin/models-skills",
+    "/admin/operations",
+  ]) {
+    const { response } = await render(pathname);
+    assert.ok([302, 307, 308].includes(response.status), `${pathname} should redirect`);
+    assert.match(response.headers.get("location") ?? "", /\/login\?return_to=/);
   }
 });
 
@@ -108,7 +118,7 @@ test("keeps approved creation-card colors and DOCX-only export", async () => {
   assert.match(creationCss, /#fffbe2/i);
   assert.match(creationCss, /#185208/i);
   assert.match(editorSource, /DOCX 检查/);
-  assert.match(exportSource, /只提供 DOCX/);
+  assert.match(exportSource, /当前仅提供 DOCX/);
   assert.doesNotMatch(`${editorSource}\n${exportSource}`, /导出 (?:PDF|Markdown)/i);
 });
 
@@ -170,7 +180,6 @@ test("freezes the independent editor workspace and evidence linkage", async () =
     "data-assistant-scroll",
     "IntersectionObserver",
     "paperStack",
-    "focusEvidence",
     "focusClaim",
     "workspaceWithoutLeft",
     "workspaceWithoutRight",
@@ -199,23 +208,20 @@ test("freezes the independent editor workspace and evidence linkage", async () =
   );
 });
 
-test("renders the gated V0.4.2 incremental mock pages without replacing M2", async () => {
+test("does not expose legacy V0.4.2 mock pages in a production build", async () => {
   const routes = [
-    ["/extensions", /研究扩展工作区/],
-    ["/extensions/idea-exploration", /Idea 探索/],
-    ["/extensions/external-literature", /外部文献/],
-    ["/extensions/advanced-review", /高级审稿/],
-    ["/extensions/submission-revision", /投稿返修/],
-    ["/extensions/research-figures", /科研图件/],
-    ["/extensions/presentations", />PPT</],
+    "/extensions",
+    "/extensions/idea-exploration",
+    "/extensions/external-literature",
+    "/extensions/advanced-review",
+    "/extensions/submission-revision",
+    "/extensions/research-figures",
+    "/extensions/presentations",
   ];
 
-  for (const [pathname, expectation] of routes) {
-    const { response, html } = await render(pathname);
-    assert.equal(response.status, 200, `${pathname} should render`);
-    assert.match(html, expectation);
-    assert.match(html, /Mock|MOCK|演示/);
-    assert.match(html, /不改写 M2|M2 核心工作台保持不变/);
+  for (const pathname of routes) {
+    const { response } = await render(pathname);
+    assert.equal(response.status, 404, `${pathname} should not be exposed`);
   }
 
   const [flagSource, shellSource, editorSource] = await Promise.all([
@@ -228,9 +234,10 @@ test("renders the gated V0.4.2 incremental mock pages without replacing M2", asy
   ]);
 
   assert.match(flagSource, /NEXT_PUBLIC_V042_INCREMENTAL_MOCK/);
+  assert.match(flagSource, /NODE_ENV !== "production"/);
   assert.match(shellSource, /V042_INCREMENTAL_MOCK_ENABLED/);
   assert.match(editorSource, /V042_INCREMENTAL_MOCK_ENABLED/);
-  assert.match(editorSource, /研究扩展/);
+  assert.doesNotMatch(editorSource, /研究扩展 M8/);
 });
 
 test("renders the gated dual-model review mock inside the M2 editor", async () => {
@@ -279,37 +286,30 @@ test("renders the progressive diagnosis entry without adding a seventh skill", a
   }
 
   assert.match(flagSource, /NEXT_PUBLIC_PROGRESSIVE_DIAGNOSIS_MOCK/);
-  assert.match(pageSource, /不调用真实动态模型/);
-  assert.match(pageSource, /前端仍只展示六个产品级 Skill/);
+  assert.match(pageSource, /AI 推测不能直接改变已确认版本/);
+  assert.match(pageSource, /确认只确认当前用户认可的边界/);
   assert.equal((mockSource.match(/\bindex: "0[1-6]"/g) ?? []).length >= 6, true);
 });
 
-test("renders bounded model orchestration and user credential mock", async () => {
-  const { response, html } = await render("/settings/models");
+test("renders the real model access page without exposing the legacy credential mock", async () => {
+  const { response } = await render("/settings/models");
   assert.equal(response.status, 200);
-
-  for (const landmark of [
-    "模型与 API",
-    "平台提供模型",
-    "使用自己的 API Key",
-    "标准模式",
-    "严格模式",
-    "自定义模式",
-    "不要粘贴真实 Key",
-  ]) {
-    assert.match(html, new RegExp(landmark));
-  }
-
-  const [flagSource, shellSource, editorSource] = await Promise.all([
+  const [flagSource, shellSource, editorSource, pageSource, realClientSource] = await Promise.all([
     readFile(new URL("../app/lib/model-orchestration-features.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/components/AppShell.tsx", import.meta.url), "utf8"),
     readFile(
       new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
       "utf8",
     ),
+    readFile(new URL("../app/settings/models/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/settings/models/RealModelAccessClient.tsx", import.meta.url), "utf8"),
   ]);
 
   assert.match(flagSource, /NEXT_PUBLIC_MODEL_ORCHESTRATION_MOCK/);
+  assert.match(flagSource, /NODE_ENV !== "production"/);
+  assert.match(pageSource, /RealModelAccessClient/);
+  assert.doesNotMatch(pageSource, /from "\.\/ModelAccessClient"/);
+  assert.match(realClientSource, /CREDENTIAL_REQUIRED|平台凭据未配置|服务器尚未配置平台凭据/);
   assert.match(shellSource, /模型与 API/);
   assert.match(editorSource, /配置模型与 API/);
   assert.match(editorSource, /验证模型/);

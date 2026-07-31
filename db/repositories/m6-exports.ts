@@ -10,12 +10,106 @@ export class M6ExportError extends Error {
   constructor(code: M6ExportError["code"], message: string) { super(message); this.code = code; }
 }
 
+export type M6ExportWorkspace = {
+  project: { id: string; title: string };
+  sections: Array<{
+    id: string;
+    slug: string;
+    title: string;
+    position: number;
+    status: string;
+    versionId: string | null;
+    versionNumber: number | null;
+    wordCount: number;
+  }>;
+  exports: Array<{
+    id: string;
+    status: string;
+    sourceVersionIds: string[];
+    errorMessage: string | null;
+    createdAt: string;
+  }>;
+};
+
+export async function loadM6ExportWorkspace(
+  actor: M3Actor,
+  requestedProjectId: string,
+): Promise<M6ExportWorkspace> {
+  const db = getD1();
+  const project = await resolveProject(db, actor, requestedProjectId);
+  const sections = await db.prepare(
+    `SELECT s.id, s.slug, s.title, s.position, s.status, s.word_count,
+            v.id AS version_id, v.version_number
+       FROM sections s
+       LEFT JOIN section_versions v ON v.id = (
+         SELECT latest.id FROM section_versions latest
+          WHERE latest.section_id = s.id
+            AND latest.owner_user_id = s.owner_user_id
+            AND latest.project_id = s.project_id
+          ORDER BY latest.version_number DESC, latest.created_at DESC
+          LIMIT 1
+       )
+      WHERE s.owner_user_id = ? AND s.project_id = ?
+      ORDER BY s.position, s.created_at`,
+  ).bind(actor.userId, project.id).all<{
+    id: string; slug: string; title: string; position: number; status: string;
+    word_count: number; version_id: string | null; version_number: number | null;
+  }>();
+  const exports = await db.prepare(
+    `SELECT id, status, source_version_ids_json, error_message, created_at
+       FROM export_records
+      WHERE owner_user_id = ? AND project_id = ? AND format = 'docx'
+      ORDER BY created_at DESC, id DESC LIMIT 20`,
+  ).bind(actor.userId, project.id).all<{
+    id: string; status: string; source_version_ids_json: string;
+    error_message: string | null; created_at: string;
+  }>();
+  return {
+    project,
+    sections: (sections.results ?? []).map((section) => ({
+      id: section.id,
+      slug: section.slug,
+      title: section.title,
+      position: section.position,
+      status: section.status,
+      versionId: section.version_id,
+      versionNumber: section.version_number,
+      wordCount: section.word_count,
+    })),
+    exports: (exports.results ?? []).map((item) => ({
+      id: item.id,
+      status: item.status,
+      sourceVersionIds: stringArray(item.source_version_ids_json),
+      errorMessage: item.error_message,
+      createdAt: item.created_at,
+    })),
+  };
+}
+
+export async function getM6DocxExport(
+  actor: M3Actor,
+  requestedProjectId: string,
+  exportId: string,
+  storage: StorageAdapter = getMaterialStorageAdapter(),
+): Promise<ArrayBuffer> {
+  const db = getD1();
+  const project = await resolveProject(db, actor, requestedProjectId);
+  const record = await db.prepare(
+    `SELECT object_key FROM export_records
+      WHERE id = ? AND owner_user_id = ? AND project_id = ?
+        AND format = 'docx' AND status = 'ready'`,
+  ).bind(exportId, actor.userId, project.id).first<{ object_key: string | null }>();
+  if (!record?.object_key) {
+    throw new M6ExportError("VERSION_NOT_FOUND", "DOCX 导出记录不存在或尚未就绪。");
+  }
+  const body = await storage.get(record.object_key);
+  if (!body) throw new M6ExportError("STORAGE_FAILED", "DOCX 文件不存在或存储暂时不可用。");
+  return body;
+}
+
 export async function createM6DocxExport(actor: M3Actor, requestedProjectId: string, versionIds: string[], storage: StorageAdapter = getMaterialStorageAdapter()) {
   const db = getD1();
-  const project = requestedProjectId === "demo"
-    ? await db.prepare("SELECT id, title FROM projects WHERE owner_user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1").bind(actor.userId).first<{ id: string; title: string }>()
-    : await db.prepare("SELECT id, title FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, actor.userId).first<{ id: string; title: string }>();
-  if (!project) throw new M6ExportError("PROJECT_NOT_FOUND", "项目不存在或不属于当前用户。");
+  const project = await resolveProject(db, actor, requestedProjectId);
   let readiness;
   try { readiness = await evaluateM6ExportReadiness(actor, project.id, versionIds); }
   catch (error) { if (error instanceof M6EvidenceError) throw new M6ExportError(error.code === "VERSION_NOT_FOUND" ? "VERSION_NOT_FOUND" : "EXPORT_BLOCKED", error.message); throw error; }
@@ -61,3 +155,11 @@ export async function createM6DocxExport(actor: M3Actor, requestedProjectId: str
 }
 
 function stringArray(value: string): string[] { try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === "string") : []; } catch { return []; } }
+
+async function resolveProject(db: D1Database, actor: M3Actor, requestedProjectId: string) {
+  const project = requestedProjectId === "demo"
+    ? await db.prepare("SELECT id, title FROM projects WHERE owner_user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1").bind(actor.userId).first<{ id: string; title: string }>()
+    : await db.prepare("SELECT id, title FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, actor.userId).first<{ id: string; title: string }>();
+  if (!project) throw new M6ExportError("PROJECT_NOT_FOUND", "项目不存在或不属于当前用户。");
+  return project;
+}

@@ -1,9 +1,10 @@
 import { M5_AGENT_ROLES, type M5AgentRole, type M5InferenceConfiguration } from "@/app/lib/m5-model-capabilities";
+import { deepSeekPlatformCredentialStatus } from "@/app/lib/m5-platform-credentials";
 import { confirmM5TaskModelSelection, loadM5ModelOrchestration, M5ModelOrchestrationError, saveM5AgentRoleConfig } from "@/db/repositories/m5-model-orchestration";
 import { apiError, apiSuccess, isRecord } from "../../../../m3/_shared";
 import { requireM4Actor } from "../../../../m4/_shared";
 
-export async function GET(request: Request, { params }: { params: Promise<{ projectId: string }> }) { const auth = await requireM4Actor(request); if ("response" in auth) return auth.response; try { return apiSuccess(await loadM5ModelOrchestration(auth.actor, (await params).projectId)); } catch (error) { return handled(error); } }
+export async function GET(request: Request, { params }: { params: Promise<{ projectId: string }> }) { const auth = await requireM4Actor(request); if ("response" in auth) return auth.response; try { const workspace = await loadM5ModelOrchestration(auth.actor, (await params).projectId); const credential = await deepSeekPlatformCredentialStatus(); return apiSuccess({ ...workspace, platformCredentialConfigured: credential.configured }); } catch (error) { return handled(error); } }
 
 export async function PUT(request: Request, { params }: { params: Promise<{ projectId: string }> }) {
   const auth = await requireM4Actor(request); if ("response" in auth) return auth.response; let body: unknown; try { body = await request.json(); } catch { return apiError(400, "INVALID_JSON", "请求正文必须是有效 JSON。"); }

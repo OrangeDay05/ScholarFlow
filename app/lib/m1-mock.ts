@@ -34,7 +34,7 @@ export const creationPaths: CreationPath[] = [
     mark: "文",
     title: "导入已有初稿",
     description: "识别章节、论点与缺口，原稿始终保留。",
-    detail: "支持 Word、PDF、TXT，M1 仅展示上传队列。",
+    detail: "支持 Word、PDF、TXT；原文件保存后进入等待解析状态。",
     href: "/projects/new/existing-draft",
     tone: "leaf",
   },
@@ -148,4 +148,3 @@ export const demoProjects = [
     tone: "secondary",
   },
 ];
-
