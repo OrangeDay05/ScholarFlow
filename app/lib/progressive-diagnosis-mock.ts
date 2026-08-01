@@ -502,6 +502,174 @@ export const guidedQuestions: GuidanceQuestion[] = [
   },
 ];
 
+type ProjectDiagnosisContext = {
+  title: string;
+};
+
+const neutralQuestionCopy: Record<
+  string,
+  Pick<
+    GuidanceQuestion,
+    | "question"
+    | "recommended_answer"
+    | "recommendation_reason"
+    | "options"
+  >
+> = {
+  "quick-materials": {
+    question: "为了推进当前项目，你目前已经有哪些可使用的材料？",
+    recommended_answer: "请按实际情况选择已有材料；系统不会把未上传或未授权的材料当成已存在。",
+    recommendation_reason: "当前问题只用于确认真实材料范围，不预设你已经拥有某类文件。",
+    options: [
+      { id: "requirements", label: "课程、学校、导师或投稿要求" },
+      { id: "literature", label: "参考论文或文献笔记" },
+      { id: "draft", label: "已有初稿、数据或研究记录" },
+    ],
+  },
+  "quick-first-help": {
+    question: "针对当前项目，你希望 AI 首先帮助你完成什么？",
+    recommended_answer: "先梳理当前目标、已知条件和关键缺口，再决定下一项任务。",
+    recommendation_reason: "在没有更多已确认信息前，先做边界梳理比直接生成内容更稳妥。",
+    options: [
+      { id: "feasibility", label: "判断当前目标是否可做并找出缺口" },
+      { id: "narrow", label: "帮助收窄研究焦点和问题" },
+      { id: "literature", label: "先整理文献和证据需求" },
+    ],
+  },
+  "guide-task": {
+    question: "针对当前项目，你希望 AI 首先帮助你完成什么？",
+    recommended_answer: "先梳理当前目标、已知条件和关键缺口，再决定下一项任务。",
+    recommendation_reason: "在没有更多已确认信息前，先做边界梳理比直接生成内容更稳妥。",
+    options: [
+      { id: "feasibility", label: "判断当前目标是否可做并找出缺口" },
+      { id: "narrow", label: "帮助收窄研究焦点和问题" },
+      { id: "literature", label: "先整理文献和证据需求" },
+    ],
+  },
+  "guide-focus": {
+    question: "结合刚才确认的目标，你希望本项目优先聚焦哪一类问题？",
+    recommended_answer: "先明确一个可核验的核心研究焦点，其他方向暂列为候选。",
+    recommendation_reason: "聚焦单一核心问题有助于后续确定材料、方法和交付边界。",
+    options: [
+      { id: "object", label: "明确研究对象或现象" },
+      { id: "relation", label: "解释变量、概念或机制之间的关系" },
+      { id: "application", label: "解决一个具体实践或应用问题" },
+    ],
+  },
+  "guide-corpus": {
+    question: "围绕这个焦点，你计划研究哪些对象、案例、文本、参与者或数据？",
+    recommended_answer: "先写明研究对象的类型、范围和可获得性；暂不确定的部分保留为待确认。",
+    recommendation_reason: "当前没有足够证据替你指定具体样本或语料。",
+    options: [
+      { id: "defined", label: "对象和范围已经明确" },
+      { id: "partial", label: "已有大致范围，仍需收窄" },
+      { id: "unknown", label: "暂时还没有确定" },
+    ],
+  },
+  "guide-data": {
+    question: "你现在是否已有可核验、可授权使用的样本、文本或研究数据？",
+    recommended_answer: "请按真实情况确认数据状态；计划采集的数据不能标记为已经存在。",
+    recommendation_reason: "系统尚不能仅凭项目名称判断真实数据是否存在。",
+    options: [
+      { id: "ready", label: "已有可核验数据和来源说明" },
+      { id: "partial", label: "只有部分材料或样本" },
+      { id: "none", label: "还没有正式数据" },
+    ],
+  },
+  "guide-method": {
+    question: "根据你已确认的研究对象和数据条件，当前更接近哪一种研究设计？",
+    recommended_answer: "先保留与你的研究问题和现有数据相匹配的方法候选，确认后再写入正式诊断卡。",
+    recommendation_reason: "方法必须由研究问题和真实数据条件共同决定。",
+    options: [
+      { id: "qualitative", label: "质性研究或文本分析" },
+      { id: "quantitative", label: "量化研究或统计分析" },
+      { id: "mixed", label: "混合研究或尚需比较方案" },
+    ],
+  },
+  "guide-framework": {
+    question: "你已经确定理论或分析框架，还是希望先保留候选方案？",
+    recommended_answer: "先保留候选框架，并在文献与研究问题核对后由你确认。",
+    recommendation_reason: "仅凭项目标题不足以认定某个理论框架已经采用。",
+    options: [
+      { id: "candidate", label: "先保留候选框架" },
+      { id: "confirmed", label: "已有明确框架，准备补充" },
+      { id: "explore", label: "先通过文献探索再决定" },
+    ],
+  },
+  "guide-deliverable": {
+    question: "这次最需要优先满足哪些课程、学校、导师、期刊或其他交付要求？",
+    recommended_answer: "请补充真实的语言、篇幅、格式、截止时间或评审要求。",
+    recommendation_reason: "当前没有已核验材料支持系统预填具体字数或引用格式。",
+    options: [
+      { id: "course", label: "课程或学校要求优先" },
+      { id: "supervisor", label: "导师或团队要求优先" },
+      { id: "journal", label: "期刊、会议或答辩要求优先" },
+    ],
+  },
+  "guide-risk": {
+    question: "你希望现在进一步核对哪一类高风险信息？",
+    recommended_answer: "优先核对最可能影响研究真实性或执行可行性的事项。",
+    recommendation_reason: "高风险信息应由用户和真实材料确认，不能从示例项目继承。",
+    options: [
+      { id: "data", label: "数据、样本和材料真实性" },
+      { id: "citation", label: "正式引用和证据身份" },
+      { id: "scope", label: "结论范围、伦理或隐私边界" },
+    ],
+  },
+  "guide-statistics": {
+    question: "你是否已经确定与当前问题和数据相匹配的分析方法？",
+    recommended_answer: "如果数据结构尚未确认，先保留分析方法候选，不锁定具体检验。",
+    recommendation_reason: "统计或分析方法需要依据真实数据结构选择。",
+    options: [
+      { id: "candidate", label: "保留候选，等数据后决定" },
+      { id: "known", label: "已经确定，准备补充" },
+      { id: "support", label: "需要后续帮助选择" },
+    ],
+  },
+};
+
+export function createProjectDiagnosisQuestions(
+  mode: DiagnosisEntryMode,
+  depth: GuidanceDepth,
+  context: ProjectDiagnosisContext,
+): GuidanceQuestion[] {
+  const selected =
+    mode === "quick"
+      ? quickQuestions
+      : mode === "guided"
+        ? guidedQuestions
+            .filter((question) => depth === "deep" || !question.deep_only)
+            .slice(0, depth === "standard" ? 6 : 10)
+        : [];
+
+  return selected.map((question) => {
+    if (question.question_id === "quick-goal") {
+      return {
+        ...question,
+        depends_on_answer: null,
+        question: `当前项目是“${context.title}”。你这次具体想研究、写作或完成什么？`,
+        recommended_answer: `以“${context.title}”为当前项目目标，先补充希望解决的核心问题和交付结果。`,
+        recommendation_reason: "推荐内容只引用当前项目名称，不替用户虚构研究对象、数据或结论。",
+        options: [
+          { id: "clarify", label: "先明确目标和研究焦点" },
+          { id: "materials", label: "先整理已有材料和证据" },
+          { id: "draft", label: "先检查或修改已有内容" },
+        ],
+        source_material_ids: [],
+        source_locations: [],
+      };
+    }
+    const copy = neutralQuestionCopy[question.question_id];
+    return {
+      ...question,
+      ...(copy ?? {}),
+      depends_on_answer: null,
+      source_material_ids: [],
+      source_locations: [],
+    };
+  });
+}
+
 export const initialDiagnosisFields: DiagnosisFieldRecord[] = [
   {
     field: "project_goal",

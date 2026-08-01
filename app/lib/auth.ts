@@ -93,6 +93,7 @@ export async function registerUser(
   }
 
   const userId = crypto.randomUUID();
+  const workspaceId = crypto.randomUUID();
   const sessionId = crypto.randomUUID();
   const sessionToken = randomHex(32);
   const tokenHash = await sha256Hex(sessionToken);
@@ -109,6 +110,19 @@ export async function registerUser(
            ) VALUES (?, ?, ?, ?, ?, 'active', 'user')`,
         )
         .bind(userId, email, phone, displayName, passwordHash),
+      db
+        .prepare(
+          `INSERT INTO workspaces (id, owner_user_id, name, status)
+           VALUES (?, ?, ?, 'active')`,
+        )
+        .bind(workspaceId, userId, `${displayName} 的工作区`),
+      db
+        .prepare(
+          `INSERT INTO workspace_memberships (
+             id, workspace_id, user_id, role, status
+           ) VALUES (?, ?, ?, 'AUTHOR', 'active')`,
+        )
+        .bind(crypto.randomUUID(), workspaceId, userId),
       db
         .prepare(
           `INSERT INTO sessions (id, user_id, token_hash, expires_at)

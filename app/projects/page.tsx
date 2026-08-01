@@ -4,22 +4,90 @@ import { authActor } from "../lib/auth";
 import type { M3ProjectSummary } from "../lib/m3-contracts";
 import { requirePageUser } from "../lib/page-auth";
 import { listM4ProjectsForActor } from "@/db/repositories/m4-projects";
+import {
+  listAvailableProductRoles,
+  listProjectAccessForActor,
+  type ProductRole,
+} from "@/db/repositories/m10-project-context";
 import styles from "./Projects.module.css";
 
-export default async function ProjectsPage() {
+export default async function ProjectsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ role?: string }>;
+}) {
   const user = await requirePageUser("/projects");
-  const projects = await listM4ProjectsForActor(authActor(user));
+  const actor = authActor(user);
+  const availableRoles = await listAvailableProductRoles(actor);
+  const requestedRole = (await searchParams).role;
+  const currentRole: ProductRole =
+    requestedRole === "REVIEWER" && availableRoles.includes("REVIEWER")
+      ? "REVIEWER"
+      : availableRoles.includes("AUTHOR")
+        ? "AUTHOR"
+        : "REVIEWER";
+  if (currentRole === "REVIEWER") {
+    const assignments = await listProjectAccessForActor(actor, "REVIEWER");
+    return (
+      <AppShell
+        action={availableRoles.includes("AUTHOR") ? <Link className={styles.newButton} href="/projects?role=AUTHOR">切换到作者身份</Link> : null}
+        description="这里只显示明确分配给当前审核员的项目；审核身份不能直接修改作者正文。"
+        eyebrow="Review workspace"
+        title={`你好，${user.displayName} · 当前身份：审核员`}
+      >
+        <section className={styles.contextNotice} aria-label="当前审核上下文">
+          <strong>当前 Workspace</strong>
+          <span>{assignments[0]?.workspaceName ?? "尚未加入任何待审核工作区"}</span>
+          <strong>当前权限</strong>
+          <span>仅可审核，不可修改正文或创建修改类 AI 任务</span>
+        </section>
+        {assignments.length ? (
+          <section className={styles.projectsSection}>
+            <div className={styles.sectionHeading}><div><p>REVIEW ASSIGNMENTS</p><h2>已分配审核项目</h2></div></div>
+            <div className={styles.projectList}>
+              {assignments.map((assignment, index) => (
+                <article className={styles.projectCard} key={assignment.projectId}>
+                  <div className={styles.cardIndex}>{pad(index + 1)}</div>
+                  <div className={styles.cardMain}>
+                    <div className={styles.cardMeta}><span>审核员</span><span>仅可审核</span></div>
+                    <h3>{assignment.projectTitle}</h3>
+                    <div className={styles.nextRow}><span>审核状态</span><p>{assignment.assignmentStatus === "in_review" ? "审核中" : "待审核"}</p></div>
+                  </div>
+                  <div className={styles.cardProgress}>
+                    <small>{assignment.workspaceName}</small>
+                    <Link href={`/reviews/${assignment.projectId}`}>进入审核工作台 <span aria-hidden="true">→</span></Link>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        ) : (
+          <section className={styles.explicitEmpty} aria-labelledby="review-empty-title">
+            <span>REVIEW QUEUE / 00</span>
+            <h2 id="review-empty-title">当前没有待审核或已分配项目</h2>
+            <p>这不是系统错误。审核员不能自动获得 Demo 项目或任意作者项目，也不具备直接修改正文的权限。</p>
+            <div><Link href="/projects?role=REVIEWER">重新检查审核分配</Link>{availableRoles.includes("AUTHOR") ? <Link href="/projects?role=AUTHOR">切换到作者身份</Link> : null}</div>
+          </section>
+        )}
+      </AppShell>
+    );
+  }
+  const projects = await listM4ProjectsForActor(actor);
   const activeProjects = projects.filter((project) => project.status === "active");
   const archivedProjects = projects.filter((project) => project.status === "archived");
   const nextProject = activeProjects[0] ?? projects[0] ?? null;
 
   return (
     <AppShell
-      action={<Link className={styles.newButton} href="/projects/new">新建项目 <span>＋</span></Link>}
+      action={<div className={styles.roleActions}>{availableRoles.includes("REVIEWER") ? <Link href="/projects?role=REVIEWER">切换到审核员身份</Link> : null}<Link className={styles.newButton} href="/projects/new">新建项目 <span>＋</span></Link></div>}
       description="从当前阶段继续，项目与版本保存在你的独立工作区。"
       eyebrow="Project workspace"
-      title={`你好，${user.displayName}。`}
+      title={`你好，${user.displayName} · 当前身份：作者`}
     >
+      <section className={styles.contextNotice} aria-label="当前作者上下文">
+        <strong>当前 Workspace</strong><span>{user.displayName} 的工作区</span>
+        <strong>当前权限</strong><span>可创建项目；进入具体项目后才建立 AI 会话和任务上下文</span>
+      </section>
       <section className={styles.focusGrid} aria-label="项目下一步概览">
         <article className={styles.nextPanel}>
           <div className={styles.panelTop}>

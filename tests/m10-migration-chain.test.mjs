@@ -14,7 +14,7 @@ test("M0 through M10 migrations replay into a fresh isolated database", async ()
     .filter((name) => /^\d{4}_.+\.sql$/u.test(name))
     .sort();
 
-  assert.equal(migrationNames.length, 19);
+  assert.equal(migrationNames.length, 20);
 
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
@@ -31,7 +31,7 @@ test("M0 through M10 migrations replay into a fresh isolated database", async ()
     .all()
     .map(({ name }) => name);
 
-  assert.equal(tables.length, 84);
+  assert.equal(tables.length, 88);
   for (const table of [
     "agent_role_model_configs",
     "model_capability_versions",
@@ -41,6 +41,10 @@ test("M0 through M10 migrations replay into a fresh isolated database", async ()
     "experiments",
     "experiment_assignments",
     "section_candidate_decisions",
+    "workspaces",
+    "workspace_memberships",
+    "project_memberships",
+    "review_assignments",
   ]) {
     assert.ok(tables.includes(table), `${table} should exist after the full migration chain`);
   }
@@ -56,4 +60,12 @@ test("M10 migration is additive", async () => {
     /(?:^|;)\s*(?:DROP|DELETE|TRUNCATE|ALTER)\b/imu,
   );
   assert.equal((sql.match(/CREATE TABLE `/gu) ?? []).length, 4);
+});
+
+test("M10 project context migration is additive", async () => {
+  const sql = await readFile(new URL("0019_m10_project_context.sql", migrationsDirectory), "utf8");
+
+  assert.doesNotMatch(executableSql(sql), /(?:^|;)\s*(?:DROP|DELETE|TRUNCATE)\b/imu);
+  assert.equal((sql.match(/CREATE TABLE `/gu) ?? []).length, 4);
+  assert.match(sql, /ALTER TABLE `projects` ADD `workspace_id`/iu);
 });

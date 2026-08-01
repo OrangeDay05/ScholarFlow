@@ -270,9 +270,8 @@ async function latestCodeVersionId(db: D1Database, context: Context, figureId: s
 }
 
 async function resolveContext(db: D1Database, actor: M3Actor, requestedProjectId: string): Promise<Context> {
-  const project = requestedProjectId === "demo"
-    ? await db.prepare("SELECT id FROM projects WHERE owner_user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1").bind(actor.userId).first<{ id: string }>()
-    : await db.prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, actor.userId).first<{ id: string }>();
+  if (!requestedProjectId || requestedProjectId === "demo") throw new M8FigureError("PROJECT_NOT_FOUND", "缺少明确的项目上下文，请先选择项目。");
+  const project = await db.prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, actor.userId).first<{ id: string }>();
   if (!project) throw new M8FigureError("PROJECT_NOT_FOUND", "项目不存在或不属于当前用户。");
   return { userId: actor.userId, projectId: project.id };
 }

@@ -402,7 +402,7 @@ export function RealAiWorkspace({
             <div className={styles.blocker} role="alert">
               <strong>真实对话尚未就绪</strong>
               <span>请配置当前项目的对话 Agent，并由部署环境提供服务器平台凭据。</span>
-              <Link href="/settings/models">打开模型与 API 设置</Link>
+              <Link href={`/settings/models?project_id=${encodeURIComponent(projectId)}`}>打开模型与 API 设置</Link>
             </div>
           ) : null}
 

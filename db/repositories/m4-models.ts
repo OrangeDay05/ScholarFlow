@@ -445,19 +445,13 @@ async function resolveContext(
     .bind(actor.userId)
     .first<{ id: string }>();
   if (!user) throw notFound("PROJECT_NOT_FOUND", "当前用户尚未初始化。");
-  const project =
-    requestedProjectId === "demo"
-      ? await db
-          .prepare(
-            `SELECT id FROM projects WHERE owner_user_id = ? AND status = 'active'
-             ORDER BY updated_at DESC LIMIT 1`,
-          )
-          .bind(user.id)
-          .first<{ id: string }>()
-      : await db
-          .prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ?")
-          .bind(requestedProjectId, user.id)
-          .first<{ id: string }>();
+  if (!requestedProjectId || requestedProjectId === "demo") {
+    throw notFound("PROJECT_NOT_FOUND", "缺少明确的项目上下文，请先选择项目。");
+  }
+  const project = await db
+    .prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ?")
+    .bind(requestedProjectId, user.id)
+    .first<{ id: string }>();
   if (!project) throw notFound("PROJECT_NOT_FOUND", "项目不存在或不属于当前用户。");
   return { userId: user.id, projectId: project.id };
 }

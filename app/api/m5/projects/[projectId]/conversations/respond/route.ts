@@ -2,6 +2,7 @@ import { DeepSeekProviderAdapter } from "@/app/lib/m5-deepseek-provider";
 import { requireDeepSeekPlatformCredential } from "@/app/lib/m5-platform-credentials";
 import { M5ProviderError } from "@/app/lib/m5-provider-error";
 import { runWithProviderTimeout } from "@/app/lib/m5-provider-adapter";
+import { buildProjectConversationSystemPrompt } from "@/app/lib/project-conversation-context";
 import {
   appendM5ConversationMessage,
   loadM5ConversationWorkspace,
@@ -14,6 +15,7 @@ import {
   M5ModelOrchestrationError,
   startM5ProviderRun,
 } from "@/db/repositories/m5-model-orchestration";
+import { loadProjectAccessContext } from "@/db/repositories/m10-project-context";
 import { apiError, apiSuccess, isRecord } from "../../../../../m3/_shared";
 import { requireM4Actor } from "../../../../../m4/_shared";
 
@@ -38,6 +40,10 @@ export async function POST(
   const projectId = (await params).projectId;
   let providerRunId: string | null = null;
   try {
+    const projectContext = await loadProjectAccessContext(auth.actor, projectId);
+    if (!projectContext.canEdit) {
+      return apiError(403, "PROJECT_EDIT_FORBIDDEN", "当前身份仅可审核，不能创建作者修改对话任务。");
+    }
     const config = await loadM5ActiveAgentRoleConfig(
       auth.actor,
       projectId,
@@ -123,8 +129,11 @@ export async function POST(
           messages: [
             {
               role: "system",
-              content:
-                "你是科研项目对话 Agent。只依据用户在当前会话中明确提供的内容回答；不得编造材料、数据、引用或研究结果。需要修改项目或运行 Skill 时，只提出操作建议并等待用户确认。不要输出隐藏推理过程。",
+              content: buildProjectConversationSystemPrompt({
+                projectId: projectContext.projectId,
+                projectTitle: projectContext.projectTitle,
+                role: projectContext.role,
+              }),
             },
             ...workspace.messages.slice(-16).map((message) => ({
               role: message.role === "USER" ? ("user" as const) : ("assistant" as const),
@@ -136,7 +145,8 @@ export async function POST(
           inference: config.inference,
           metadata: {
             purpose: "project-conversation",
-            projectId: config.projectId,
+            projectId: projectContext.projectId,
+            projectTitle: projectContext.projectTitle,
             conversationSessionId: sessionId,
           },
         },

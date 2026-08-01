@@ -18,6 +18,29 @@
   font-weight: 400;
 }
 
+.roleActions { display: flex; align-items: center; gap: 12px; }
+.roleActions > a:not(.newButton) { color: var(--forest); font-size: 12px; font-weight: 800; }
+
+.contextNotice {
+  display: grid;
+  margin-bottom: 18px;
+  padding: 14px 18px;
+  grid-template-columns: max-content minmax(0, 1fr) max-content minmax(0, 1fr);
+  gap: 8px 14px;
+  border: 1px solid var(--line);
+  background: #f4f8f3;
+  color: var(--muted-strong);
+  font-size: 12px;
+}
+.contextNotice strong { color: var(--forest); }
+
+.explicitEmpty { padding: 48px; border: 1px dashed var(--line); background: var(--paper); }
+.explicitEmpty > span { color: var(--green); font-size: 10px; font-weight: 800; letter-spacing: .16em; }
+.explicitEmpty h2 { margin: 14px 0 8px; color: var(--forest); font-family: var(--font-serif); font-size: 30px; }
+.explicitEmpty p { max-width: 720px; color: var(--muted-strong); line-height: 1.7; }
+.explicitEmpty div { display: flex; margin-top: 20px; flex-wrap: wrap; gap: 12px; }
+.explicitEmpty a { padding: 11px 14px; border: 1px solid var(--forest); color: var(--forest); font-size: 12px; font-weight: 800; text-decoration: none; }
+
 .focusGrid {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.7fr);

@@ -1294,7 +1294,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
                       平台额度 / 用户 Key、数据处理方、超时与降级方案将在执行前再次披露。
                     </span>
                   </div>
-                  <Link href="/settings/models">配置模型与 API →</Link>
+                  <Link href={`/settings/models?project_id=${encodeURIComponent(projectId)}`}>配置模型与 API →</Link>
                 </div>
               ) : null}
             </div>

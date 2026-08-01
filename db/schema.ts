@@ -2655,6 +2655,7 @@ export const sectionCandidateDecisions = sqliteTable(
     ownerUserId: text("owner_user_id")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    workspaceId: text("workspace_id"),
     projectId: text("project_id")
       .notNull()
       .references(() => projects.id, { onDelete: "cascade" }),
@@ -2689,6 +2690,110 @@ export const sectionCandidateDecisions = sqliteTable(
       table.ownerUserId,
       table.sectionId,
       table.decidedAt,
+    ),
+  ],
+);
+
+export const workspaces = sqliteTable(
+  "workspaces",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    status: text("status", { enum: ["active", "archived"] })
+      .notNull()
+      .default("active"),
+    ...timestamps(),
+  },
+  (table) => [index("workspaces_owner_idx").on(table.ownerUserId)],
+);
+
+export const workspaceMemberships = sqliteTable(
+  "workspace_memberships",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["AUTHOR", "REVIEWER"] }).notNull(),
+    status: text("status", { enum: ["active", "revoked"] })
+      .notNull()
+      .default("active"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("workspace_memberships_workspace_user_role_uq").on(
+      table.workspaceId,
+      table.userId,
+      table.role,
+    ),
+    index("workspace_memberships_user_role_idx").on(table.userId, table.role),
+  ],
+);
+
+export const projectMemberships = sqliteTable(
+  "project_memberships",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    userId: text("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["AUTHOR", "REVIEWER"] }).notNull(),
+    canEdit: integer("can_edit", { mode: "boolean" }).notNull().default(false),
+    status: text("status", { enum: ["active", "revoked"] })
+      .notNull()
+      .default("active"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("project_memberships_project_user_role_uq").on(
+      table.projectId,
+      table.userId,
+      table.role,
+    ),
+    index("project_memberships_user_role_idx").on(table.userId, table.role),
+  ],
+);
+
+export const reviewAssignments = sqliteTable(
+  "review_assignments",
+  {
+    id: text("id").primaryKey(),
+    workspaceId: text("workspace_id")
+      .notNull()
+      .references(() => workspaces.id, { onDelete: "cascade" }),
+    projectId: text("project_id")
+      .notNull()
+      .references(() => projects.id, { onDelete: "cascade" }),
+    reviewerUserId: text("reviewer_user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    status: text("status", {
+      enum: ["assigned", "in_review", "completed", "revoked"],
+    })
+      .notNull()
+      .default("assigned"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("review_assignments_project_reviewer_uq").on(
+      table.projectId,
+      table.reviewerUserId,
+    ),
+    index("review_assignments_reviewer_status_idx").on(
+      table.reviewerUserId,
+      table.status,
     ),
   ],
 );

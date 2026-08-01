@@ -56,6 +56,15 @@ export async function createM4ProjectForActor(
   }
 
   const projectId = crypto.randomUUID();
+  const workspace = await db
+    .prepare(
+      `SELECT id FROM workspaces
+       WHERE owner_user_id = ? AND status = 'active'
+       ORDER BY created_at ASC LIMIT 1`,
+    )
+    .bind(ownerUserId)
+    .first<{ id: string }>();
+  if (!workspace) throw new Error("当前用户工作区不存在，请先完成数据库迁移。");
   const diagnosisId = crypto.randomUUID();
   const outlineId = crypto.randomUUID();
   const title = input.title?.trim() || deriveTitle(input.goal);
@@ -65,18 +74,26 @@ export async function createM4ProjectForActor(
     db
       .prepare(
         `INSERT INTO projects (
-          id, owner_user_id, title, paper_type, language,
+          id, owner_user_id, workspace_id, title, paper_type, language,
           primary_creation_method, status, current_stage
-        ) VALUES (?, ?, ?, ?, ?, ?, 'active', 'diagnosis')`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 'diagnosis')`,
       )
       .bind(
         projectId,
         ownerUserId,
+        workspace.id,
         title,
         paperType,
         language,
         input.primaryCreationMethod,
       ),
+    db
+      .prepare(
+        `INSERT INTO project_memberships (
+           id, workspace_id, project_id, user_id, role, can_edit, status
+         ) VALUES (?, ?, ?, ?, 'AUTHOR', 1, 'active')`,
+      )
+      .bind(crypto.randomUUID(), workspace.id, projectId, ownerUserId),
     db
       .prepare(
         `INSERT INTO diagnosis_cards (
@@ -277,26 +294,17 @@ async function ownedProject(
   ownerUserId: string,
   requestedProjectId: string,
 ): Promise<ProjectRow> {
-  const row =
-    requestedProjectId === "demo"
-      ? await db
-          .prepare(
-            `SELECT id, title, paper_type, language, primary_creation_method,
-                    status, current_stage, updated_at
-             FROM projects
-             WHERE owner_user_id = ? AND status = 'active'
-             ORDER BY updated_at DESC, created_at DESC LIMIT 1`,
-          )
-          .bind(ownerUserId)
-          .first<ProjectRow>()
-      : await db
-          .prepare(
-            `SELECT id, title, paper_type, language, primary_creation_method,
-                    status, current_stage, updated_at
-             FROM projects WHERE id = ? AND owner_user_id = ?`,
-          )
-          .bind(requestedProjectId, ownerUserId)
-          .first<ProjectRow>();
+  if (!requestedProjectId || requestedProjectId === "demo") {
+    throw new M4ProjectRepositoryError("PROJECT_NOT_FOUND", "缺少明确的项目上下文，请先选择项目。");
+  }
+  const row = await db
+    .prepare(
+      `SELECT id, title, paper_type, language, primary_creation_method,
+              status, current_stage, updated_at
+       FROM projects WHERE id = ? AND owner_user_id = ?`,
+    )
+    .bind(requestedProjectId, ownerUserId)
+    .first<ProjectRow>();
   if (!row) {
     throw new M4ProjectRepositoryError(
       "PROJECT_NOT_FOUND",

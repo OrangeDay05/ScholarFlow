@@ -9,8 +9,7 @@ import type {
 } from "@/app/lib/m4-diagnosis-contracts";
 import type { M3Actor } from "@/app/lib/m3-server-identity";
 import {
-  guidedQuestions,
-  quickQuestions,
+  createProjectDiagnosisQuestions,
   type DiagnosisEntryMode,
   type DiagnosisFieldStatus,
   type DiagnosisSourceType,
@@ -135,7 +134,7 @@ export async function startM4DiagnosisSession(
   const { userId, project } = await resolveContext(db, actor, requestedProjectId);
   const now = new Date().toISOString();
   const sessionId = crypto.randomUUID();
-  const questions = selectQuestions(mode, depth);
+  const questions = selectQuestions(mode, depth, project);
   const baseCard = await db
     .prepare(
       `SELECT id, title, paper_type, language, research_object,
@@ -745,6 +744,10 @@ async function readWorkspace(
     )
     .bind(projectId, userId)
     .first<{ id: string }>();
+  const project = await db
+    .prepare("SELECT title FROM projects WHERE id = ? AND owner_user_id = ?")
+    .bind(projectId, userId)
+    .first<{ title: string }>();
   const [questions, fields, versions, readiness, audit] = await Promise.all([
     session ? readQuestions(db, userId, projectId, session.id) : Promise.resolve([]),
     session
@@ -756,14 +759,45 @@ async function readWorkspace(
     readReadiness(db, userId, projectId, session?.id ?? null, latestCard?.id ?? null),
     readAudit(db, userId, projectId),
   ]);
+  const contextualQuestions = session && project
+    ? contextualizeStoredQuestions(questions, session.mode, session.depth, project.title)
+    : questions;
   return {
     source: "d1-m4",
-    session: session ? toSession(session, questions, fields) : null,
+    session: session ? toSession(session, contextualQuestions, fields) : null,
     latest_diagnosis_card_id: latestCard?.id ?? null,
     versions,
     readiness,
     audit,
   };
+}
+
+function contextualizeStoredQuestions(
+  stored: M4DiagnosisQuestion[],
+  mode: DiagnosisEntryMode,
+  depth: GuidanceDepth,
+  projectTitle: string,
+): M4DiagnosisQuestion[] {
+  const templates = new Map(
+    createProjectDiagnosisQuestions(mode, depth, { title: projectTitle })
+      .map((question) => [question.question_id, question]),
+  );
+  return stored.map((question) => {
+    const template = templates.get(question.question_id);
+    if (!template) return question;
+    return {
+      ...question,
+      ...template,
+      id: question.id,
+      position: question.position,
+      answer: question.answer,
+      answer_status: question.answer_status,
+      answer_source_type: question.answer_source_type,
+      confidence: question.confidence,
+      asked_at: question.asked_at,
+      answered_at: question.answered_at,
+    };
+  });
 }
 
 async function resolveContext(
@@ -776,34 +810,26 @@ async function resolveContext(
     .bind(actor.userId)
     .first<UserRow>();
   if (!user) throw new Error("当前 Session 用户不存在或已停用。");
-  const project =
-    requestedProjectId === "demo"
-      ? await db
-          .prepare(
-            `SELECT id, title, paper_type, language FROM projects
-             WHERE owner_user_id = ? AND status = 'active'
-             ORDER BY updated_at DESC, created_at DESC LIMIT 1`,
-          )
-          .bind(user.id)
-          .first<ProjectRow>()
-      : await db
-          .prepare(
-            `SELECT id, title, paper_type, language FROM projects
-             WHERE id = ? AND owner_user_id = ?`,
-          )
-          .bind(requestedProjectId, user.id)
-          .first<ProjectRow>();
+  if (!requestedProjectId || requestedProjectId === "demo") {
+    throw notFound("PROJECT_NOT_FOUND", "缺少明确的项目上下文，请先选择项目。");
+  }
+  const project = await db
+    .prepare(
+      `SELECT id, title, paper_type, language FROM projects
+       WHERE id = ? AND owner_user_id = ?`,
+    )
+    .bind(requestedProjectId, user.id)
+    .first<ProjectRow>();
   if (!project) throw notFound("PROJECT_NOT_FOUND", "项目不存在或不属于当前用户。");
   return { userId: user.id, project };
 }
 
-function selectQuestions(mode: DiagnosisEntryMode, depth: GuidanceDepth) {
-  if (mode === "quick") return quickQuestions;
-  if (mode !== "guided") return [];
-  const available = guidedQuestions.filter(
-    (question) => depth === "deep" || !question.deep_only,
-  );
-  return available.slice(0, depth === "standard" ? 6 : 10);
+function selectQuestions(
+  mode: DiagnosisEntryMode,
+  depth: GuidanceDepth,
+  project: ProjectRow,
+) {
+  return createProjectDiagnosisQuestions(mode, depth, { title: project.title });
 }
 
 function fieldsFromCard(

@@ -746,26 +746,15 @@ async function resolveOwnedProjectId(
   ownerUserId: string,
   requestedProjectId: string,
 ): Promise<string> {
-  const project =
-    requestedProjectId === "demo"
-      ? await db
-          .prepare(
-            `SELECT id
-             FROM projects
-             WHERE owner_user_id = ? AND status = 'active'
-             ORDER BY updated_at DESC, created_at DESC
-             LIMIT 1`,
-          )
-          .bind(ownerUserId)
-          .first<{ id: string }>()
-      : await db
-          .prepare(
-            `SELECT id
-             FROM projects
-             WHERE id = ? AND owner_user_id = ?`,
-          )
-          .bind(requestedProjectId, ownerUserId)
-          .first<{ id: string }>();
+  if (!requestedProjectId || requestedProjectId === "demo") throw projectNotFound();
+  const project = await db
+    .prepare(
+      `SELECT id
+       FROM projects
+       WHERE id = ? AND owner_user_id = ?`,
+    )
+    .bind(requestedProjectId, ownerUserId)
+    .first<{ id: string }>();
 
   if (!project) throw projectNotFound();
   return project.id;

@@ -62,7 +62,8 @@ export async function prepareM6Submission(actor: M3Actor, requestedProjectId: st
 }
 
 async function resolveContext(db: D1Database, actor: M3Actor, requestedProjectId: string): Promise<Context> {
-  const project = requestedProjectId === "demo" ? await db.prepare("SELECT id FROM projects WHERE owner_user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1").bind(actor.userId).first<{ id: string }>() : await db.prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, actor.userId).first<{ id: string }>();
+  if (!requestedProjectId || requestedProjectId === "demo") throw new M6ReviewSubmissionError("PROJECT_NOT_FOUND", "缺少明确的项目上下文，请先选择项目。");
+  const project = await db.prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, actor.userId).first<{ id: string }>();
   if (!project) throw new M6ReviewSubmissionError("PROJECT_NOT_FOUND", "项目不存在或不属于当前用户。"); return { userId: actor.userId, projectId: project.id };
 }
 async function requireVersion(db: D1Database, context: Context, id: string) { const row = await db.prepare("SELECT id FROM section_versions WHERE id = ? AND owner_user_id = ? AND project_id = ?").bind(id, context.userId, context.projectId).first<{ id: string }>(); if (!row) throw new M6ReviewSubmissionError("VERSION_NOT_FOUND", "章节版本不存在或不属于当前用户。"); }

@@ -46,6 +46,8 @@ next-env.d.ts
 /.sites-dev*.log
 /.codex-dev.*.log
 /.codex-dev.pid
+/.codex-logs/
+/docs/testing/local-acceptance-accounts.private.txt
 /preview-*.png
 /.venv-m8/
 /.m8-runner/

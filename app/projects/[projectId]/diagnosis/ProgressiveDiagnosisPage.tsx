@@ -12,6 +12,7 @@ import {
   diagnosisAuditItems,
   diagnosisEntryModes,
   diagnosisVersions,
+  createProjectDiagnosisQuestions,
   guidedQuestions,
   initialDiagnosisFields,
   materialExtractedFields,
@@ -144,12 +145,12 @@ export default function ProgressiveDiagnosisPage({
 
   const activeQuestions = useMemo(() => {
     if (persistedQuestions.length) return persistedQuestions;
-    if (entryMode === "quick") return quickQuestions;
-    const available = guidedQuestions.filter(
-      (question) => depth === "deep" || !question.deep_only,
-    );
-    return available.slice(0, depth === "standard" ? 6 : 10);
-  }, [depth, entryMode, persistedQuestions]);
+    return createProjectDiagnosisQuestions(entryMode, depth, {
+      title:
+        fields.find((field) => field.field === "project_goal")?.value ||
+        "当前项目",
+    });
+  }, [depth, entryMode, fields, persistedQuestions]);
 
   const currentQuestion =
     activeQuestions[Math.min(questionIndex, activeQuestions.length - 1)];
@@ -1199,7 +1200,7 @@ export default function ProgressiveDiagnosisPage({
             </section>
             <section className={styles.nextActionsPanel}>
               <span>建议下一步 · 只推荐 3 项</span>
-              <Link href="/extensions/external-literature">1. 开始文献探索</Link>
+              <Link href={`/projects/${projectId}/editor`}>1. 打开当前项目 AI 工具</Link>
               <button type="button" onClick={() => resetGuidance("guided", "standard")}>
                 2. 继续标准梳理
               </button>
@@ -1229,7 +1230,7 @@ export default function ProgressiveDiagnosisPage({
             </div>
             <div className={styles.auditList}>
               {auditItems.map((item, index) => (
-                <div key={item}>
+                <div key={`${item}-${index}`}>
                   <span>{String(index + 1).padStart(2, "0")}</span>
                   <p>{item}</p>
                 </div>
@@ -1256,7 +1257,9 @@ export default function ProgressiveDiagnosisPage({
             <button type="button" onClick={() => setView("professional")}>
               修改单个字段
             </button>
-            <Link href="/extensions/external-literature">进入可开展任务</Link>
+            <Link href={`/projects/${projectId}/tasks`}>
+              进入可开展任务
+            </Link>
             <button
               className={styles.confirmButton}
               type="button"

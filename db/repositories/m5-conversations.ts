@@ -475,21 +475,16 @@ async function ownedProjectId(
   ownerUserId: string,
   requestedProjectId: string,
 ): Promise<string> {
-  const row =
-    requestedProjectId === "demo"
-      ? await db
-          .prepare(
-            `SELECT id FROM projects WHERE owner_user_id = ? AND status = 'active'
-             ORDER BY updated_at DESC, created_at DESC LIMIT 1`,
-          )
-          .bind(ownerUserId)
-          .first<{ id: string }>()
-      : await db
-          .prepare(
-            "SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'",
-          )
-          .bind(requestedProjectId, ownerUserId)
-          .first<{ id: string }>();
+  if (!requestedProjectId || requestedProjectId === "demo") {
+    throw new M5ConversationRepositoryError(
+      "PROJECT_NOT_FOUND",
+      "缺少明确的项目上下文，请先选择项目。",
+    );
+  }
+  const row = await db
+    .prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'")
+    .bind(requestedProjectId, ownerUserId)
+    .first<{ id: string }>();
   if (!row) {
     throw new M5ConversationRepositoryError(
       "PROJECT_NOT_FOUND",

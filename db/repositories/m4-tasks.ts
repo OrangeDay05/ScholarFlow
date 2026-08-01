@@ -613,22 +613,13 @@ async function resolveContext(
       "当前用户尚未初始化。",
     );
   }
-  const project =
-    requestedProjectId === "demo"
-      ? await db
-          .prepare(
-            `SELECT id FROM projects
-             WHERE owner_user_id = ? AND status = 'active'
-             ORDER BY updated_at DESC LIMIT 1`,
-          )
-          .bind(user.id)
-          .first<{ id: string }>()
-      : await db
-          .prepare(
-            "SELECT id FROM projects WHERE id = ? AND owner_user_id = ?",
-          )
-          .bind(requestedProjectId, user.id)
-          .first<{ id: string }>();
+  if (!requestedProjectId || requestedProjectId === "demo") {
+    throw new M4TaskRepositoryError("PROJECT_NOT_FOUND", "缺少明确的项目上下文，请先选择项目。");
+  }
+  const project = await db
+    .prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ?")
+    .bind(requestedProjectId, user.id)
+    .first<{ id: string }>();
   if (!project) {
     throw new M4TaskRepositoryError(
       "PROJECT_NOT_FOUND",

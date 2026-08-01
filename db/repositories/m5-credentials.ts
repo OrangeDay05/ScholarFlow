@@ -83,7 +83,8 @@ function masterKey(): string {
 }
 
 async function ownedProjectId(db: D1Database, owner: string, requested: string): Promise<string> {
-  const row = requested === "demo" ? await db.prepare("SELECT id FROM projects WHERE owner_user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1").bind(owner).first<{ id: string }>() : await db.prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requested, owner).first<{ id: string }>();
+  if (!requested || requested === "demo") throw new M5CredentialRepositoryError("PROJECT_NOT_FOUND", "缺少明确的项目上下文，请先选择项目。");
+  const row = await db.prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requested, owner).first<{ id: string }>();
   if (!row) throw new M5CredentialRepositoryError("PROJECT_NOT_FOUND", "项目不存在或不属于当前用户。" );
   return row.id;
 }

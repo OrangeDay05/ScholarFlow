@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { AppShell } from "@/app/components/AppShell";
 import styles from "./models.module.css";
@@ -32,6 +33,7 @@ type Workspace = {
 };
 
 export default function RealModelAccessClient() {
+  const searchParams = useSearchParams();
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState("");
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
@@ -63,8 +65,10 @@ export default function RealModelAccessClient() {
       if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? "无法读取项目。");
       const next = (Array.isArray(payload.data) ? payload.data : []).map((item: Record<string, unknown>) => ({ id: String(item.id), title: String(item.title ?? "未命名项目") }));
       setProjects(next);
-      setProjectId(next[0]?.id ?? "");
-      setNotice(next.length ? "请选择项目并配置每个 Agent 角色。" : "请先创建项目，再配置模型角色。");
+      const requestedProjectId = searchParams.get("project_id") ?? "";
+      const selected = next.some((project: Project) => project.id === requestedProjectId) ? requestedProjectId : "";
+      setProjectId(selected);
+      setNotice(next.length ? selected ? "已载入链接中明确指定的项目。" : "请选择项目；系统不会默认使用第一个项目。" : "请先创建项目，再配置模型角色。");
     } catch (error) {
       setNotice(error instanceof Error ? error.message : "无法读取项目。");
     }
@@ -132,7 +136,7 @@ export default function RealModelAccessClient() {
         <div className={styles.keyPanel}>
           <header><div><span>Project scope</span><h2>项目级 Agent 角色</h2></div><strong>{workspace?.platformCredentialConfigured ? "平台凭据可用" : "平台凭据未配置"}</strong></header>
           <div className={styles.keyForm}>
-            <label><span>项目</span><select value={projectId} onChange={(event) => { setProjectId(event.target.value); setConfirmed(false); }}>{projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
+            <label><span>项目</span><select value={projectId} onChange={(event) => { setProjectId(event.target.value); setConfirmed(false); }}><option value="">请选择当前项目</option>{projects.map((project) => <option key={project.id} value={project.id}>{project.title}</option>)}</select></label>
             <label><span>Agent Role</span><select value={role} onChange={(event) => { setRole(event.target.value as typeof role); setConfirmed(false); }}>{roles.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             <label><span>Model</span><select value={effectiveModelId} onChange={(event) => { setModelId(event.target.value); setConfirmed(false); }}><option value="">请选择</option>{activeModels.map((model) => <option key={model.model_key} value={model.model_key}>{model.model_key}</option>)}</select></label>
             <label><span>Thinking Mode</span><select value={thinkingMode} onChange={(event) => { setThinkingMode(event.target.value as typeof thinkingMode); setConfirmed(false); }}><option value="DISABLED">关闭</option><option value="ENABLED">开启</option></select></label>

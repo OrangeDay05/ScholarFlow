@@ -7,7 +7,8 @@ import { M7RevisionError } from "./m7-revisions";
 
 export async function createM7ResponseLetterDocx(actor: M3Actor, requestedProjectId: string, revisionTaskIds: string[], storage: StorageAdapter = getMaterialStorageAdapter()) {
   const db = getD1();
-  const project = requestedProjectId === "demo" ? await db.prepare("SELECT id, title FROM projects WHERE owner_user_id = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1").bind(actor.userId).first<{ id: string; title: string }>() : await db.prepare("SELECT id, title FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, actor.userId).first<{ id: string; title: string }>();
+  if (!requestedProjectId || requestedProjectId === "demo") throw new M7RevisionError("PROJECT_NOT_FOUND", "缺少明确的项目上下文，请先选择项目。");
+  const project = await db.prepare("SELECT id, title FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, actor.userId).first<{ id: string; title: string }>();
   if (!project) throw new M7RevisionError("PROJECT_NOT_FOUND", "项目不存在或不属于当前用户。");
   const ids = [...new Set(revisionTaskIds.filter(Boolean))]; if (!ids.length || ids.length > 200) throw new M7RevisionError("INVALID_INPUT", "回复信必须选择 1—200 个返修任务。");
   const sections: Array<{ title: string; content: string }> = []; const versionIds: string[] = [];
