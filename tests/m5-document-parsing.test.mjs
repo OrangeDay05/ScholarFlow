@@ -3,19 +3,27 @@ import { zipSync, strToU8 } from "fflate";
 import test from "node:test";
 import { parseDocx, parseTextPdf } from "../app/lib/material-parsers/document-parsers.ts";
 
-test("DOCX parser preserves paragraph order, heading style and OOXML location", () => {
+test("DOCX parser preserves document order and structured rich content", () => {
   const docx = zipSync({
     "[Content_Types].xml": strToU8("<Types></Types>"),
+    "word/_rels/document.xml.rels": strToU8(`<Relationships><Relationship Id="rId1" Target="media/image1.png"/></Relationships>`),
+    "word/media/image1.png": new Uint8Array([137, 80, 78, 71]),
     "word/document.xml": strToU8(`<?xml version="1.0"?><w:document xmlns:w="x"><w:body>
       <w:p><w:pPr><w:pStyle w:val="Heading1"/></w:pPr><w:r><w:t>研究方法</w:t></w:r></w:p>
-      <w:p><w:r><w:t>第一段 &amp; 证据</w:t></w:r></w:p>
+      <w:p><w:pPr><w:jc w:val="center"/></w:pPr><w:r><w:rPr><w:b/><w:i/><w:u w:val="single"/><w:rFonts w:ascii="Arial"/><w:sz w:val="24"/><w:color w:val="FF0000"/></w:rPr><w:t>第一段 &amp; 证据</w:t></w:r></w:p>
+      <w:tbl><w:tr><w:tc><w:p><w:r><w:t>单元格 A</w:t></w:r></w:p></w:tc><w:tc><w:p><w:r><w:t>单元格 B</w:t></w:r></w:p></w:tc></w:tr></w:tbl>
+      <w:p><w:r><w:drawing><a:blip r:embed="rId1"/></w:drawing></w:r></w:p>
     </w:body></w:document>`),
   });
   const result = parseDocx(docx);
-  assert.equal(result.recordCount, 2);
-  assert.equal(result.chunks[0].metadata.heading, true);
+  assert.equal(result.recordCount, 4);
   assert.equal(result.chunks[1].text, "第一段 & 证据");
-  assert.deepEqual(result.chunks[1].location, { part: "word/document.xml", paragraph: 2 });
+  assert.deepEqual(result.structuredDocument.blocks.map((block) => block.type), ["heading", "paragraph", "table", "image"]);
+  assert.deepEqual(result.structuredDocument.blocks[1].runs[0], { text: "第一段 & 证据", bold: true, italic: true, underline: true, fontFamily: "Arial", fontSizePt: 12, color: "FF0000", superscript: undefined, subscript: undefined });
+  assert.equal(result.structuredDocument.blocks[1].alignment, "center");
+  assert.equal(result.structuredDocument.blocks[2].rows[0].cells[1].blocks[0].runs[0].text, "单元格 B");
+  assert.equal(result.assets.length, 1);
+  assert.equal(result.structuredDocument.blocks[3].assetId, result.assets[0].id);
 });
 
 test("DOCX parser rejects non-DOCX ZIP containers", () => {

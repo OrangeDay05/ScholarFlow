@@ -1,14 +1,18 @@
 import { DeepSeekProviderAdapter } from "@/app/lib/m5-deepseek-provider";
 import { requireDeepSeekPlatformCredential } from "@/app/lib/m5-platform-credentials";
 import { M5ProviderError } from "@/app/lib/m5-provider-error";
-import { runWithProviderTimeout } from "@/app/lib/m5-provider-adapter";
+import { assembleAgentContext } from "@/app/lib/context-engine/context-engine";
+import { ContextRetrievalError } from "@/app/lib/context-engine/retrieval";
+import type { AgentRole } from "@/app/lib/context-engine/types";
 import { buildProjectConversationSystemPrompt } from "@/app/lib/project-conversation-context";
+import { conversationSkillInstruction } from "@/app/lib/m5-conversation-skill-instructions";
+import type { M5ProductSkill } from "@/app/lib/m5-execution-contracts";
 import {
   appendM5ConversationMessage,
-  loadM5ConversationWorkspace,
   M5ConversationRepositoryError,
 } from "@/db/repositories/m5-conversations";
 import {
+  attachM5ProviderRunContextSnapshot,
   confirmM5TaskModelSelection,
   finishM5ProviderRun,
   loadM5ActiveAgentRoleConfig,
@@ -16,6 +20,7 @@ import {
   startM5ProviderRun,
 } from "@/db/repositories/m5-model-orchestration";
 import { loadProjectAccessContext } from "@/db/repositories/m10-project-context";
+import { createAgentHandoff } from "@/db/repositories/context-engine";
 import { apiError, apiSuccess, isRecord } from "../../../../../m3/_shared";
 import { requireM4Actor } from "../../../../../m4/_shared";
 
@@ -33,6 +38,10 @@ export async function POST(
   const clientMessageId = idValue(body.clientMessageId);
   const clientAgentMessageId = idValue(body.clientAgentMessageId);
   const content = textValue(body.content, 1, 12_000);
+  const authorizedMaterialIds = stringArray(body.authorizedMaterialIds);
+  const productSkill = productSkillValue(body.productSkill);
+  const contextRole = roleForProductSkill(productSkill);
+  const currentSectionSlug = currentSectionSlugValue(body.workspaceContext);
   if (!sessionId || !clientMessageId || !clientAgentMessageId || !content) {
     return invalidRequest();
   }
@@ -87,12 +96,6 @@ export async function POST(
       role: "USER",
       content,
     });
-    const workspace = await loadM5ConversationWorkspace(
-      auth.actor,
-      projectId,
-      sessionId,
-      { messageLimit: 24 },
-    );
     const snapshot = await confirmM5TaskModelSelection(auth.actor, projectId, {
       taskId: null,
       conversationSessionId: sessionId,
@@ -113,35 +116,55 @@ export async function POST(
       usageCategory: "CONVERSATION_AGENT",
     });
     providerRunId = providerRun.id;
+    if (contextRole !== "CONVERSATION_AGENT") {
+      await createAgentHandoff(auth.actor, projectId, {
+        conversationSessionId: sessionId,
+        fromAgentRole: "CONVERSATION_AGENT",
+        toAgentRole: contextRole,
+        goal: content,
+        confirmedInputs: [{ type: "USER_REQUEST", content }],
+        relevantDecisions: [{ type: "TASK_INTENT", value: productSkill }],
+        recommendedMaterialIds: authorizedMaterialIds,
+      });
+    }
+    const assembledContext = await assembleAgentContext({
+      actor: auth.actor,
+      projectId,
+      conversationSessionId: sessionId,
+      providerRunId,
+      agentRole: contextRole,
+      taskIntent: productSkill ?? "PROJECT_CONVERSATION",
+      query: content,
+      currentSectionSlug,
+      authorizedMaterialIds,
+      provider: config.providerKey,
+      model: config.modelKey,
+      baseSystemPrompt: [
+        buildProjectConversationSystemPrompt({
+          projectId: projectContext.projectId,
+          projectTitle: projectContext.projectTitle,
+          role: projectContext.role,
+        }),
+        conversationSkillInstruction(productSkill),
+      ].filter(Boolean).join("\n\n"),
+    });
+    await attachM5ProviderRunContextSnapshot(auth.actor, projectId, {
+      runId: providerRunId,
+      contextSnapshotId: assembledContext.snapshot.id,
+    });
 
     const adapter = new DeepSeekProviderAdapter();
-    const timeoutSeconds = Math.max(
-      1,
-      Math.min(600, Math.ceil(config.inference.timeoutMs / 1_000)),
-    );
-    const result = await runWithProviderTimeout(timeoutSeconds, (signal) =>
-      adapter.createCompletion(
+    const inactivitySeconds = Math.max(30, Math.min(600, Math.ceil(config.inference.timeoutMs / 1_000)));
+    const result = await runWithProviderActivityTimeout(inactivitySeconds, request.signal, (signal, onActivity) =>
+      adapter.streamCompletion(
         {
           requestId: crypto.randomUUID(),
           modelKey: config.modelKey,
           modelVersion: config.capabilityVersion,
           taskRole: "CONVERSATION_AGENT",
-          messages: [
-            {
-              role: "system",
-              content: buildProjectConversationSystemPrompt({
-                projectId: projectContext.projectId,
-                projectTitle: projectContext.projectTitle,
-                role: projectContext.role,
-              }),
-            },
-            ...workspace.messages.slice(-16).map((message) => ({
-              role: message.role === "USER" ? ("user" as const) : ("assistant" as const),
-              content: message.content,
-            })),
-          ],
+          messages: assembledContext.messages,
           maxOutputTokens: config.inference.maxOutputTokens,
-          timeoutSeconds,
+          timeoutSeconds: inactivitySeconds,
           inference: config.inference,
           metadata: {
             purpose: "project-conversation",
@@ -152,6 +175,8 @@ export async function POST(
         },
         credential,
         signal,
+        onActivity,
+        onActivity,
       ),
     );
 
@@ -165,6 +190,22 @@ export async function POST(
         content: result.outputText,
       },
     );
+    if (contextRole !== "CONVERSATION_AGENT") {
+      await createAgentHandoff(auth.actor, projectId, {
+        conversationSessionId: sessionId,
+        fromAgentRole: contextRole,
+        toAgentRole: "CONVERSATION_AGENT",
+        goal: `继续与用户讨论 ${productSkill} 的专业 Agent 结果。`,
+        relevantDecisions: [{
+          type: "AI_SUGGESTED_RESULT",
+          conversationMessageId: agentMessage.message.id,
+          status: "TENTATIVE_REQUIRES_USER_CONFIRMATION",
+        }],
+        artifactRefs: [{ type: "CONVERSATION_MESSAGE", id: agentMessage.message.id }],
+        warnings: ["专业 Agent 结果不是 Project Truth；用户确认前不得写入正式事实。"],
+        recommendedMaterialIds: assembledContext.snapshot.authorizedMaterialIds,
+      });
+    }
     await finishM5ProviderRun(auth.actor, projectId, {
       runId: providerRunId,
       status: "SUCCEEDED",
@@ -187,9 +228,18 @@ export async function POST(
         model: result.modelKey,
         finishReason: result.finishReason,
       },
-      materialScope: [],
+      contextSnapshot: assembledContext.snapshot,
+      materialScope: assembledContext.snapshot.items
+        .filter((item) => item.itemType === "RETRIEVED_CHUNK" && item.included)
+        .map((item) => ({
+          materialId: item.materialId,
+          filename: item.filename,
+          chunkId: item.materialChunkId,
+          location: item.location,
+        })),
     });
   } catch (error) {
+    console.error("M5 conversation response failure", error);
     if (providerRunId) {
       await finishM5ProviderRun(auth.actor, projectId, {
         runId: providerRunId,
@@ -209,7 +259,33 @@ export async function POST(
     if (error instanceof M5ModelOrchestrationError) {
       return apiError(error.code.endsWith("NOT_FOUND") ? 404 : 409, error.code, error.message);
     }
+    if (error instanceof ContextRetrievalError) {
+      const status = error.code === "MATERIAL_SELECTION_REQUIRED" ? 409 : 422;
+      return apiError(status, error.code, error.message);
+    }
     return apiError(500, "CONVERSATION_RESPONSE_FAILED", "对话生成失败，用户消息已安全保留。 ");
+  }
+}
+
+async function runWithProviderActivityTimeout<T>(
+  inactivitySeconds: number,
+  requestSignal: AbortSignal,
+  operation: (signal: AbortSignal, onActivity: () => void) => Promise<T>,
+): Promise<T> {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const onActivity = () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => controller.abort(), inactivitySeconds * 1_000);
+  };
+  const onRequestAbort = () => controller.abort();
+  requestSignal.addEventListener("abort", onRequestAbort, { once: true });
+  onActivity();
+  try {
+    return await operation(controller.signal, onActivity);
+  } finally {
+    clearTimeout(timer);
+    requestSignal.removeEventListener("abort", onRequestAbort);
   }
 }
 
@@ -221,6 +297,35 @@ function textValue(value: unknown, min: number, max: number): string | null {
   if (typeof value !== "string") return null;
   const text = value.trim();
   return text.length >= min && text.length <= max ? text : null;
+}
+
+function stringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? [...new Set(value.filter((item): item is string => typeof item === "string" && safeId.test(item)))]
+    : [];
+}
+
+function currentSectionSlugValue(value: unknown): string | null {
+  return isRecord(value) ? textValue(value.sectionSlug, 1, 300) : null;
+}
+
+function productSkillValue(value: unknown): M5ProductSkill | null {
+  return typeof value === "string" && [
+    "project_diagnosis_outline", "literature_summary_matrix", "chapter_writing",
+    "general_revision", "consistency_check", "citation_evidence_check",
+  ].includes(value) ? value as M5ProductSkill : null;
+}
+
+function roleForProductSkill(productSkill: M5ProductSkill | null): AgentRole {
+  switch (productSkill) {
+    case "project_diagnosis_outline": return "RESEARCH_PLANNER";
+    case "literature_summary_matrix": return "RETRIEVER_EVIDENCE";
+    case "chapter_writing":
+    case "general_revision": return "WRITER";
+    case "consistency_check": return "REVIEWER";
+    case "citation_evidence_check": return "VERIFIER";
+    default: return "CONVERSATION_AGENT";
+  }
 }
 
 function invalidRequest() {

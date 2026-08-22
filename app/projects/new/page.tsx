@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/app/components/AppShell";
 import { creationPaths } from "@/app/lib/m1-mock";
 import styles from "./new.module.css";
+import { GuidedStartButton } from "./GuidedStartButton";
 
 export default function NewProjectPage() {
   return (
@@ -20,6 +21,8 @@ export default function NewProjectPage() {
           选择入口后只需提供三个基础回答。项目会保存到你的独立工作区，专业信息和材料可以稍后继续补充。
         </p>
       </section>
+
+      <GuidedStartButton />
 
       <section className={styles.cardGrid} aria-label="选择项目创建方式">
         {creationPaths.map((path, index) => (

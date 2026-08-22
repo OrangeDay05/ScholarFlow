@@ -2,6 +2,7 @@ import { sql } from "drizzle-orm";
 import {
   index,
   integer,
+  real,
   sqliteTable,
   text,
   uniqueIndex,
@@ -362,6 +363,7 @@ export const providerRunRecords = sqliteTable(
     ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
     projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
     snapshotId: text("snapshot_id").notNull().references(() => resolvedModelConfigSnapshots.id, { onDelete: "restrict" }),
+    agentContextSnapshotId: text("agent_context_snapshot_id"),
     usageCategory: text("usage_category").notNull(),
     status: text("status", { enum: ["RUNNING", "SUCCEEDED", "FAILED", "CANCELLED", "BUDGET_PAUSED"] }).notNull(),
     promptTokens: integer("prompt_tokens"),
@@ -383,7 +385,10 @@ export const providerRunRecords = sqliteTable(
     finishedAt: text("finished_at"),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
-  (table) => [index("provider_run_owner_project_idx").on(table.ownerUserId, table.projectId, table.createdAt)],
+  (table) => [
+    index("provider_run_owner_project_idx").on(table.ownerUserId, table.projectId, table.createdAt),
+    index("provider_run_context_snapshot_idx").on(table.agentContextSnapshotId),
+  ],
 );
 
 export const projects = sqliteTable(
@@ -399,6 +404,11 @@ export const projects = sqliteTable(
     primaryCreationMethod: text("primary_creation_method", {
       enum: ["idea", "existing_draft", "requirements", "literature", "data"],
     }).notNull(),
+    onboardingMode: text("onboarding_mode", {
+      enum: ["direct", "guided"],
+    })
+      .notNull()
+      .default("direct"),
     status: text("status", { enum: ["active", "archived"] }).notNull().default("active"),
     currentStage: text("current_stage").notNull().default("diagnosis"),
     ...timestamps(),
@@ -1212,6 +1222,9 @@ export const materialChunks = sqliteTable(
     text: text("text").notNull(),
     locationJson: text("location_json").notNull(),
     metadataJson: text("metadata_json").notNull().default("{}"),
+    blockId: text("block_id"),
+    blockType: text("block_type"),
+    sectionPathJson: text("section_path_json").notNull().default("[]"),
     contentHash: text("content_hash").notNull(),
     createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
   },
@@ -2648,6 +2661,50 @@ export const slides = sqliteTable(
   ],
 );
 
+export const parsedDocuments = sqliteTable(
+  "parsed_documents",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    materialId: text("material_id").notNull().references(() => materials.id, { onDelete: "cascade" }),
+    parseRunId: text("parse_run_id").notNull().references(() => materialParseRuns.id, { onDelete: "cascade" }),
+    modelVersion: integer("model_version").notNull().default(1),
+    contentJson: text("content_json").notNull(),
+    plainText: text("plain_text").notNull(),
+    statsJson: text("stats_json").notNull().default("{}"),
+    warningsJson: text("warnings_json").notNull().default("[]"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("parsed_documents_run_uq").on(table.parseRunId),
+    index("parsed_documents_owner_project_material_idx").on(table.ownerUserId, table.projectId, table.materialId),
+  ],
+);
+
+export const parsedDocumentAssets = sqliteTable(
+  "parsed_document_assets",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    materialId: text("material_id").notNull().references(() => materials.id, { onDelete: "cascade" }),
+    parseRunId: text("parse_run_id").notNull().references(() => materialParseRuns.id, { onDelete: "cascade" }),
+    parsedDocumentId: text("parsed_document_id").notNull().references(() => parsedDocuments.id, { onDelete: "cascade" }),
+    relationshipId: text("relationship_id"),
+    filename: text("filename").notNull(),
+    contentType: text("content_type").notNull(),
+    objectKey: text("object_key").notNull(),
+    contentHash: text("content_hash").notNull(),
+    fileSize: integer("file_size").notNull(),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    uniqueIndex("parsed_document_assets_object_key_uq").on(table.objectKey),
+    index("parsed_document_assets_scope_idx").on(table.ownerUserId, table.projectId, table.materialId),
+  ],
+);
+
 export const sectionCandidateDecisions = sqliteTable(
   "section_candidate_decisions",
   {
@@ -2892,4 +2949,181 @@ export const experimentAssignments = sqliteTable(
     uniqueIndex("experiment_assignments_experiment_user_uq").on(table.experimentId, table.userId),
     index("experiment_assignments_user_idx").on(table.userId),
   ],
+);
+
+export const agentContextSnapshots = sqliteTable(
+  "agent_context_snapshots",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    conversationSessionId: text("conversation_session_id").references(() => conversationSessions.id, { onDelete: "set null" }),
+    taskId: text("task_id").references(() => aiTasks.id, { onDelete: "set null" }),
+    providerRunId: text("provider_run_id").references(() => providerRunRecords.id, { onDelete: "set null" }),
+    agentRole: text("agent_role").notNull(),
+    taskIntent: text("task_intent").notNull(),
+    policyName: text("policy_name").notNull(),
+    policyVersion: text("policy_version").notNull(),
+    diagnosisCardId: text("diagnosis_card_id"),
+    diagnosisCardVersion: integer("diagnosis_card_version"),
+    outlineId: text("outline_id"),
+    outlineVersion: integer("outline_version"),
+    sectionId: text("section_id"),
+    sectionVersionId: text("section_version_id"),
+    conversationSummaryId: text("conversation_summary_id"),
+    recentMessageIdsJson: text("recent_message_ids_json").notNull().default("[]"),
+    authorizedMaterialIdsJson: text("authorized_material_ids_json").notNull().default("[]"),
+    originalQuery: text("original_query").notNull(),
+    rewrittenQueriesJson: text("rewritten_queries_json").notNull().default("[]"),
+    retrievalFiltersJson: text("retrieval_filters_json").notNull().default("{}"),
+    retrievalAlgorithm: text("retrieval_algorithm").notNull(),
+    retrievalVersion: text("retrieval_version").notNull(),
+    retrievalMode: text("retrieval_mode").notNull(),
+    tokenBudget: integer("token_budget").notNull(),
+    estimatedContextTokens: integer("estimated_context_tokens").notNull(),
+    provider: text("provider"),
+    model: text("model"),
+    promptHash: text("prompt_hash").notNull(),
+    contextHash: text("context_hash").notNull(),
+    capabilityStatusJson: text("capability_status_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("agent_context_snapshots_scope_idx").on(table.ownerUserId, table.projectId, table.createdAt),
+    index("agent_context_snapshots_conversation_idx").on(table.conversationSessionId, table.createdAt),
+  ],
+);
+
+export const contextSnapshotItems = sqliteTable(
+  "context_snapshot_items",
+  {
+    id: text("id").primaryKey(),
+    snapshotId: text("snapshot_id").notNull().references(() => agentContextSnapshots.id, { onDelete: "cascade" }),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    itemType: text("item_type").notNull(),
+    sourceType: text("source_type").notNull(),
+    sourceId: text("source_id"),
+    materialId: text("material_id").references(() => materials.id, { onDelete: "restrict" }),
+    parseRunId: text("parse_run_id").references(() => materialParseRuns.id, { onDelete: "restrict" }),
+    materialChunkId: text("material_chunk_id").references(() => materialChunks.id, { onDelete: "restrict" }),
+    contentHash: text("content_hash").notNull(),
+    sourceLocationJson: text("source_location_json").notNull().default("{}"),
+    content: text("content").notNull(),
+    contentJson: text("content_json"),
+    retrievalMethod: text("retrieval_method"),
+    lexicalScore: real("lexical_score"),
+    vectorScore: real("vector_score"),
+    fusedScore: real("fused_score"),
+    rerankScore: real("rerank_score"),
+    rank: integer("rank"),
+    included: integer("included", { mode: "boolean" }).notNull().default(true),
+    estimatedTokens: integer("estimated_tokens").notNull().default(0),
+    metadataJson: text("metadata_json").notNull().default("{}"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+  },
+  (table) => [
+    index("context_snapshot_items_snapshot_rank_idx").on(table.snapshotId, table.included, table.rank),
+    index("context_snapshot_items_material_chunk_idx").on(table.materialId, table.materialChunkId),
+  ],
+);
+
+export const agentWorkingMemories = sqliteTable(
+  "agent_working_memories",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    conversationSessionId: text("conversation_session_id").references(() => conversationSessions.id, { onDelete: "cascade" }),
+    agentRole: text("agent_role").notNull(),
+    scopeType: text("scope_type").notNull(),
+    scopeId: text("scope_id"),
+    memoryType: text("memory_type").notNull(),
+    contentJson: text("content_json").notNull(),
+    status: text("status", { enum: ["ACTIVE", "SUPERSEDED", "REJECTED", "EXPIRED"] }).notNull().default("ACTIVE"),
+    expiresAt: text("expires_at"),
+    supersededAt: text("superseded_at"),
+    ...timestamps(),
+  },
+  (table) => [index("agent_working_memories_active_scope_idx").on(
+    table.ownerUserId,
+    table.projectId,
+    table.agentRole,
+    table.status,
+  )],
+);
+
+export const agentHandoffs = sqliteTable(
+  "agent_handoffs",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    conversationSessionId: text("conversation_session_id").references(() => conversationSessions.id, { onDelete: "set null" }),
+    fromAgentRole: text("from_agent_role").notNull(),
+    toAgentRole: text("to_agent_role").notNull(),
+    sourceTaskId: text("source_task_id"),
+    targetTaskId: text("target_task_id"),
+    goal: text("goal").notNull(),
+    confirmedInputsJson: text("confirmed_inputs_json").notNull().default("[]"),
+    relevantDecisionsJson: text("relevant_decisions_json").notNull().default("[]"),
+    openQuestionsJson: text("open_questions_json").notNull().default("[]"),
+    warningsJson: text("warnings_json").notNull().default("[]"),
+    artifactRefsJson: text("artifact_refs_json").notNull().default("[]"),
+    recommendedMaterialIdsJson: text("recommended_material_ids_json").notNull().default("[]"),
+    status: text("status", { enum: ["OPEN", "CONSUMED", "SUPERSEDED"] }).notNull().default("OPEN"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    consumedAt: text("consumed_at"),
+  },
+  (table) => [index("agent_handoffs_target_scope_idx").on(
+    table.ownerUserId,
+    table.projectId,
+    table.toAgentRole,
+    table.status,
+  )],
+);
+
+export const materialChunkEmbeddings = sqliteTable(
+  "material_chunk_embeddings",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    materialId: text("material_id").notNull().references(() => materials.id, { onDelete: "cascade" }),
+    parseRunId: text("parse_run_id").notNull().references(() => materialParseRuns.id, { onDelete: "cascade" }),
+    materialChunkId: text("material_chunk_id").notNull().references(() => materialChunks.id, { onDelete: "cascade" }),
+    provider: text("provider").notNull(),
+    model: text("model").notNull(),
+    dimension: integer("dimension"),
+    vectorRecordId: text("vector_record_id"),
+    contentHash: text("content_hash").notNull(),
+    status: text("status", { enum: ["PENDING", "READY", "CONFIGURATION_REQUIRED", "FAILED"] }).notNull().default("PENDING"),
+    errorCode: text("error_code"),
+    ...timestamps(),
+  },
+  (table) => [
+    uniqueIndex("material_chunk_embeddings_chunk_model_uq").on(table.materialChunkId, table.provider, table.model),
+    index("material_chunk_embeddings_scope_status_idx").on(table.ownerUserId, table.projectId, table.status),
+  ],
+);
+
+export const evidenceCandidates = sqliteTable(
+  "evidence_candidates",
+  {
+    id: text("id").primaryKey(),
+    ownerUserId: text("owner_user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+    contextSnapshotItemId: text("context_snapshot_item_id").notNull().references(() => contextSnapshotItems.id, { onDelete: "restrict" }),
+    answerMessageId: text("answer_message_id").references(() => conversationMessages.id, { onDelete: "set null" }),
+    claimText: text("claim_text").notNull(),
+    quote: text("quote").notNull(),
+    status: text("status", { enum: ["CANDIDATE", "ACCEPTED", "REJECTED"] }).notNull().default("CANDIDATE"),
+    createdAt: text("created_at").notNull().default(sql`CURRENT_TIMESTAMP`),
+    decidedAt: text("decided_at"),
+  },
+  (table) => [index("evidence_candidates_scope_status_idx").on(
+    table.ownerUserId,
+    table.projectId,
+    table.status,
+  )],
 );

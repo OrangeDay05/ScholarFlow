@@ -47,6 +47,7 @@ next-env.d.ts
 /.codex-dev.*.log
 /.codex-dev.pid
 /.codex-logs/
+/.codex-artifacts/
 /docs/testing/local-acceptance-accounts.private.txt
 /preview-*.png
 /.venv-m8/

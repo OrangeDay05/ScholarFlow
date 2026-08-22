@@ -44,6 +44,7 @@ export async function POST(
       await appendSectionVersion(auth.actor, projectId, sectionSlug, {
         source: body.source,
         content: typeof body.content === "string" ? body.content : undefined,
+        contentJson: typeof body.contentJson === "string" ? body.contentJson : null,
         sourceVersionId:
           typeof body.sourceVersionId === "string"
             ? body.sourceVersionId

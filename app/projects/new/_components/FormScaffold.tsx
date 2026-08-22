@@ -88,17 +88,26 @@ export function FormScaffold({
 export function Field({
   label,
   hint,
+  aiState,
   children,
   full = false,
 }: {
   label: string;
   hint?: string;
+  aiState?: "available" | "filled";
   children: React.ReactNode;
   full?: boolean;
 }) {
   return (
     <label className={full ? styles.fieldFull : styles.field}>
-      <span className={styles.fieldLabel}>{label}</span>
+      <span className={styles.fieldHeading}>
+        <span className={styles.fieldLabel}>{label}</span>
+        {aiState ? (
+          <span className={aiState === "filled" ? styles.aiFilledBadge : styles.aiBadge}>
+            {aiState === "filled" ? "AI 已填入候选" : "AI 可根据材料填入"}
+          </span>
+        ) : null}
+      </span>
       {children}
       {hint ? <small>{hint}</small> : null}
     </label>
@@ -135,8 +144,13 @@ export function FormActions({
   draftSaved,
   createDisabled = false,
   createDisabledLabel = "请先处理队列",
+  nextDisabled = false,
+  nextLabel,
+  processDisabled = false,
+  processLabel,
   onBack,
   onNext,
+  onProcess,
   onSave,
   onCreate,
 }: {
@@ -144,8 +158,13 @@ export function FormActions({
   draftSaved: boolean;
   createDisabled?: boolean;
   createDisabledLabel?: string;
+  nextDisabled?: boolean;
+  nextLabel?: string;
+  processDisabled?: boolean;
+  processLabel?: string;
   onBack: () => void;
   onNext: () => void;
+  onProcess?: () => void;
   onSave: () => void;
   onCreate: () => void;
 }) {
@@ -163,10 +182,22 @@ export function FormActions({
       </div>
 
       {step < 3 ? (
-        <button className={styles.primaryButton} type="button" onClick={onNext}>
-          {step === 1 ? "查看处理队列" : "核对并继续"}
-          <span>→</span>
-        </button>
+        <div className={styles.actionGroup}>
+          {step === 2 && processLabel && onProcess ? (
+            <button
+              className={styles.secondaryButton}
+              disabled={processDisabled}
+              type="button"
+              onClick={onProcess}
+            >
+              {processLabel}
+            </button>
+          ) : null}
+          <button className={styles.primaryButton} disabled={nextDisabled} type="button" onClick={onNext}>
+            {nextLabel ?? (step === 1 ? "查看处理列表" : "下一步")}
+            <span>→</span>
+          </button>
+        </div>
       ) : (
         <button
           className={styles.primaryButton}

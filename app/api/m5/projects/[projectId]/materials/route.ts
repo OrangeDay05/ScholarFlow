@@ -8,7 +8,9 @@ import { getMaterialStorageAdapter } from "@/app/lib/storage/storage-adapter";
 import {
   listM5MaterialObjectsForActor,
   M5MaterialUploadRepositoryError,
+  softDeleteM5MaterialForActor,
   storeM5MaterialForActor,
+  updateM5MaterialKindForActor,
   type M5MaterialKind,
 } from "@/db/repositories/m5-material-uploads";
 import { apiError, apiSuccess } from "../../../../m3/_shared";
@@ -134,6 +136,50 @@ export async function POST(
   }
 }
 
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ projectId: string }> },
+) {
+  const auth = await requireM4Actor(request);
+  if ("response" in auth) return auth.response;
+  const body = await readJson(request);
+  const materialId = typeof body.material_id === "string" ? body.material_id.trim() : "";
+  const kind = typeof body.kind === "string" ? body.kind.trim() : "";
+  if (!materialId) return apiError(400, "MATERIAL_REQUIRED", "缺少材料 ID。");
+  if (!allowedKinds.has(kind as M5MaterialKind)) {
+    return apiError(400, "INVALID_MATERIAL_KIND", "材料类别无效。");
+  }
+  try {
+    return apiSuccess(
+      await updateM5MaterialKindForActor(
+        auth.actor,
+        (await params).projectId,
+        materialId,
+        kind as M5MaterialKind,
+      ),
+    );
+  } catch (error) {
+    return uploadError(error);
+  }
+}
+
+export async function DELETE(
+  request: Request,
+  { params }: { params: Promise<{ projectId: string }> },
+) {
+  const auth = await requireM4Actor(request);
+  if ("response" in auth) return auth.response;
+  const body = await readJson(request);
+  const materialId = typeof body.material_id === "string" ? body.material_id.trim() : "";
+  if (!materialId) return apiError(400, "MATERIAL_REQUIRED", "缺少材料 ID。");
+  try {
+    await softDeleteM5MaterialForActor(auth.actor, (await params).projectId, materialId);
+    return apiSuccess({ removed: true });
+  } catch (error) {
+    return uploadError(error);
+  }
+}
+
 function uploadError(error: unknown): Response {
   if (error instanceof MaterialUploadValidationError) {
     return apiError(
@@ -144,7 +190,7 @@ function uploadError(error: unknown): Response {
   }
   if (error instanceof M5MaterialUploadRepositoryError) {
     const status =
-      error.code === "PROJECT_NOT_FOUND"
+      error.code === "PROJECT_NOT_FOUND" || error.code === "MATERIAL_NOT_FOUND"
         ? 404
         : error.code === "STORAGE_UNAVAILABLE"
           ? 503
@@ -152,6 +198,15 @@ function uploadError(error: unknown): Response {
     return apiError(status, error.code, error.message);
   }
   return apiError(500, "INTERNAL_ERROR", "上传处理失败。");
+}
+
+async function readJson(request: Request): Promise<Record<string, unknown>> {
+  try {
+    const body = await request.json();
+    return body && typeof body === "object" ? body as Record<string, unknown> : {};
+  } catch {
+    return {};
+  }
 }
 
 function inferKind(filename: string): M5MaterialKind {

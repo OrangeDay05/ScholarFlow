@@ -7,6 +7,15 @@
   color: var(--ink);
 }
 
+.workspaceExpanded {
+  position: fixed;
+  inset: 18px;
+  z-index: 1000;
+  height: auto;
+  border: 1px solid var(--line);
+  box-shadow: 0 0 0 100vmax rgb(8 35 27 / 52%), 0 24px 70px rgb(8 35 27 / 24%);
+}
+
 .heading {
   display: flex;
   align-items: center;
@@ -33,11 +42,35 @@
   font-weight: 500;
 }
 
-.heading > strong {
+.headingActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.headingActions > strong {
   padding: 6px 8px;
   background: var(--mint);
   color: var(--forest);
   font-size: 8px;
+}
+
+.headingActions button {
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--forest);
+  background: var(--paper);
+  color: var(--forest);
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.headingActions button:hover,
+.headingActions button[aria-pressed="true"] {
+  background: var(--forest);
+  color: var(--cream);
 }
 
 .tabs {
@@ -171,6 +204,60 @@
   overflow-y: auto;
 }
 
+.workspaceExpanded .conversation {
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 34%);
+  align-items: start;
+}
+
+.workspaceExpanded .preflight,
+.workspaceExpanded .materialAuthorization,
+.workspaceExpanded .contextSnapshot,
+.workspaceExpanded .messages {
+  grid-column: 1;
+}
+
+.workspaceExpanded .messages {
+  max-height: none;
+  min-height: 46vh;
+  padding-right: 8px;
+}
+
+.workspaceExpanded .inputDock,
+.workspaceExpanded .blocker,
+.workspaceExpanded .proposal,
+.workspaceExpanded .executionResult {
+  grid-column: 2;
+}
+
+.workspaceExpanded .inputDock {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: grid;
+  grid-row: 1;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.workspaceExpanded .markdown,
+.workspaceExpanded .messages article p,
+.workspaceExpanded .empty {
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.workspaceExpanded .markdownHeading { font-size: 14px; }
+
+@media (max-width: 760px) {
+  .workspaceExpanded { inset: 8px; }
+  .workspaceExpanded .conversation { display: grid; grid-template-columns: 1fr; }
+  .workspaceExpanded .conversation > * { grid-column: 1; grid-row: auto; }
+  .workspaceExpanded .inputDock { position: static; }
+  .workspaceExpanded .messages { min-height: 52vh; }
+}
+
 .messages article {
   display: grid;
   grid-template-columns: 26px minmax(0, 1fr);
@@ -183,6 +270,21 @@
 
 .messages article[data-role="USER"] {
   background: var(--mint);
+}
+
+.messages article.completeArtifact {
+  border: 2px solid var(--green);
+  background: color-mix(in srgb, var(--mint) 52%, var(--paper-strong));
+  box-shadow: 0 12px 28px rgb(0 66 44 / 9%);
+}
+
+.messages article.completeArtifact::before {
+  grid-column: 1 / -1;
+  content: "完整可用章节候选";
+  color: var(--green);
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
 }
 
 .messages article > span {
@@ -207,6 +309,26 @@
   white-space: pre-wrap;
 }
 
+.markdown {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--muted-strong);
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.markdown p { margin: 0 0 7px; white-space: normal; }
+.markdown p:last-child { margin-bottom: 0; }
+.markdownSpace { display: block; height: 4px; }
+.markdownHeading { display: block; margin: 8px 0 5px; color: var(--forest); font-size: 10px; }
+.markdownList { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 3px; }
+.markdown hr { margin: 9px 0; border: 0; border-top: 1px solid var(--line); }
+.markdown code { padding: 1px 3px; background: var(--mint); font-size: 8px; }
+.markdownTableWrap { max-width: 100%; margin: 7px 0; overflow-x: auto; }
+.markdown table { width: 100%; border-collapse: collapse; font-size: 8px; }
+.markdown th, .markdown td { padding: 5px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+.markdown th { background: var(--mint); color: var(--forest); }
+
 .empty {
   padding: 18px;
   border: 1px dashed var(--line);
@@ -230,6 +352,69 @@
   color: var(--forest);
   font-size: 9px;
   font-weight: 800;
+}
+
+.inputDock {
+  display: contents;
+}
+
+.activeSkillChip {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+  align-items: center;
+  width: fit-content;
+  max-width: 100%;
+  padding: 9px 34px 9px 11px;
+  border: 1px solid var(--green);
+  background: var(--mint);
+  color: var(--forest);
+}
+
+.activeSkillChip > span {
+  grid-row: span 2;
+  color: var(--green);
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.activeSkillChip > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 9px;
+}
+
+.activeSkillChip > button {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  display: grid;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--forest);
+  cursor: pointer;
+  font: inherit;
+  font-size: 17px;
+  opacity: 0;
+  transition: opacity 140ms ease, background 140ms ease;
+}
+
+.activeSkillChip:hover > button,
+.activeSkillChip:focus-within > button {
+  opacity: 1;
+}
+
+.activeSkillChip > button:hover,
+.activeSkillChip > button:focus-visible {
+  background: var(--paper-strong);
+  outline: 2px solid rgb(0 119 70 / 20%);
 }
 
 .composer textarea {
@@ -312,6 +497,56 @@
   border-left: 3px solid var(--green);
 }
 
+.completeCandidate,
+.candidateSummary {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--green);
+  background: color-mix(in srgb, var(--mint) 46%, var(--paper-strong));
+}
+
+.completeCandidate > span {
+  color: var(--green);
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+
+.completeCandidate > strong {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.completeCandidate .markdown {
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+  color: var(--ink);
+  font-size: 10px;
+}
+
+.candidateSummary {
+  border-color: var(--line);
+  background: var(--paper-strong);
+}
+
+.candidateSummary > strong {
+  color: var(--forest);
+  font-size: 10px;
+}
+
+.candidateSummary > p,
+.candidateSummary > small {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 8px;
+  line-height: 1.65;
+}
+
 .executionResult > span {
   color: var(--green);
   font-size: 8px;
@@ -338,6 +573,50 @@
 .diff del { color: #8a3b2d; background: #fff0ec; }
 .diff ins { color: var(--forest); background: var(--mint); text-decoration: none; }
 
+.contextSnapshot {
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--mint) 42%, white);
+}
+
+.contextSnapshot summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 3px 10px;
+  padding: 10px 12px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.contextSnapshot summary span { color: var(--green); font-size: 8px; font-weight: 850; letter-spacing: 0.08em; }
+.contextSnapshot summary strong { grid-row: span 2; align-self: center; font-size: 8px; }
+.contextSnapshot summary small { color: var(--muted); font-size: 8px; }
+.contextSnapshot dl { display: grid; gap: 5px; margin: 0; padding: 0 12px 10px; }
+.contextSnapshot dl > div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 8px; font-size: 8px; }
+.contextSnapshot dt { color: var(--muted); }
+.contextSnapshot dd { margin: 0; overflow-wrap: anywhere; }
+.contextSources { display: grid; gap: 7px; padding: 0 12px 12px; }
+.contextSources article { display: grid; gap: 4px; padding: 8px; border: 1px solid var(--line); background: var(--paper); }
+.contextSources strong { font-size: 8px; }
+.contextSources small { color: var(--muted); font-size: 7px; overflow-wrap: anywhere; }
+.contextSources p { margin: 0; font-size: 8px; line-height: 1.55; }
+
+.materialAuthorization {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+}
+
+.materialAuthorization legend { padding: 0 5px; color: var(--green); font-size: 8px; font-weight: 850; }
+.materialAuthorization label { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; font-size: 8px; }
+.materialAuthorization input { margin-top: 2px; accent-color: var(--green); }
+.materialAuthorization label span { display: grid; gap: 2px; min-width: 0; }
+.materialAuthorization label strong { overflow-wrap: anywhere; }
+.materialAuthorization label small,
+.materialAuthorization p { color: var(--muted); font-size: 7px; }
+.materialAuthorization p { margin: 0; }
+
 @media (max-width: 520px) {
   .heading {
     align-items: flex-start;
@@ -356,4 +635,348 @@
   .conversation {
     padding: 12px;
   }
+}
+
+/* Conversation-first workspace */
+.workspace {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.heading {
+  min-height: 54px;
+  padding: 10px 14px;
+}
+
+.heading > span {
+  align-self: center;
+}
+
+.headingActions > strong,
+.headingActions button {
+  min-height: 32px;
+}
+
+.tabs {
+  gap: 0;
+  padding: 0;
+}
+
+.tabs button {
+  min-height: 48px;
+  border-right: 1px solid var(--line);
+}
+
+.conversation {
+  position: relative;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.messages {
+  min-height: 0;
+  max-height: none;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.inputDock,
+.workspaceExpanded .inputDock {
+  position: relative;
+  top: auto;
+  z-index: 4;
+  display: grid;
+  grid-column: 1;
+  grid-row: auto;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.composerTools {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.compactContext {
+  position: relative;
+}
+
+.compactContext > summary,
+.proposalListButton {
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+  color: var(--forest);
+  cursor: pointer;
+  font: inherit;
+  font-size: 8px;
+  font-weight: 800;
+  list-style: none;
+}
+
+.compactContext > summary {
+  display: flex;
+  align-items: center;
+}
+
+.compactContext > summary::-webkit-details-marker {
+  display: none;
+}
+
+.compactContext .materialAuthorization {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
+  z-index: 8;
+  width: min(330px, 78vw);
+  max-height: 300px;
+  overflow-y: auto;
+  background: var(--paper-strong);
+  box-shadow: 0 14px 34px rgb(0 44 31 / 15%);
+}
+
+.proposalListButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.proposalListButton span {
+  display: grid;
+  min-width: 20px;
+  height: 20px;
+  place-items: center;
+  background: var(--mint);
+  font-size: 7px;
+}
+
+.proposalShelf {
+  position: absolute;
+  right: 14px;
+  bottom: calc(100% + 8px);
+  z-index: 9;
+  display: grid;
+  width: min(360px, calc(100% - 28px));
+  max-height: 56vh;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+  box-shadow: 0 18px 45px rgb(0 44 31 / 18%);
+}
+
+.proposalShelf > header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 11px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-strong);
+}
+
+.proposalShelf > header button,
+.proposalModal > header button {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  background: transparent;
+  color: var(--forest);
+  cursor: pointer;
+  font: inherit;
+  font-size: 20px;
+}
+
+.proposalShelf > article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.proposalOpenButton {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+.proposalOpenButton span,
+.proposalOpenButton small,
+.auditKept {
+  color: var(--muted);
+  font-size: 7px;
+}
+
+.proposalOpenButton strong {
+  overflow-wrap: anywhere;
+  color: var(--forest);
+  font-size: 9px;
+}
+
+.deleteProposalButton,
+.deleteProposalConfirm button {
+  align-self: center;
+  padding: 5px 7px;
+  border: 0;
+  background: transparent;
+  color: #984b3f;
+  cursor: pointer;
+  font: inherit;
+  font-size: 7px;
+}
+
+.deleteProposalConfirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 3px;
+  color: #984b3f;
+  font-size: 7px;
+}
+
+.auditKept {
+  align-self: center;
+  text-align: right;
+}
+
+.composer textarea {
+  min-height: 82px;
+}
+
+.statusLine {
+  margin: 0;
+  color: var(--muted);
+  font-size: 7px;
+  line-height: 1.45;
+}
+
+.proposalOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(8 35 27 / 52%);
+}
+
+.proposalModal {
+  display: grid;
+  width: min(760px, 100%);
+  max-height: min(82vh, 820px);
+  overflow: hidden;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: 0 28px 80px rgb(0 30 20 / 28%);
+}
+
+.proposalModal > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.proposalModal > header div {
+  display: grid;
+  gap: 5px;
+}
+
+.proposalModal > header span,
+.proposalBody > span {
+  color: var(--green);
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+
+.proposalModal > header strong {
+  color: var(--forest);
+  font-family: var(--font-serif);
+  font-size: 22px;
+  font-weight: 500;
+}
+
+.proposalBody {
+  display: grid;
+  gap: 12px;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.proposalBody > p,
+.proposalBody > small {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 9px;
+  line-height: 1.65;
+}
+
+.proposalActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.proposalActions button,
+.executionGate button,
+.executionResult button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--forest);
+  background: var(--forest);
+  color: var(--cream);
+  cursor: pointer;
+  font: inherit;
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.proposalActions button + button,
+.executionResult button + button {
+  background: transparent;
+  color: var(--forest);
+}
+
+.workspaceExpanded .conversation {
+  grid-template-columns: 1fr;
+  grid-template-rows: minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+
+.workspaceExpanded .messages {
+  grid-column: 1;
+  min-height: 0;
+  padding-right: 16px;
+}
+
+@media (max-width: 620px) {
+  .proposalOverlay { padding: 10px; }
+  .proposalModal { max-height: 92vh; }
+  .heading { align-items: center; }
+  .headingActions { margin-left: auto; }
+  .headingActions > strong { max-width: 86px; }
 }

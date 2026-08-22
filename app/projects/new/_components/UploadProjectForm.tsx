@@ -11,11 +11,20 @@ import {
   formStyles,
 } from "./FormScaffold";
 
-type UploadKind = "draft" | "requirements" | "literature" | "data";
+type UploadKind = "idea" | "draft" | "requirements" | "literature" | "data";
 
-type UploadState = "idle" | "uploading" | "stored" | "failed" | "cancelled";
+type UploadState =
+  | "idle"
+  | "uploading"
+  | "stored"
+  | "parsing"
+  | "parsed"
+  | "parse_failed"
+  | "failed"
+  | "cancelled";
 
 type StoredMaterial = {
+  materialId: string;
   originalFilename: string;
   detectedContentType: string;
   sizeBytes: number;
@@ -24,6 +33,18 @@ type StoredMaterial = {
 };
 
 const copy = {
+  idea: {
+    eyebrow: "01 · 从 Idea 开始",
+    title: "把一个念头，变成研究起点",
+    description: "先给出你已经知道的部分，也可以加入材料，让 AI 帮你填写创建信息候选。",
+    noteTitle: "不替你编造研究",
+    note: "没有材料支持的对象、方法和结论会被标为缺失。AI 填入内容只是候选，仍需你确认。",
+    pathLabel: "从一个 Idea 开始",
+    uploadTitle: "加入已有材料（可选）",
+    uploadHint: "支持 DOCX、PDF、TXT、XLSX、CSV、JPG、JPEG、PNG",
+    fileId: "idea",
+    defaultTitle: "数字平台中的知识协作机制研究",
+  },
   draft: {
     eyebrow: "02 · 导入已有初稿",
     title: "保留原稿，再开始修改",
@@ -97,6 +118,14 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
   const [draftSaved, setDraftSaved] = useState(false);
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [projectTitle, setProjectTitle] = useState(copy[kind].defaultTitle);
+  const [materialsSummary, setMaterialsSummary] = useState(
+    kind === "idea" ? "目前只有一个初步想法，材料情况待补充。" : "本次创建所加入的材料。",
+  );
+  const [firstAiHelp, setFirstAiHelp] = useState(
+    kind === "draft" ? "先识别初稿结构与缺口。" : "先读取材料并整理创建信息候选。",
+  );
+  const [aiFillState, setAiFillState] = useState<"idle" | "running" | "filled" | "failed">("idle");
+  const [aiFillError, setAiFillError] = useState("");
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const [uploadState, setUploadState] = useState<UploadState>("idle");
@@ -106,9 +135,15 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
   const abortController = useRef<AbortController | null>(null);
   const fileInput = useRef<HTMLInputElement | null>(null);
   const page = copy[kind];
-  const materialSummary =
-    uploadState === "stored"
-      ? `${storedMaterials.length} 个原始材料已安全存储 · 等待解析`
+  const materialStatusSummary =
+    uploadState === "parsed"
+      ? `${storedMaterials.length} 个原始材料已存储并解析成功`
+      : uploadState === "parsing"
+        ? `${storedMaterials.length} 个原始材料已存储 · 正在解析`
+        : uploadState === "stored"
+          ? `${storedMaterials.length} 个原始材料已存储 · 等待用户开始解析`
+        : uploadState === "parse_failed"
+          ? `${storedMaterials.length} 个原始材料已存储 · 部分材料解析失败`
       : uploadState === "cancelled"
         ? "材料已取消，可先创建项目后再补充"
         : "尚未完成材料上传";
@@ -126,9 +161,25 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
     setStep(3);
   }
 
-  function createProject() {
-    if (uploadState !== "uploading") {
-      router.push(`/projects/${projectId ?? "demo"}/diagnosis`);
+  function runProcessingAction() {
+    if (step !== 2) return;
+    if (storedMaterials.length > 0) void retryParsing();
+  }
+
+  async function createProject() {
+    if (uploadState !== "uploading" && uploadState !== "parsing") {
+      try {
+        if (!projectId) {
+          const controller = new AbortController();
+          const createdProjectId = await ensureProject(controller.signal);
+          router.push(`/projects/${createdProjectId}/diagnosis/candidate`);
+          return;
+        }
+        await persistIntake(projectId);
+        router.push(`/projects/${projectId}/diagnosis/candidate`);
+      } catch (error) {
+        setUploadError(error instanceof Error ? error.message : "项目创建失败。");
+      }
     }
   }
 
@@ -143,8 +194,8 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
       body: JSON.stringify({
         primaryCreationMethod: creationMethod(kind),
         goal: projectTitle.trim() || page.defaultTitle,
-        materialsSummary: "用户选择了需要安全保存的本机材料。",
-        firstAiHelp: "先保存原始材料，稍后通过诊断卡确认下一步。",
+        materialsSummary: materialsSummary.trim() || "材料情况待补充。",
+        firstAiHelp: firstAiHelp.trim() || "先读取材料并整理创建信息候选。",
       }),
       signal,
     });
@@ -162,6 +213,8 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
     setUploadState("idle");
     setUploadError("");
     setStoredMaterials([]);
+    setAiFillState("idle");
+    setAiFillError("");
   }
 
   function removeFile(file: File) {
@@ -176,6 +229,8 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
     setUploadState("idle");
     setUploadError("");
     setStoredMaterials([]);
+    setAiFillState("idle");
+    setAiFillError("");
     if (fileInput.current) fileInput.current.value = "";
   }
 
@@ -210,7 +265,10 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
     } catch (error) {
       if (controller.signal.aborted) {
         setUploadState("cancelled");
-        setUploadError("上传已取消，原文件未标记为已存储。");
+        setUploadError(snapshots.length > 0 ? "解析已取消，原文件仍已安全存储。" : "上传已取消，原文件未标记为已存储。");
+      } else if (snapshots.length > 0) {
+        setUploadState("parse_failed");
+        setUploadError(error instanceof Error ? error.message : "材料解析失败。");
       } else {
         setUploadState("failed");
         setUploadError(error instanceof Error ? error.message : "文件上传失败。");
@@ -218,6 +276,88 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
     } finally {
       abortController.current = null;
     }
+  }
+
+  async function parseStoredMaterials(
+    targetProjectId: string,
+    materials: StoredMaterial[],
+    signal: AbortSignal,
+  ) {
+      setUploadState("parsing");
+      setUploadError("");
+      for (const material of materials.filter((item) => item.materialStatus !== "success")) {
+        const response = await fetch(
+          `/api/m5/projects/${targetProjectId}/materials/${material.materialId}/parse`,
+          {
+            method: "POST",
+            headers: { "Idempotency-Key": `creation-parse:${crypto.randomUUID()}` },
+            signal,
+          },
+        );
+        const payload = await response.json();
+        if (!response.ok) throw new Error(apiMessage(payload, `《${material.originalFilename}》解析失败。`));
+        setStoredMaterials((current) => current.map((item) => item.materialId === material.materialId
+          ? { ...item, materialStatus: "success" }
+          : item));
+      }
+      setUploadState("parsed");
+  }
+
+  async function retryParsing() {
+    if (!projectId || storedMaterials.length === 0) return;
+    const controller = new AbortController();
+    abortController.current = controller;
+    try {
+      await parseStoredMaterials(projectId, storedMaterials, controller.signal);
+    } catch (error) {
+      setUploadState(controller.signal.aborted ? "cancelled" : "parse_failed");
+      setUploadError(controller.signal.aborted ? "解析已取消，原文件仍已安全存储。" : error instanceof Error ? error.message : "材料解析失败。");
+    } finally {
+      abortController.current = null;
+    }
+  }
+
+  async function fillFromMaterials() {
+    if (!projectId || uploadState !== "parsed" || storedMaterials.length === 0 || aiFillState === "running") return;
+    setAiFillState("running");
+    setAiFillError("");
+    try {
+      const response = await fetch(`/api/m5/projects/${projectId}/creation-assist`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          confirmed: true,
+          creationMethod: creationMethod(kind),
+          materialIds: storedMaterials.map((material) => material.materialId),
+          currentValues: { projectTitle, materialsSummary, firstAiHelp },
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(apiMessage(payload, "AI 无法根据当前材料填写创建信息。"));
+      const candidate = payload?.data?.candidate;
+      if (!candidate || typeof candidate !== "object") throw new Error("AI 没有返回有效候选。");
+      if (typeof candidate.projectTitle === "string" && candidate.projectTitle.trim()) setProjectTitle(candidate.projectTitle.trim());
+      if (typeof candidate.materialsSummary === "string" && candidate.materialsSummary.trim()) setMaterialsSummary(candidate.materialsSummary.trim());
+      if (typeof candidate.firstAiHelp === "string" && candidate.firstAiHelp.trim()) setFirstAiHelp(candidate.firstAiHelp.trim());
+      setAiFillState("filled");
+    } catch (error) {
+      setAiFillState("failed");
+      setAiFillError(error instanceof Error ? error.message : "AI 填写失败。");
+    }
+  }
+
+  async function persistIntake(targetProjectId: string) {
+    const response = await fetch(`/api/m4/projects/${targetProjectId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        goal: projectTitle.trim() || page.defaultTitle,
+        materialsSummary: materialsSummary.trim() || "材料情况待补充。",
+        firstAiHelp: firstAiHelp.trim() || "先读取材料并整理创建信息候选。",
+      }),
+    });
+    const payload = await response.json();
+    if (!response.ok) throw new Error(apiMessage(payload, "创建信息候选保存失败。"));
   }
 
   return (
@@ -238,12 +378,39 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
             description="先说明这批材料的用途，再进入真实上传与状态核对。"
           >
             <div className={formStyles.fieldGrid}>
-              <Field label="项目暂定名称 *" full>
+              <Field
+                label="项目暂定名称 *"
+                aiState={selectedFiles.length > 0 ? (aiFillState === "filled" ? "filled" : "available") : undefined}
+                full
+              >
                 <input
                   value={projectTitle}
                   onChange={(event) => setProjectTitle(event.target.value)}
                   placeholder="例如：数字平台中的知识协作机制研究"
                   aria-label="项目暂定名称"
+                />
+              </Field>
+              <Field
+                label={kind === "idea" ? "目前已经有哪些材料或信息？ *" : "这批材料主要包含什么？ *"}
+                hint="AI 填入内容只作为创建候选，进入诊断卡前仍可修改。"
+                aiState={selectedFiles.length > 0 ? (aiFillState === "filled" ? "filled" : "available") : undefined}
+                full
+              >
+                <textarea
+                  value={materialsSummary}
+                  onChange={(event) => setMaterialsSummary(event.target.value)}
+                  aria-label="材料与已有信息说明"
+                />
+              </Field>
+              <Field
+                label="希望 AI 首先帮助完成什么？ *"
+                aiState={selectedFiles.length > 0 ? (aiFillState === "filled" ? "filled" : "available") : undefined}
+                full
+              >
+                <textarea
+                  value={firstAiHelp}
+                  onChange={(event) => setFirstAiHelp(event.target.value)}
+                  aria-label="希望 AI 首先帮助完成什么"
                 />
               </Field>
               {kind === "requirements" ? (
@@ -311,6 +478,11 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
                   />
                 </Field>
               ) : null}
+              {kind === "idea" ? (
+                <div className={formStyles.infoBox}>
+                  不上传文件也可以继续。上传后需由你明确开始读取；AI 只会填写带标识的候选字段。
+                </div>
+              ) : null}
               {kind === "requirements" ? (
                 <Field label="直接填写要求（可选）" full>
                   <textarea
@@ -332,7 +504,9 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
                 ref={fileInput}
                 className={formStyles.visuallyHidden}
                 accept={
-                  kind === "data"
+                  kind === "idea"
+                    ? ".docx,.pdf,.txt,.xlsx,.csv,.jpg,.jpeg,.png"
+                    : kind === "data"
                     ? ".xlsx,.csv,.txt,.jpg,.jpeg,.png"
                     : kind === "requirements"
                       ? ".pdf,.docx,.txt,.jpg,.jpeg,.png"
@@ -422,28 +596,50 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
         <FormSection
           index="02"
           title="真实上传状态"
-          description="本批次只安全保存原始对象，不读取正文，也不启动解析。"
+          description="先安全保存原始对象，再创建独立解析版本；解析结果不会覆盖原文件。"
         >
           <div className={formStyles.warningBox} aria-live="polite">
             <span className={formStyles.warningIcon} aria-hidden="true">
-              {uploadState === "stored" ? "✓" : uploadState === "failed" ? "!" : "↑"}
+              {uploadState === "parsed" ? "✓" : uploadState === "failed" || uploadState === "parse_failed" ? "!" : "↑"}
             </span>
             <div>
-              <strong>{uploadStatusTitle(uploadState)}</strong>
+              <strong>
+                {kind === "idea" && selectedFiles.length === 0
+                  ? "本次未加入材料，可直接下一步"
+                  : uploadStatusTitle(uploadState)}
+              </strong>
               <span>
                 {storedMaterials.length > 0
-                  ? `${storedMaterials.length} 个原始文件已存储 · 等待解析`
+                  ? uploadState === "parsed"
+                    ? `${storedMaterials.length} 个原始文件已存储并解析成功`
+                    : uploadState === "parsing"
+                      ? `${storedMaterials.length} 个原始文件已存储 · 正在解析正文`
+                      : uploadError || `${storedMaterials.length} 个原始文件已存储`
                   : uploadError || selectedFiles.map((file) => file.name).join("、") || "尚未选择文件。"}
               </span>
             </div>
           </div>
-          {uploadState === "uploading" ? (
+          {uploadState === "uploading" || uploadState === "parsing" ? (
             <button type="button" onClick={() => abortController.current?.abort()}>
               取消上传
             </button>
-          ) : uploadState === "failed" || uploadState === "cancelled" ? (
-            <button type="button" onClick={() => void uploadSelectedFiles()}>
-              重新上传
+          ) : uploadState === "failed" || (uploadState === "cancelled" && storedMaterials.length === 0) ? (
+            <button type="button" onClick={() => void (storedMaterials.length > 0 ? retryParsing() : uploadSelectedFiles())}>
+              {storedMaterials.length > 0 ? "重新解析" : "重新上传"}
+            </button>
+          ) : null}
+          {uploadState === "parsed" && storedMaterials.length > 0 ? (
+            <button
+              className={formStyles.aiFillButton}
+              type="button"
+              disabled={aiFillState === "running"}
+              onClick={() => void fillFromMaterials()}
+            >
+              {aiFillState === "running"
+                ? "AI 正在读取材料并填写…"
+                : aiFillState === "filled"
+                  ? "重新由 AI 填写候选"
+                  : "AI 根据材料填入创建信息"}
             </button>
           ) : null}
           <div className={kind === "draft" ? formStyles.protectionBox : formStyles.warningBox}>
@@ -454,6 +650,8 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
               <strong>
                 {kind === "draft"
                   ? "原始初稿只读保留"
+                  : kind === "idea"
+                    ? "Idea 路径允许稍后补充材料"
                   : kind === "data"
                     ? "请先移除姓名、联系方式等敏感信息"
                     : "解析结果将在诊断卡中等待确认"}
@@ -461,6 +659,8 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
               <span>
                 {kind === "draft"
                   ? "AI 修改只会创建新版本，任何操作都不会覆盖原稿。"
+                  : kind === "idea"
+                    ? "未加入材料时不会执行读取或 AI 填入；项目创建后仍可在诊断卡继续添加材料。"
                   : kind === "literature"
                     ? "仅基于用户上传原文定位证据，不声称已通过外部数据库验证。"
                     : kind === "data"
@@ -469,6 +669,20 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
               </span>
             </div>
           </div>
+          {aiFillState === "filled" ? (
+            <div className={formStyles.protectionBox} aria-live="polite">
+              <span className={formStyles.warningIcon} aria-hidden="true">AI</span>
+              <div>
+                <strong>AI 已根据材料填写 3 个创建候选字段</strong>
+                <span>可返回编辑查看和修改；这些内容尚未进入正式项目诊断卡。</span>
+              </div>
+            </div>
+          ) : aiFillError ? (
+            <div className={formStyles.warningBox} role="alert">
+              <span className={formStyles.warningIcon} aria-hidden="true">!</span>
+              <div><strong>AI 填写未完成</strong><span>{aiFillError}</span></div>
+            </div>
+          ) : null}
         </FormSection>
       ) : null}
 
@@ -476,8 +690,8 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
         <CreationReview
           pathLabel={page.pathLabel}
           title={projectTitle}
-          materialSummary={materialSummary}
-          persisted={uploadState === "stored"}
+          materialSummary={materialStatusSummary}
+          persisted={uploadState === "parsed" || uploadState === "parse_failed"}
         />
       ) : null}
 
@@ -487,10 +701,36 @@ export function UploadProjectForm({ kind }: { kind: UploadKind; state?: string }
         createDisabled={
           (step === 1 && selectedFiles.length === 0) ||
           uploadState === "uploading" ||
-          (step === 3 && uploadState !== "stored" && uploadState !== "cancelled")
+          uploadState === "parsing" ||
+          (step === 3 && uploadState !== "parsed" && uploadState !== "parse_failed" && uploadState !== "cancelled")
+        }
+        nextDisabled={
+          step === 1
+            ? kind !== "idea" && selectedFiles.length === 0
+            : step === 2 && (uploadState === "uploading" || uploadState === "parsing" || uploadState === "stored" || uploadState === "failed")
+        }
+        nextLabel={step === 1 ? "查看处理列表" : "下一步"}
+        processDisabled={
+          uploadState === "idle" || uploadState === "uploading" || uploadState === "parsing" || uploadState === "failed" || uploadState === "parsed"
+        }
+        processLabel={
+          step !== 2
+            ? undefined
+            : uploadState === "parsing"
+              ? "正在读取…"
+              : uploadState === "parsed"
+                ? "读取完成"
+                : uploadState === "parse_failed" || uploadState === "cancelled"
+                  ? "重新读取"
+                  : uploadState === "stored"
+                    ? "确认开始读取"
+                    : selectedFiles.length === 0
+                      ? "暂无材料可读取"
+                      : "等待原文件存储"
         }
         onBack={goBack}
         onNext={goNext}
+        onProcess={runProcessingAction}
         onSave={() => setDraftSaved(true)}
         onCreate={createProject}
       />
@@ -507,12 +747,20 @@ function materialKind(kind: UploadKind, filename: string) {
   if (kind === "draft") return "manuscript";
   if (kind === "literature") return "literature";
   const extension = filename.split(".").pop()?.toLowerCase();
+  if (kind === "idea") {
+    if (["jpg", "jpeg", "png"].includes(extension ?? "")) return "image";
+    if (["xlsx", "csv"].includes(extension ?? "")) return "data";
+    return "note";
+  }
   return ["jpg", "jpeg", "png"].includes(extension ?? "") ? "image" : "data";
 }
 
 function uploadStatusTitle(state: UploadState) {
   if (state === "uploading") return "正在安全上传原始文件";
-  if (state === "stored") return "原始文件已存储，等待解析";
+  if (state === "parsing") return "原始文件已存储，正在解析";
+  if (state === "stored") return "原始文件已存储，等待开始解析";
+  if (state === "parsed") return "原始文件已存储并解析成功";
+  if (state === "parse_failed") return "原始文件已存储，但解析未完成";
   if (state === "failed") return "上传失败，未标记为已存储";
   if (state === "cancelled") return "上传已取消";
   return "等待开始上传";
@@ -530,7 +778,11 @@ function fileTypeLabel(file: File) {
 }
 
 function fileStatus(state: UploadState, stored: boolean) {
-  if (state === "stored" || stored) return "等待解析";
+  if (state === "parsed") return "解析成功";
+  if (state === "parsing") return "正在解析";
+  if (state === "stored") return "原文件已存储，等待解析";
+  if (state === "parse_failed") return "解析失败";
+  if (stored) return "原文件已存储";
   if (state === "uploading") return "等待上传";
   return "已选择";
 }

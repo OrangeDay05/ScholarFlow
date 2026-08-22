@@ -223,8 +223,8 @@
 
 .sectionSelector > header {
   display: flex;
-  padding: 20px 22px;
-  align-items: flex-end;
+  padding: 24px;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 20px;
   border-bottom: 1px solid var(--line);
@@ -250,54 +250,374 @@
   font-weight: 500;
 }
 
-.sectionSelector > div {
+.sectionSelector header p {
+  max-width: 720px;
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.6;
+}
+
+.sectionRows {
+  display: block;
+}
+
+.sectionRow {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-}
-
-.sectionToggle {
-  display: flex;
-  min-width: 0;
-  padding: 16px 20px;
-  align-items: flex-start;
-  gap: 12px;
+  padding: 20px 24px;
+  grid-template-columns: minmax(220px, 0.8fr) minmax(420px, 1.2fr);
+  gap: 30px;
+  align-items: start;
   border-bottom: 1px solid var(--line);
-  cursor: pointer;
 }
 
-.sectionToggle:nth-child(odd) {
-  border-right: 1px solid var(--line);
+.sectionRow:last-child {
+  border-bottom: 0;
 }
 
-.sectionToggle:has(input:disabled) {
-  cursor: not-allowed;
+.emptySection {
+  grid-template-columns: 1fr;
   opacity: 0.55;
 }
 
-.sectionToggle input {
-  width: 16px;
-  height: 16px;
-  margin: 2px 0 0;
+.sectionIdentity {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: 18px 34px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+  cursor: pointer;
+}
+
+.sectionIdentity input {
+  width: 17px;
+  height: 17px;
+  margin: 3px 0 0;
   accent-color: var(--forest);
 }
 
-.sectionToggle span,
-.sectionToggle strong,
-.sectionToggle small {
+.sectionIdentity span,
+.sectionIdentity strong,
+.sectionIdentity small {
   display: block;
   min-width: 0;
 }
 
-.sectionToggle strong {
+.sectionNumber {
+  padding-top: 3px;
+  color: var(--green);
   font-family: var(--font-serif);
-  font-size: 14px;
+  font-size: 12px;
 }
 
-.sectionToggle small {
-  margin-top: 5px;
+.sectionIdentity strong {
+  font-family: var(--font-serif);
+  font-size: 17px;
+  font-weight: 500;
+}
+
+.sectionIdentity small {
+  margin-top: 7px;
   color: var(--muted);
   font-size: 9px;
   overflow-wrap: anywhere;
+}
+
+.versionPicker {
+  display: grid;
+  min-width: 0;
+  grid-template-columns: minmax(230px, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.versionPicker > label span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted-strong);
+  font-size: 9px;
+  font-weight: 800;
+}
+
+.versionPicker select,
+.versionPicker > button,
+.versionHistory summary,
+.versionHistory button {
+  min-height: 40px;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-strong);
+  color: var(--forest);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.versionPicker select {
+  width: 100%;
+  padding: 0 36px 0 12px;
+}
+
+.versionPicker > button {
+  padding: 0 14px;
+  cursor: pointer;
+}
+
+.versionHistory {
+  grid-column: 1 / -1;
+  border: 1px solid var(--line);
+}
+
+.versionHistory summary {
+  display: flex;
+  min-height: 38px;
+  padding: 0 12px;
+  align-items: center;
+  border: 0;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.versionHistory > div > article {
+  display: grid;
+  min-height: 58px;
+  padding: 9px 12px;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  border-top: 1px solid var(--line);
+}
+
+.versionHistory strong,
+.versionHistory small {
+  display: block;
+}
+
+.versionHistory strong {
+  font-size: 10px;
+}
+
+.versionHistory small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.versionHistory button {
+  min-height: 32px;
+  padding: 0 10px;
+  cursor: pointer;
+}
+
+.deleteButton {
+  border-color: transparent !important;
+  background: transparent !important;
+  color: var(--danger) !important;
+}
+
+.keepLabel {
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 8px;
+}
+
+.headingStyle {
+  margin: 24px 0 0;
+  padding: 22px 24px 24px;
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+}
+
+.headingStyle legend {
+  padding: 0 8px;
+  font-family: var(--font-serif);
+  font-size: 18px;
+}
+
+.headingStyle > p {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.headingStyle > div {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.headingOption,
+.headingOptionActive {
+  display: flex;
+  min-height: 78px;
+  padding: 14px;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.headingOptionActive {
+  border-color: var(--green);
+  background: var(--mint);
+}
+
+.headingOption input,
+.headingOptionActive input {
+  margin: 3px 0 0;
+  accent-color: var(--forest);
+}
+
+.headingOption strong,
+.headingOption small,
+.headingOptionActive strong,
+.headingOptionActive small {
+  display: block;
+}
+
+.headingOption strong,
+.headingOptionActive strong {
+  font-size: 10px;
+}
+
+.headingOption small,
+.headingOptionActive small {
+  margin-top: 8px;
+  color: var(--muted-strong);
+  font-family: var(--font-serif);
+  font-size: 15px;
+}
+
+.modalOverlay {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  padding: 28px;
+  place-items: center;
+  background: rgb(8 45 31 / 42%);
+}
+
+.previewDialog,
+.deleteDialog {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 56px);
+  overflow: auto;
+  border: 1px solid var(--line-strong);
+  background: var(--paper-strong);
+  box-shadow: 0 26px 80px rgb(8 45 31 / 20%);
+}
+
+.previewDialog > header {
+  display: flex;
+  padding: 24px;
+  justify-content: space-between;
+  gap: 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.previewDialog header span,
+.deleteDialog > span {
+  color: var(--green);
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+}
+
+.previewDialog h2,
+.previewDialog p,
+.deleteDialog h2,
+.deleteDialog p {
+  margin: 0;
+}
+
+.previewDialog h2,
+.deleteDialog h2 {
+  margin-top: 7px;
+  font-family: var(--font-serif);
+  font-size: 24px;
+  font-weight: 500;
+}
+
+.previewDialog header p {
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 9px;
+}
+
+.previewDialog header > button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--forest);
+  cursor: pointer;
+  font-size: 24px;
+}
+
+.previewDialog aside {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--mint);
+}
+
+.previewDialog aside strong,
+.previewDialog aside p {
+  font-size: 10px;
+}
+
+.previewDialog aside p {
+  margin-top: 5px;
+  color: var(--muted-strong);
+}
+
+.previewText {
+  min-height: 210px;
+  padding: 26px 24px;
+  white-space: pre-wrap;
+  color: var(--forest);
+  font-size: 13px;
+  line-height: 1.9;
+}
+
+.previewDialog footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--line);
+  text-align: right;
+}
+
+.previewDialog footer button,
+.deleteDialog button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--forest);
+  background: transparent;
+  color: var(--forest);
+  font-weight: 800;
+}
+
+.deleteDialog {
+  width: min(520px, 100%);
+  padding: 30px;
+}
+
+.deleteDialog > p {
+  margin-top: 14px;
+  color: var(--muted-strong);
+  font-size: 11px;
+  line-height: 1.8;
+}
+
+.deleteDialog > div {
+  display: flex;
+  margin-top: 24px;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.confirmDelete {
+  border-color: var(--danger) !important;
+  background: var(--danger) !important;
+  color: white !important;
 }
 
 .exportHistory {
@@ -366,14 +686,43 @@
   }
 
   .sectionSelector > div {
+    display: block;
+  }
+
+  .sectionRow {
     grid-template-columns: 1fr;
   }
 
-  .sectionToggle:nth-child(odd) {
-    border-right: 0;
+  .headingStyle > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .exportHistory div {
     grid-template-columns: minmax(0, 1fr) auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .sectionSelector > header,
+  .sectionRow {
+    padding-right: 16px;
+    padding-left: 16px;
+  }
+
+  .versionPicker {
+    grid-template-columns: 1fr;
+  }
+
+  .versionPicker > button,
+  .versionHistory {
+    grid-column: 1;
+  }
+
+  .headingStyle > div {
+    grid-template-columns: 1fr;
+  }
+
+  .modalOverlay {
+    padding: 12px;
   }
 }

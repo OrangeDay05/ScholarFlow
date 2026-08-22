@@ -10,6 +10,7 @@ import {
   type ProductRole,
 } from "@/db/repositories/m10-project-context";
 import styles from "./Projects.module.css";
+import { ProjectDeleteButton } from "./ProjectDeleteButton";
 
 export default async function ProjectsPage({
   searchParams,
@@ -75,7 +76,7 @@ export default async function ProjectsPage({
   const projects = await listM4ProjectsForActor(actor);
   const activeProjects = projects.filter((project) => project.status === "active");
   const archivedProjects = projects.filter((project) => project.status === "archived");
-  const nextProject = activeProjects[0] ?? projects[0] ?? null;
+  const nextProject = activeProjects.at(0) ?? null;
 
   return (
     <AppShell
@@ -99,7 +100,7 @@ export default async function ProjectsPage({
               <p>{nextProject?.title ?? "还没有项目"}</p>
               <h2>
                 {nextProject
-                  ? `继续${stageLabel(nextProject.currentStage)}`
+                  ? `继续${projectStageLabel(nextProject)}`
                   : "从 Idea、初稿、要求、文献或研究数据开始。"}
               </h2>
               <span>
@@ -147,12 +148,13 @@ export default async function ProjectsPage({
                 <div className={styles.cardMain}>
                   <div className={styles.cardMeta}>
                     <span>{creationLabel(project.primaryCreationMethod)}</span>
+                    {project.onboardingMode === "guided" ? <span>AI 引导</span> : null}
                     <span>{project.language}</span>
                   </div>
                   <h3>{project.title}</h3>
                   <div className={styles.phaseRow}>
                     <span>当前阶段</span>
-                    <strong>{stageLabel(project.currentStage)}</strong>
+                    <strong>{projectStageLabel(project)}</strong>
                   </div>
                   <div className={styles.nextRow}>
                     <span>项目状态</span>
@@ -160,6 +162,9 @@ export default async function ProjectsPage({
                   </div>
                 </div>
                 <div className={styles.cardProgress}>
+                  <div className={styles.cardDeleteSlot}>
+                    <ProjectDeleteButton projectId={project.id} title={project.title} />
+                  </div>
                   <small>更新于 {formatDate(project.updatedAt)}</small>
                   <Link href={projectDestination(project)}>继续项目 <span aria-hidden="true">→</span></Link>
                 </div>
@@ -201,13 +206,20 @@ function formatDate(value: string) {
 }
 
 function projectDestination(project: M3ProjectSummary) {
-  if (project.currentStage === "diagnosis") return `/projects/${project.id}/diagnosis`;
+  if (project.currentStage === "diagnosis" && project.onboardingMode === "guided") return `/projects/${project.id}/guided`;
+  if (project.currentStage === "diagnosis") return `/projects/${project.id}/diagnosis/candidate`;
   if (project.currentStage === "outline") return `/projects/${project.id}/outline`;
   return `/projects/${project.id}/editor?section=introduction`;
 }
 
 function stageLabel(stage: string) {
   return ({ diagnosis: "项目诊断", outline: "研究提纲", writing: "章节写作" } as Record<string, string>)[stage] ?? stage;
+}
+
+function projectStageLabel(project: M3ProjectSummary) {
+  return project.currentStage === "diagnosis" && project.onboardingMode === "guided"
+    ? "AI 梳理中"
+    : stageLabel(project.currentStage);
 }
 
 function creationLabel(method: M3ProjectSummary["primaryCreationMethod"]) {

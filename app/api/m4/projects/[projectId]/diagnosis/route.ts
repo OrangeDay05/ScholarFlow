@@ -113,14 +113,14 @@ export async function POST(
           201,
         );
       case "confirm":
-        if (!string(body.diagnosis_card_id)) {
+        if (!string(body.session_id)) {
           return apiError(400, "INVALID_CONFIRMATION", "缺少诊断卡版本。");
         }
         return apiSuccess(
           await confirmM4DiagnosisCard(
             auth.actor,
             projectId,
-            body.diagnosis_card_id,
+            body.session_id,
           ),
           201,
         );

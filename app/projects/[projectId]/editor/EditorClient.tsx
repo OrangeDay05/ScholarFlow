@@ -36,6 +36,8 @@ import {
 import { PROGRESSIVE_DIAGNOSIS_MOCK_ENABLED } from "@/app/lib/progressive-diagnosis-features";
 import { V042_INCREMENTAL_MOCK_ENABLED } from "@/app/lib/v042-features";
 import { RealAiWorkspace } from "./RealAiWorkspace";
+import { ManuscriptImport } from "./ManuscriptImport";
+import { serializeStructuredEditor, StructuredDocument } from "./StructuredDocument";
 import styles from "./Editor.module.css";
 
 type EditorClientProps = {
@@ -182,6 +184,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
   const {
     dataSource,
     diagnosis,
+    confirmedDiagnosis,
     files,
     diagnosisStatus,
     outline,
@@ -200,6 +203,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     failMockTask,
     versions,
     sectionContents,
+    sectionDocuments,
     appendMockVersion,
     restoreVersion,
     saveCurrentSection,
@@ -244,6 +248,11 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     useState<ReviewConclusion | null>(null);
   const [reviewDecision, setReviewDecision] =
     useState<ReviewDecision>("pending");
+
+  function applyInlineFormat(command: "bold" | "italic" | "underline" | "formatBlock", value?: string) {
+    document.execCommand(command, false, value);
+    setUnsavedChanges(true);
+  }
   const [selectedReviewIssueIds, setSelectedReviewIssueIds] = useState<string[]>(
     () =>
       mockReviewIssues
@@ -690,7 +699,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
       await restoreVersion(id);
       setNotice(
         dataSource === "d1"
-          ? "已从所选版本创建新的 D1 恢复版本；历史版本均未覆盖。"
+          ? "已从所选版本创建新的恢复版本；历史版本均未覆盖。"
           : "已从所选版本创建一个新的恢复版本；历史版本均未覆盖。· Mock",
       );
     } catch {
@@ -706,7 +715,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             <p>STRUCTURE</p>
             <h2>论文目录</h2>
           </div>
-          <span className={styles.mockLabel}>{dataSource === "d1" ? "D1" : "MOCK"}</span>
+          <span className={styles.mockLabel}>{dataSource === "d1" ? "已同步" : "MOCK"}</span>
         </div>
 
         <nav className={styles.outline} aria-label="论文章节">
@@ -746,8 +755,8 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             <div className={styles.materialMini} key={material.id}>
               <span className={styles.fileMark}>{material.kind.slice(0, 1)}</span>
               <span>
-                <strong>{material.kind}</strong>
-                <small>{statusText[material.status]}</small>
+                <strong>{material.name}</strong>
+                <small>{material.kind} · {statusText[material.status]}</small>
               </span>
             </div>
           ))}
@@ -946,8 +955,16 @@ export default function EditorClient({ projectId }: EditorClientProps) {
     ) {
       return (
         <RealAiWorkspace
-          authorizedMaterialIds={selectedMaterialIds}
+          authorizedMaterialIds={readableSelectedMaterials.map((material) => material.id)}
+          availableMaterials={files.map((material) => ({
+            id: material.id,
+            name: material.name,
+            kind: material.kind,
+            status: material.status,
+          }))}
           baseVersionId={versions[0]?.id ?? null}
+          diagnosis={confirmedDiagnosis ?? diagnosis}
+          diagnosisStatus={diagnosisStatus}
           projectId={projectId}
           sectionSlug={selectedSection.id}
           sectionTitle={selectedSection.title}
@@ -1809,7 +1826,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             </p>
             <small>
               {selectedSection.status} · {selectedSection.words.toLocaleString()} 字 ·{" "}
-              {versions[0]?.label ?? "v1"} 当前版本
+              <span className={styles.versionBadge}>{versions[0]?.label ?? "v1"}</span>
             </small>
           </div>
         </div>
@@ -1818,16 +1835,24 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           <span className={styles.saveStatus}>
             {unsavedChanges ? "有未保存修改" : "修改已保存"}
           </span>
+          <Link className={styles.secondaryButton} href={`/projects/${projectId}/diagnosis`}>
+            项目诊断卡
+          </Link>
           <button
             className={styles.secondaryButton}
             onClick={async () => {
               try {
-                const content =
-                  sectionBodyRefs.current[selectedSectionId]?.innerText ?? "";
-                await saveCurrentSection(content);
+                const body = sectionBodyRefs.current[selectedSectionId];
+                const currentDocument = sectionDocuments[selectedSectionId];
+                if (body && currentDocument) {
+                  const serialized = serializeStructuredEditor(body, currentDocument);
+                  await saveCurrentSection(serialized.plainText, JSON.stringify(serialized.document));
+                } else {
+                  await saveCurrentSection(body?.innerText ?? "", null);
+                }
                 setNotice(
                   dataSource === "d1"
-                    ? "已追加一个新的 D1 章节版本，旧版本未覆盖。"
+                    ? "已创建新的章节版本，旧版本未覆盖。"
                     : "当前正文修改已标记保存 · Mock",
                 );
               } catch {
@@ -1835,9 +1860,10 @@ export default function EditorClient({ projectId }: EditorClientProps) {
               }
             }}
             type="button"
-          >
-            保存修改
-          </button>
+            >
+              保存修改
+            </button>
+            <ManuscriptImport autoOpen={versions.length === 0} projectId={projectId} />
           <button
             className={styles.secondaryButton}
             onClick={() => setHistoryOpen(true)}
@@ -1849,15 +1875,38 @@ export default function EditorClient({ projectId }: EditorClientProps) {
             DOCX 检查
           </Link>
         </div>
-      </header>
 
-      <div className={styles.mockBanner}>
-        <span>项目持久化 · D1</span>
-        <p>
-          项目、诊断、提纲、章节版本、材料、证据与 DOCX 使用持久化服务；AI
-          执行仍取决于当前环境的模型配置。
-        </p>
-      </div>
+        <div className={styles.mobileTools}>
+          <details
+            onToggle={(event) => {
+              if (event.currentTarget.open) setFocusMode(false);
+            }}
+            ref={outlineDrawerRef}
+          >
+            <summary>
+              <span className={styles.compactOpenLabel}>打开论文目录</span>
+              <span className={styles.compactCloseLabel}>关闭论文目录</span>
+            </summary>
+            <div className={styles.mobileDrawer}>
+              {renderOutlinePanel()}
+            </div>
+          </details>
+          <details
+            onToggle={(event) => {
+              if (event.currentTarget.open) setFocusMode(false);
+            }}
+            ref={assistantDrawerRef}
+          >
+            <summary>
+              <span className={styles.compactOpenLabel}>打开 AI 工作台</span>
+              <span className={styles.compactCloseLabel}>关闭 AI 工作台</span>
+            </summary>
+            <div className={styles.mobileDrawer}>
+              {renderAssistantPanel()}
+            </div>
+          </details>
+        </div>
+      </header>
 
       {diagnosisStatus !== "confirmed" ? (
         <aside className={styles.warningBar} aria-label="诊断卡未确认警告">
@@ -1889,37 +1938,6 @@ export default function EditorClient({ projectId }: EditorClientProps) {
         </div>
       ) : null}
 
-      <div className={styles.mobileTools}>
-        <details
-          onToggle={(event) => {
-            if (event.currentTarget.open) setFocusMode(false);
-          }}
-          ref={outlineDrawerRef}
-        >
-          <summary>
-            <span className={styles.compactOpenLabel}>打开论文目录</span>
-            <span className={styles.compactCloseLabel}>关闭论文目录</span>
-          </summary>
-          <div className={styles.mobileDrawer}>
-            {renderOutlinePanel()}
-          </div>
-        </details>
-        <details
-          onToggle={(event) => {
-            if (event.currentTarget.open) setFocusMode(false);
-          }}
-          ref={assistantDrawerRef}
-        >
-          <summary>
-            <span className={styles.compactOpenLabel}>打开 AI 工作台</span>
-            <span className={styles.compactCloseLabel}>关闭 AI 工作台</span>
-          </summary>
-          <div className={styles.mobileDrawer}>
-            {renderAssistantPanel()}
-          </div>
-        </details>
-      </div>
-
       <main
         className={`${styles.workspace} ${leftHidden ? styles.workspaceWithoutLeft : ""} ${
           rightHidden ? styles.workspaceWithoutRight : ""
@@ -1938,18 +1956,15 @@ export default function EditorClient({ projectId }: EditorClientProps) {
         >
           <div className={styles.documentToolbar}>
             <div className={styles.formatTools} aria-label="基础格式工具">
-              <button type="button">正文</button>
-              <button aria-label="加粗" type="button">
+              <button onMouseDown={(event) => { event.preventDefault(); applyInlineFormat("formatBlock", "p"); }} type="button">正文</button>
+              <button aria-label="加粗" onMouseDown={(event) => { event.preventDefault(); applyInlineFormat("bold"); }} type="button">
                 B
               </button>
-              <button aria-label="斜体" type="button">
+              <button aria-label="斜体" onMouseDown={(event) => { event.preventDefault(); applyInlineFormat("italic"); }} type="button">
                 I
               </button>
-              <button type="button">引用</button>
-            </div>
-            <div className={styles.versionRule}>
-              <span>当前版本 · {versions[0]?.label ?? "v1"}</span>
-              <small>生成、修改或恢复都会创建新版本，不覆盖原稿</small>
+              <button aria-label="下划线" onMouseDown={(event) => { event.preventDefault(); applyInlineFormat("underline"); }} type="button">U</button>
+              <button onMouseDown={(event) => { event.preventDefault(); applyInlineFormat("formatBlock", "blockquote"); }} type="button">引用</button>
             </div>
             <div className={styles.panelControls} aria-label="编辑器布局">
               <button
@@ -1996,6 +2011,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
           <div className={styles.paperStack}>
             {outline.map((section) => {
               const persistedContent = sectionContents[section.id] ?? "";
+              const persistedDocument = sectionDocuments[section.id];
               return (
                 <div className={styles.paperPageGroup} key={section.id}>
                   <article
@@ -2023,7 +2039,7 @@ export default function EditorClient({ projectId }: EditorClientProps) {
                         sectionBodyRefs.current[section.id] = node;
                       }}
                     >
-                      {persistedContent}
+                      {persistedDocument ? <StructuredDocument document={persistedDocument} projectId={projectId} /> : persistedContent}
                     </div>
                   </article>
 

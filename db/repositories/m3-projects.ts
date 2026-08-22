@@ -66,6 +66,7 @@ type SectionVersionRow = {
   source: M3SectionVersion["source"];
   source_version_id: string | null;
   content: string;
+  content_json: string | null;
   summary: string;
   created_at: string;
 };
@@ -364,7 +365,7 @@ export async function getWorkspaceForActor(
     const result = await db
       .prepare(
         `SELECT id, section_id, version_number, source, source_version_id,
-                content, summary, created_at
+                content, content_json, summary, created_at
          FROM section_versions
          WHERE section_id = ? AND project_id = ? AND owner_user_id = ?
            AND NOT EXISTS (
@@ -612,6 +613,7 @@ export async function appendSectionVersion(
   input: {
     source: "manual" | "restore";
     content?: string;
+    contentJson?: string | null;
     sourceVersionId?: string;
     summary?: string;
   },
@@ -642,17 +644,18 @@ export async function appendSectionVersion(
   }
 
   let content = input.content ?? "";
+  let contentJson = input.contentJson ?? null;
   let sourceVersionId: string | null = null;
   if (input.source === "restore") {
     const source = input.sourceVersionId
       ? await db
           .prepare(
-            `SELECT id, content
+            `SELECT id, content, content_json
              FROM section_versions
              WHERE id = ? AND section_id = ? AND project_id = ? AND owner_user_id = ?`,
           )
           .bind(input.sourceVersionId, section.id, projectId, user.id)
-          .first<{ id: string; content: string }>()
+          .first<{ id: string; content: string; content_json: string | null }>()
       : null;
     if (!source) {
       throw new M3RepositoryError(
@@ -661,6 +664,7 @@ export async function appendSectionVersion(
       );
     }
     content = source.content;
+    contentJson = source.content_json;
     sourceVersionId = source.id;
   }
 
@@ -685,8 +689,8 @@ export async function appendSectionVersion(
       .prepare(
         `INSERT INTO section_versions (
           id, owner_user_id, project_id, section_id, version_number,
-          source, source_version_id, content, content_hash, summary
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          source, source_version_id, content, content_json, content_hash, summary
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .bind(
         id,
@@ -697,6 +701,7 @@ export async function appendSectionVersion(
         input.source,
         sourceVersionId,
         content,
+        contentJson,
         await hashText(content),
         summary,
       ),
@@ -723,6 +728,7 @@ export async function appendSectionVersion(
     source: input.source,
     sourceVersionId,
     content,
+    contentJson,
     summary,
     createdAt,
   };
@@ -815,6 +821,7 @@ function toSectionVersion(row: SectionVersionRow): M3SectionVersion {
     source: row.source,
     sourceVersionId: row.source_version_id,
     content: row.content,
+    contentJson: row.content_json,
     summary: row.summary,
     createdAt: row.created_at,
   };

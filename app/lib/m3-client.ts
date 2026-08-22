@@ -65,7 +65,7 @@ export async function saveM3SectionVersion(
   projectId: string,
   sectionSlug: string,
   input:
-    | { source: "manual"; content: string; summary?: string }
+    | { source: "manual"; content: string; contentJson?: string | null; summary?: string }
     | { source: "restore"; sourceVersionId: string; summary?: string },
 ): Promise<M3SectionVersion> {
   return request<M3SectionVersion>(

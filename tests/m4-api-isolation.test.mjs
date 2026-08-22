@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readdir, readFile } from "node:fs/promises";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 import { env as workerEnv } from "./cloudflare-workers-shim.mjs";
@@ -71,14 +71,11 @@ async function setup() {
   if (worker) return;
   database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
-  for (const name of [
-    "0000_swift_blue_shield.sql",
-    "0001_vengeful_tigra.sql",
-    "0002_petite_sir_ram.sql",
-    "0003_condemned_magik.sql",
-    "0004_nervous_maddog.sql",
-    "0005_freezing_nextwave.sql",
-  ]) {
+  const migrationDirectory = new URL("../drizzle/", import.meta.url);
+  const migrationNames = (await readdir(migrationDirectory))
+    .filter((name) => name.endsWith(".sql"))
+    .sort();
+  for (const name of migrationNames) {
     const sql = await readFile(new URL(`../drizzle/${name}`, import.meta.url), "utf8");
     database.exec(sql.replaceAll("--> statement-breakpoint", ""));
   }
@@ -271,6 +268,107 @@ test("M4 APIs reject anonymous access and isolate project resources", { skip: !e
     cookie: ownerBCookie,
   });
   assert.equal(crossed.response.status, 404);
+});
+
+test("M4 diagnosis confirmation gate creates immutable confirmed versions", { skip: !enabled }, async () => {
+  const created = await api("/api/m4/projects", {
+    cookie: ownerACookie,
+    method: "POST",
+    body: {
+      primaryCreationMethod: "idea",
+      onboardingMode: "guided",
+      goal: "研究数字平台中的知识协作机制",
+      materialsSummary: "暂时没有材料",
+      firstAiHelp: "先帮助梳理研究问题",
+    },
+  });
+  assert.equal(created.response.status, 201);
+  assert.equal(created.payload.data.project.primaryCreationMethod, "idea");
+  assert.equal(created.payload.data.project.onboardingMode, "guided");
+  const projectId = created.payload.data.project.id;
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM diagnosis_cards WHERE project_id = ?").get(projectId).count, 0);
+
+  async function createAndConfirmCandidate(title) {
+    const started = await api(`/api/m4/projects/${projectId}/diagnosis`, {
+      cookie: ownerACookie,
+      method: "POST",
+      body: { action: "start", mode: "guided", depth: "standard" },
+    });
+    assert.equal(started.response.status, 201);
+    const sessionId = started.payload.data.session.id;
+    const saved = await api(`/api/m4/projects/${projectId}/diagnosis`, {
+      cookie: ownerACookie,
+      method: "POST",
+      body: {
+        action: "save_fields",
+        session_id: sessionId,
+        fields: [{
+          field: "formal_title",
+          label: "正式题目",
+          value: title,
+          status: "AI_INFERRED",
+          source_type: "AI_RECOMMENDED",
+          source_material_ids: [],
+          source_locations: [],
+          confidence: "MEDIUM",
+          requires_confirmation: true,
+          rationale: "候选题目，等待用户确认。",
+        }, {
+          field: "data_source",
+          label: "数据与研究对象",
+          value: "20 名互联网行业从业者访谈",
+          status: "AI_INFERRED",
+          source_type: "AI_RECOMMENDED",
+          source_material_ids: [],
+          source_locations: [],
+          confidence: "MEDIUM",
+          requires_confirmation: true,
+          rationale: "候选研究对象，等待用户确认。",
+        }],
+      },
+    });
+    assert.equal(saved.response.status, 200);
+    const beforeFinish = database.prepare("SELECT COUNT(*) AS count FROM diagnosis_cards WHERE project_id = ?").get(projectId).count;
+    const finished = await api(`/api/m4/projects/${projectId}/diagnosis`, {
+      cookie: ownerACookie,
+      method: "POST",
+      body: { action: "finish", session_id: sessionId, stop_reason: "candidate_ready" },
+    });
+    assert.equal(finished.response.status, 201);
+    assert.equal(finished.payload.data.session.output_diagnosis_card_id, null);
+    assert.equal(database.prepare("SELECT COUNT(*) AS count FROM diagnosis_cards WHERE project_id = ?").get(projectId).count, beforeFinish);
+    const confirmed = await api(`/api/m4/projects/${projectId}/diagnosis`, {
+      cookie: ownerACookie,
+      method: "POST",
+      body: { action: "confirm", session_id: sessionId },
+    });
+    assert.equal(confirmed.response.status, 201);
+    return confirmed;
+  }
+
+  const v1 = await createAndConfirmCandidate("数字平台中的知识协作机制研究");
+  assert.equal(v1.payload.data.versions[0].version_number, 1);
+  assert.equal(v1.payload.data.versions[0].status, "confirmed");
+  const v1Id = v1.payload.data.versions[0].id;
+  assert.equal(
+    database.prepare("SELECT title FROM projects WHERE id = ?").get(projectId).title,
+    "数字平台中的知识协作机制研究",
+  );
+  assert.equal(
+    database.prepare("SELECT research_object FROM diagnosis_cards WHERE id = ?").get(v1Id).research_object,
+    "20 名互联网行业从业者访谈",
+  );
+
+  const v2 = await createAndConfirmCandidate("数字平台知识协作机制的演化研究");
+  assert.equal(v2.payload.data.versions[0].version_number, 2);
+  assert.equal(v2.payload.data.versions[0].status, "confirmed");
+  const retainedV1 = database.prepare("SELECT status FROM diagnosis_cards WHERE id = ?").get(v1Id);
+  assert.equal(retainedV1.status, "superseded");
+  assert.equal(database.prepare("SELECT COUNT(*) AS count FROM diagnosis_cards WHERE project_id = ?").get(projectId).count, 2);
+  const confirmedField = database.prepare("SELECT status, source_type, rationale FROM diagnosis_field_values WHERE diagnosis_card_id = ? AND field_key = 'formal_title'").get(v2.payload.data.versions[0].id);
+  assert.equal(confirmedField.status, "USER_CONFIRMED");
+  assert.equal(confirmedField.source_type, "AI_RECOMMENDED");
+  assert.equal(confirmedField.rationale, "候选题目，等待用户确认。");
 });
 
 test("M4 persists material, task, privacy, model metadata and PPT contracts without external calls", { skip: !enabled }, async () => {

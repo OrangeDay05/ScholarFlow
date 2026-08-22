@@ -26,6 +26,24 @@
   line-height: 1.6;
 }
 
+.guidedCta {
+  display: grid;
+  margin-bottom: 24px;
+  padding: 28px 30px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px 32px;
+  border: 1px solid rgb(20 84 58 / 22%);
+  background: linear-gradient(120deg, #edf6ee, #d7eada);
+}
+
+.guidedCta span { color: var(--green); font-size: 10px; font-weight: 800; letter-spacing: .15em; }
+.guidedCta h2 { margin: 8px 0 6px; color: var(--forest); font-family: var(--font-serif); font-size: clamp(25px, 3vw, 38px); font-weight: 500; }
+.guidedCta p { margin: 0; color: var(--muted-strong); font-size: 12px; line-height: 1.7; }
+.guidedCta button { min-height: 48px; padding: 0 20px; border: 0; background: var(--forest); color: var(--cream); cursor: pointer; font-weight: 800; }
+.guidedCta button:disabled { cursor: wait; opacity: .62; }
+.guidedCta .guidedError { grid-column: 1 / -1; color: #a33a2f; }
+
 .cardGrid {
   display: grid;
   grid-auto-rows: minmax(206px, auto);
@@ -200,6 +218,8 @@
 }
 
 @media (max-width: 620px) {
+  .guidedCta { grid-template-columns: 1fr; padding: 24px; }
+
   .intro {
     align-items: flex-start;
   }

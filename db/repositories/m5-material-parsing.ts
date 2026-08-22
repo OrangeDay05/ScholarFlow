@@ -14,6 +14,9 @@ import {
   registerImageAsset,
 } from "@/app/lib/material-parsers/spreadsheet-image-parsers";
 import type { StorageAdapter } from "@/app/lib/storage/storage-adapter";
+import { getEmbeddingProviderAdapter } from "@/app/lib/context-engine/retrieval";
+import { documentToPlainText } from "@/app/lib/document-model/projection";
+import type { DocumentContent } from "@/app/lib/document-model/types";
 import { getD1 } from "../index";
 
 export type M5ParseRunSnapshot = {
@@ -146,18 +149,63 @@ export async function parseM5MaterialForActor(
           : format === "IMAGE"
             ? registerImageAsset(body, source.detected_extension)
             : parseTextReferenceMaterial(body, format);
+    const structuredDocument = "structuredDocument" in parsed ? parsed.structuredDocument : undefined;
+    const parsedAssets = "assets" in parsed ? parsed.assets ?? [] : [];
+    const parseWarnings = "warnings" in parsed ? parsed.warnings ?? [] : [];
+    const parsedDocumentId = structuredDocument ? crypto.randomUUID() : null;
+    const assetStatements: D1PreparedStatement[] = [];
+    if (parsedDocumentId && parsedAssets.length) {
+      for (const asset of parsedAssets) {
+        const hash = await sha256Bytes(asset.bytes);
+        const extension = asset.filename.split(".").pop()?.replace(/[^a-zA-Z0-9]/gu, "") || "bin";
+        const objectKey = `users/${actor.userId}/projects/${projectId}/materials/${materialId}/parse-runs/${runId}/assets/${asset.id}.${extension}`;
+        await storage.put(objectKey, asset.bytes.buffer.slice(asset.bytes.byteOffset, asset.bytes.byteOffset + asset.bytes.byteLength) as ArrayBuffer, { contentType: asset.contentType, contentHash: hash });
+        assetStatements.push(db.prepare(`INSERT INTO parsed_document_assets (
+          id, owner_user_id, project_id, material_id, parse_run_id, parsed_document_id,
+          relationship_id, filename, content_type, object_key, content_hash, file_size
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+          asset.id, actor.userId, projectId, materialId, runId, parsedDocumentId,
+          asset.relationshipId, asset.filename, asset.contentType, objectKey, hash, asset.bytes.byteLength,
+        ));
+      }
+    }
     const chunkStatements: D1PreparedStatement[] = [];
+    const embeddingStatements: D1PreparedStatement[] = [];
+    const embedding = getEmbeddingProviderAdapter();
     for (const chunk of parsed.chunks) {
+      const chunkId = crypto.randomUUID();
+      const chunkHash = await sha256(chunk.text);
+      const metadata = chunk.metadata as { blockId?: string; blockType?: string; sectionPath?: string[] };
       chunkStatements.push(db.prepare(`INSERT INTO material_chunks (
         id, owner_user_id, project_id, material_id, parse_run_id, ordinal,
-        text, location_json, metadata_json, content_hash
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
-        crypto.randomUUID(), actor.userId, projectId, materialId, runId, chunk.ordinal,
-        chunk.text, JSON.stringify(chunk.location), JSON.stringify(chunk.metadata), await sha256(chunk.text),
+        text, location_json, metadata_json, block_id, block_type, section_path_json, content_hash
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+        chunkId, actor.userId, projectId, materialId, runId, chunk.ordinal,
+        chunk.text, JSON.stringify(chunk.location), JSON.stringify(chunk.metadata), metadata.blockId ?? null,
+        metadata.blockType ?? null, JSON.stringify(metadata.sectionPath ?? []), chunkHash,
+      ));
+      embeddingStatements.push(db.prepare(`INSERT INTO material_chunk_embeddings (
+        id, owner_user_id, project_id, material_id, parse_run_id, material_chunk_id,
+        provider, model, content_hash, status, error_code
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).bind(
+        crypto.randomUUID(), actor.userId, projectId, materialId, runId, chunkId,
+        embedding.provider, embedding.model, chunkHash,
+        embedding.capability === "READY" ? "PENDING" : "CONFIGURATION_REQUIRED",
+        embedding.capability === "READY" ? null : "EMBEDDING_CONFIGURATION_REQUIRED",
       ));
     }
     await db.batch([
+      ...(parsedDocumentId && structuredDocument ? [db.prepare(`INSERT INTO parsed_documents (
+        id, owner_user_id, project_id, material_id, parse_run_id, model_version,
+        content_json, plain_text, stats_json, warnings_json
+      ) VALUES (?, ?, ?, ?, ?, 1, ?, ?, ?, ?)`).bind(
+        parsedDocumentId, actor.userId, projectId, materialId, runId,
+        JSON.stringify(structuredDocument), documentToPlainText(structuredDocument),
+        JSON.stringify(documentStats(structuredDocument)), JSON.stringify(parseWarnings),
+      )] : []),
+      ...assetStatements,
       ...chunkStatements,
+      ...embeddingStatements,
       db.prepare(`UPDATE material_parse_runs SET status = 'SUCCEEDED', record_count = ?,
         chunk_count = ?, finished_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP
         WHERE id = ? AND owner_user_id = ?`).bind(parsed.recordCount, parsed.chunks.length, runId, actor.userId),
@@ -221,3 +269,23 @@ async function findRun(db: D1Database, owner: string, project: string, key: stri
 async function loadRun(db: D1Database, owner: string, project: string, id: string) { return db.prepare(`${runSelect()} WHERE owner_user_id = ? AND project_id = ? AND id = ?`).bind(owner, project, id).first<RunRow>(); }
 function toRunSnapshot(row: RunRow): M5ParseRunSnapshot { return { id: row.id, materialId: row.material_id, materialObjectId: row.material_object_id, format: row.format, parserKey: row.parser_key, parserVersion: row.parser_version, status: row.status, recordCount: row.record_count, chunkCount: row.chunk_count, errorCode: row.error_code, errorMessage: row.error_message, createdAt: row.created_at, finishedAt: row.finished_at }; }
 async function sha256(value: string): Promise<string> { const bytes = new TextEncoder().encode(value); const digest = await crypto.subtle.digest("SHA-256", bytes); return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join(""); }
+async function sha256Bytes(value: Uint8Array): Promise<string> {
+  const bytes = new Uint8Array(value.byteLength);
+  bytes.set(value);
+  const digest = await crypto.subtle.digest("SHA-256", bytes);
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
+function documentStats(document: DocumentContent) {
+  let runs = 0; let boldRuns = 0; let italicRuns = 0; let underlineRuns = 0;
+  const textBlocks = document.blocks.flatMap((block) => block.type === "table" ? block.rows.flatMap((row) => row.cells.flatMap((cell) => cell.blocks)) : block.type === "image" ? [] : [block]);
+  for (const block of textBlocks) for (const run of block.runs) { runs += 1; if (run.bold) boldRuns += 1; if (run.italic) italicRuns += 1; if (run.underline) underlineRuns += 1; }
+  return {
+    headings: document.blocks.filter((block) => block.type === "heading").length,
+    paragraphs: document.blocks.filter((block) => block.type === "paragraph").length,
+    lists: document.blocks.filter((block) => block.type === "list_item").length,
+    tables: document.blocks.filter((block) => block.type === "table").length,
+    images: document.blocks.filter((block) => block.type === "image").length,
+    runs, boldRuns, italicRuns, underlineRuns,
+  };
+}

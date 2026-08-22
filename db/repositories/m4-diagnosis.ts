@@ -504,100 +504,52 @@ export async function finishM4DiagnosisSession(
   const db = getD1();
   const { userId, project } = await resolveContext(db, actor, requestedProjectId);
   const session = await requireOwnedSession(db, userId, project.id, sessionId);
-  if (session.output_diagnosis_card_id) {
+  if (session.status === "completed") {
     return readWorkspace(db, userId, project.id);
   }
   const fields = await readFields(db, userId, project.id, sessionId, null);
-  const latest = await db
-    .prepare(
-      `SELECT MAX(version_number) AS value FROM diagnosis_cards
-       WHERE project_id = ? AND owner_user_id = ?`,
-    )
-    .bind(project.id, userId)
-    .first<{ value: number | null }>();
-  const cardId = crypto.randomUUID();
   const now = new Date().toISOString();
-  const fieldMap = new Map(fields.map((field) => [field.field, field.value]));
   const statements: D1PreparedStatement[] = [
     db
       .prepare(
-        `INSERT INTO diagnosis_cards (
-          id, owner_user_id, project_id, version_number, status,
-          title, paper_type, language, research_object, research_question,
-          method, requirements, confirmed_at
-        ) VALUES (?, ?, ?, ?, 'pending_confirmation', ?, ?, ?, ?, ?, ?, ?, NULL)`,
-      )
-      .bind(
-        cardId,
-        userId,
-        project.id,
-        (latest?.value ?? 0) + 1,
-        fieldMap.get("formal_title") || fieldMap.get("project_goal") || project.title,
-        project.paper_type,
-        project.language,
-        fieldMap.get("research_focus") || "",
-        fieldMap.get("research_question") || "",
-        fieldMap.get("research_method") || "",
-        fieldMap.get("delivery_requirements") || "",
-      ),
-    db
-      .prepare(
         `UPDATE diagnosis_sessions
-         SET status = 'completed', stop_reason = ?, output_diagnosis_card_id = ?,
+         SET status = 'completed', stop_reason = ?, output_diagnosis_card_id = NULL,
              completed_at = ?, current_question_id = NULL,
              updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND owner_user_id = ? AND project_id = ?`,
       )
-      .bind(stopReason, cardId, now, sessionId, userId, project.id),
-    db
-      .prepare(
-        `UPDATE diagnosis_field_values
-         SET diagnosis_card_id = ?, updated_at = CURRENT_TIMESTAMP
-         WHERE session_id = ? AND owner_user_id = ? AND project_id = ?`,
-      )
-      .bind(cardId, sessionId, userId, project.id),
+      .bind(stopReason, now, sessionId, userId, project.id),
     auditStatement(db, {
       userId,
       projectId: project.id,
       sessionId,
-      diagnosisCardId: cardId,
-      action: "DRAFT_VERSION_CREATED",
+      action: "CANDIDATE_COMPLETED",
       actorType: "SYSTEM",
       detail: { stop_reason: stopReason, field_count: fields.length },
     }),
   ];
   await db.batch(statements);
-  await replaceReadiness(db, userId, project.id, sessionId, cardId);
+  await replaceReadiness(db, userId, project.id, sessionId, null);
   return readWorkspace(db, userId, project.id);
 }
 
 export async function confirmM4DiagnosisCard(
   actor: M3Actor,
   requestedProjectId: string,
-  sourceCardId: string,
+  sessionId: string,
 ): Promise<M4DiagnosisWorkspace> {
   const db = getD1();
   const { userId, project } = await resolveContext(db, actor, requestedProjectId);
-  const source = await db
-    .prepare(
-      `SELECT id, title, paper_type, language, research_object,
-              research_question, method, requirements
-       FROM diagnosis_cards
-       WHERE id = ? AND project_id = ? AND owner_user_id = ?
-         AND status IN ('draft', 'pending_confirmation')`,
-    )
-    .bind(sourceCardId, project.id, userId)
-    .first<{
-      id: string;
-      title: string;
-      paper_type: string;
-      language: string;
-      research_object: string;
-      research_question: string;
-      method: string;
-      requirements: string;
-    }>();
-  if (!source) throw notFound("DIAGNOSIS_NOT_FOUND", "诊断卡版本不存在。");
+  const session = await requireOwnedSession(db, userId, project.id, sessionId);
+  if (session.status !== "completed") {
+    throw new M4DiagnosisRepositoryError(
+      "CANDIDATE_NOT_COMPLETED",
+      "诊断候选尚未完成，不能确认成正式诊断卡。",
+    );
+  }
+  if (session.output_diagnosis_card_id) {
+    return readWorkspace(db, userId, project.id);
+  }
   const latest = await db
     .prepare(
       `SELECT MAX(version_number) AS value FROM diagnosis_cards
@@ -605,7 +557,8 @@ export async function confirmM4DiagnosisCard(
     )
     .bind(project.id, userId)
     .first<{ value: number | null }>();
-  const sourceFields = await readFields(db, userId, project.id, null, sourceCardId);
+  const sourceFields = await readFields(db, userId, project.id, sessionId, null);
+  const fieldMap = new Map(sourceFields.map((field) => [field.field, field.value]));
   const confirmedCardId = crypto.randomUUID();
   const now = new Date().toISOString();
   const statements: D1PreparedStatement[] = [
@@ -629,21 +582,29 @@ export async function confirmM4DiagnosisCard(
         userId,
         project.id,
         (latest?.value ?? 0) + 1,
-        source.title,
-        source.paper_type,
-        source.language,
-        source.research_object,
-        source.research_question,
-        source.method,
-        source.requirements,
+        fieldMap.get("formal_title") || fieldMap.get("project_goal") || project.title,
+        project.paper_type,
+        project.language,
+        fieldMap.get("research_focus") || fieldMap.get("data_source") || "",
+        fieldMap.get("research_question") || "",
+        fieldMap.get("research_method") || "",
+        fieldMap.get("delivery_requirements") || "",
         now,
       ),
     db
       .prepare(
-        `UPDATE projects SET current_stage = 'outline', updated_at = CURRENT_TIMESTAMP
+        `UPDATE diagnosis_sessions
+         SET output_diagnosis_card_id = ?, updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND owner_user_id = ? AND project_id = ?`,
+      )
+      .bind(confirmedCardId, sessionId, userId, project.id),
+    db
+      .prepare(
+        `UPDATE projects
+         SET title = COALESCE(NULLIF(?, ''), title), current_stage = 'outline', updated_at = CURRENT_TIMESTAMP
          WHERE id = ? AND owner_user_id = ?`,
       )
-      .bind(project.id, userId),
+      .bind(fieldMap.get("formal_title") ?? "", project.id, userId),
   ];
   sourceFields.forEach((field) => {
     statements.push(
@@ -655,7 +616,9 @@ export async function confirmM4DiagnosisCard(
         confirmedCardId,
         {
           ...field,
-          confirmed_at: undefined,
+          status: "USER_CONFIRMED",
+          requires_confirmation: false,
+          confirmed_at: now,
         },
       ),
     );
@@ -664,19 +627,18 @@ export async function confirmM4DiagnosisCard(
     auditStatement(db, {
       userId,
       projectId: project.id,
+      sessionId,
       diagnosisCardId: confirmedCardId,
       action: "DIAGNOSIS_CONFIRMED",
       actorType: "USER",
       detail: {
-        source_card_id: sourceCardId,
-        preserved_unconfirmed_fields: sourceFields.filter(
-          (field) => field.status !== "USER_CONFIRMED",
-        ).length,
+        source_session_id: sessionId,
+        confirmed_field_count: sourceFields.length,
       },
     }),
   );
   await db.batch(statements);
-  await copyReadinessToCard(db, userId, project.id, sourceCardId, confirmedCardId);
+  await copyReadinessToCard(db, userId, project.id, sessionId, confirmedCardId);
   return readWorkspace(db, userId, project.id);
 }
 
@@ -732,7 +694,7 @@ async function readWorkspace(
               output_diagnosis_card_id, completed_at
        FROM diagnosis_sessions
        WHERE project_id = ? AND owner_user_id = ?
-       ORDER BY created_at DESC LIMIT 1`,
+       ORDER BY created_at DESC, rowid DESC LIMIT 1`,
     )
     .bind(projectId, userId)
     .first<SessionRow>();
@@ -1020,16 +982,16 @@ async function copyReadinessToCard(
   db: D1Database,
   userId: string,
   projectId: string,
-  sourceCardId: string,
+  sourceSessionId: string,
   targetCardId: string,
 ) {
   const source = await db
     .prepare(
       `SELECT task_key, task_name, status, reason, missing_field_keys_json, checked_at
        FROM diagnosis_task_readiness
-       WHERE diagnosis_card_id = ? AND owner_user_id = ? AND project_id = ?`,
+       WHERE session_id = ? AND owner_user_id = ? AND project_id = ?`,
     )
-    .bind(sourceCardId, userId, projectId)
+    .bind(sourceSessionId, userId, projectId)
     .all<Omit<ReadinessRow, "id">>();
   if (!(source.results ?? []).length) return;
   await db.batch(

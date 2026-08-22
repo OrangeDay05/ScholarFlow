@@ -4,6 +4,7 @@ import {
 } from "@/app/lib/m5-execution-contracts";
 import {
   createM5ActionProposalForActor,
+  deleteM5ActionProposalForActor,
   decideM5ActionProposalForActor,
   loadM5ActionProposalWorkspace,
   M5ActionProposalRepositoryError,
@@ -116,6 +117,15 @@ export async function POST(
       });
       return apiSuccess(result);
     }
+    if (body.action === "delete_proposal") {
+      const conversationSessionId = idValue(body.conversationSessionId);
+      const proposalId = idValue(body.proposalId);
+      if (!conversationSessionId || !proposalId) return invalidInput();
+      return apiSuccess(await deleteM5ActionProposalForActor(auth.actor, projectId, {
+        conversationSessionId,
+        proposalId,
+      }));
+    }
     return apiError(400, "INVALID_ACTION", "不支持的操作提案请求。");
   } catch (error) {
     return proposalError(error);
@@ -185,6 +195,8 @@ function proposalError(error: unknown): Response {
         ? 404
         : error.code === "DATABASE_WRITE_FAILED"
           ? 500
+          : error.code === "PROPOSAL_NOT_DELETABLE"
+            ? 409
           : 409;
     return apiError(status, error.code, error.message);
   }

@@ -374,13 +374,6 @@ async function ensureMockCatalog(db: D1Database) {
       ),
     db
       .prepare(
-        `INSERT OR IGNORE INTO model_providers (
-          id, provider_key, display_name, data_processor_name, status
-        ) VALUES ('provider-deepseek-mock', 'deepseek', 'DeepSeek',
-                  'DeepSeek · Mock', 'MOCK_ONLY')`,
-      ),
-    db
-      .prepare(
         `INSERT OR IGNORE INTO provider_models (
           id, provider_id, model_key, display_name, model_version,
           allowed_roles_json, status
@@ -388,28 +381,11 @@ async function ensureMockCatalog(db: D1Database) {
                   'GPT Mock', 'm4-contract', ?, 'MOCK_ONLY')`,
       )
       .bind(allRoles),
-    db
-      .prepare(
-        `INSERT OR IGNORE INTO provider_models (
-          id, provider_id, model_key, display_name, model_version,
-          allowed_roles_json, status
-        ) VALUES ('model-deepseek-mock', 'provider-deepseek-mock',
-                  'deepseek-mock', 'DeepSeek Mock', 'm4-contract', ?,
-                  'MOCK_ONLY')`,
-      )
-      .bind(allRoles),
     platformCredential(
       db,
       "credential-platform-openai-mock",
       "provider-openai-mock",
       "model-openai-mock",
-      allRoles,
-    ),
-    platformCredential(
-      db,
-      "credential-platform-deepseek-mock",
-      "provider-deepseek-mock",
-      "model-deepseek-mock",
       allRoles,
     ),
   ]);

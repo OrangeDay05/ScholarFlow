@@ -9,6 +9,7 @@ import {
   useRef,
   useState,
 } from "react";
+import { usePathname } from "next/navigation";
 import {
   createM3Project,
   loadM3Workspace,
@@ -21,6 +22,7 @@ import type {
   M3SectionVersion,
 } from "./m3-contracts";
 import { M3_PERSISTENCE_ENABLED } from "./m3-features";
+import type { DocumentContent } from "./document-model/types";
 
 export type FileQueueStatus =
   | "queued"
@@ -65,6 +67,7 @@ export type VersionItem = {
   time: string;
   summary: string;
   content?: string;
+  contentJson?: string | null;
 };
 
 type MockWorkspaceValue = {
@@ -100,9 +103,10 @@ type MockWorkspaceValue = {
   failMockTask: () => void;
   versions: VersionItem[];
   sectionContents: Record<string, string>;
+  sectionDocuments: Record<string, DocumentContent | null>;
   appendMockVersion: (version: Omit<VersionItem, "time">) => void;
   restoreVersion: (id: string) => Promise<void>;
-  saveCurrentSection: (content: string) => Promise<void>;
+  saveCurrentSection: (content: string, contentJson?: string | null) => Promise<void>;
   unsavedChanges: boolean;
   setUnsavedChanges: (value: boolean) => void;
 };
@@ -210,6 +214,7 @@ const workspaceToM3Status: Record<
 const MockWorkspaceContext = createContext<MockWorkspaceValue | null>(null);
 
 export function MockWorkspaceProvider({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
   const [dataSource, setDataSource] = useState<"mock" | "d1">("mock");
   const [persistenceStatus, setPersistenceStatus] = useState<
     "disabled" | "loading" | "ready" | "error"
@@ -240,7 +245,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (!M3_PERSISTENCE_ENABLED) return;
 
-    const match = window.location.pathname.match(
+    const match = pathname.match(
       /^\/projects\/([^/]+)\/(?:diagnosis|outline|editor|export)/,
     );
     if (!match) return;
@@ -348,7 +353,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
 
     void hydrate();
     return () => controller.abort();
-  }, []);
+  }, [pathname]);
 
   const setFileStatus = useCallback((id: string, status: FileQueueStatus) => {
     setFiles((items) =>
@@ -545,7 +550,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
   );
 
   const saveCurrentSection = useCallback(
-    async (content: string) => {
+    async (content: string, contentJson?: string | null) => {
       if (dataSource === "d1") {
         try {
           const created = await saveM3SectionVersion(
@@ -554,6 +559,7 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
             {
               source: "manual",
               content,
+              contentJson,
               summary: "人工保存当前章节",
             },
           );
@@ -632,6 +638,14 @@ export function MockWorkspaceProvider({ children }: { children: React.ReactNode 
           items[0]?.content ?? "",
         ]),
       ),
+      sectionDocuments: Object.fromEntries(
+        Object.entries(sectionVersions).map(([sectionId, items]) => {
+          const value = items[0]?.contentJson;
+          if (!value) return [sectionId, null];
+          try { return [sectionId, JSON.parse(value) as DocumentContent]; }
+          catch { return [sectionId, null]; }
+        }),
+      ),
       appendMockVersion,
       restoreVersion,
       saveCurrentSection,
@@ -709,6 +723,7 @@ function toWorkspaceVersion(version: M3SectionVersion): VersionItem {
         }),
     summary: version.summary,
     content: version.content,
+    contentJson: version.contentJson,
   };
 }
 

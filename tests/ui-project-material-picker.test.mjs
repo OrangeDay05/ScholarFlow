@@ -35,10 +35,44 @@ test("the material picker exposes one custom control and truthful file states", 
   assert.match(form, /aria-label=\{`移除 \$\{file\.name\}`\}/);
   assert.match(form, /"已选择"/);
   assert.match(form, /"等待上传"/);
-  assert.match(form, /"等待解析"/);
+  assert.match(form, /"stored"/);
+  assert.match(form, /"确认开始读取"/);
+  assert.match(form, /"查看处理列表"/);
+  assert.match(form, /"下一步"/);
+  assert.match(form, /creation-assist/);
+  assert.match(form, /AI 根据材料填入创建信息/);
+  assert.match(form, /"原始文件已存储，等待开始解析"/);
+  assert.match(form, /"解析成功"/);
+  assert.match(form, /\/materials\/\$\{material\.materialId\}\/parse/);
+  assert.match(form, /diagnosis\/candidate/);
   assert.doesNotMatch(form, /已进入知识库|证据提取完成/);
   assert.match(styles, /\.visuallyHidden/);
   assert.match(styles, /\.uploadBox:focus-visible/);
   assert.match(styles, /overflow-wrap: anywhere/);
   assert.doesNotMatch(styles, /file-selector-button/);
+});
+
+test("all five creation entries share file intake and AI candidate fields", async () => {
+  const form = await source("../app/projects/new/_components/UploadProjectForm.tsx");
+  const idea = await source("../app/projects/new/idea/page.tsx");
+  const scaffold = await source("../app/projects/new/_components/FormScaffold.tsx");
+
+  assert.match(form, /type UploadKind = "idea" \| "draft" \| "requirements" \| "literature" \| "data"/);
+  assert.match(idea, /<UploadProjectForm kind="idea"/);
+  assert.match(scaffold, /AI 可根据材料填入/);
+  assert.match(scaffold, /AI 已填入候选/);
+  assert.match(scaffold, /processLabel/);
+});
+
+test("project actions keep diagnosis and deletion reachable", async () => {
+  const projects = await source("../app/projects/page.tsx");
+  const deletion = await source("../app/projects/ProjectDeleteButton.tsx");
+  const editor = await source("../app/projects/[projectId]/editor/EditorClient.tsx");
+
+  assert.match(projects, /ProjectDeleteButton/);
+  assert.match(deletion, /role="dialog"/);
+  assert.match(deletion, /method: "DELETE"/);
+  assert.match(deletion, /确认删除/);
+  assert.match(editor, /href=\{`\/projects\/\$\{projectId\}\/diagnosis`\}/);
+  assert.match(editor, /项目诊断卡/);
 });

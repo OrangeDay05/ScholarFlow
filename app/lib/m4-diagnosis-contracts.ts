@@ -115,7 +115,7 @@ export type FinishM4DiagnosisInput = {
 
 export type ConfirmM4DiagnosisInput = {
   action: "confirm";
-  diagnosis_card_id: string;
+  session_id: string;
 };
 
 export type ArchiveM4DiagnosisInput = {

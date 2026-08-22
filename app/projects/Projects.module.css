@@ -386,9 +386,117 @@
 }
 
 .cardProgress small {
-  margin-top: 12px;
+  margin-top: 8px;
   color: var(--muted);
   font-size: 10px;
+}
+
+.cardDeleteSlot {
+  display: flex;
+  min-height: 82px;
+  align-items: center;
+  justify-content: center;
+}
+
+.projectDeleteTrigger {
+  min-width: 108px;
+  min-height: 38px;
+  padding: 0 14px;
+  border: 0;
+  background: transparent;
+  color: #8b514b;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  text-decoration: none;
+  transition: background-color 150ms ease, color 150ms ease;
+}
+
+.projectDeleteTrigger:hover,
+.projectDeleteTrigger:focus-visible {
+  background: #f5e7e2;
+  color: #713b36;
+}
+
+.projectDeleteTrigger:focus-visible {
+  outline: 2px solid rgb(113 59 54 / 24%);
+  outline-offset: 5px;
+}
+
+.deleteOverlay {
+  position: fixed;
+  z-index: 120;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  background: rgb(12 38 28 / 48%);
+}
+
+.deleteDialog {
+  width: min(520px, 100%);
+  padding: 34px;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  box-shadow: 0 28px 70px rgb(12 38 28 / 24%);
+}
+
+.deleteDialog > span {
+  color: #8b514b;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .16em;
+}
+
+.deleteDialog h2 {
+  margin: 12px 0 10px;
+  color: var(--forest);
+  font-family: var(--font-serif);
+  font-size: 30px;
+  font-weight: 500;
+}
+
+.deleteDialog p {
+  margin: 0;
+  color: var(--muted-strong);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.deleteDialog .deleteError {
+  margin-top: 14px;
+  color: #8b3d36;
+  font-weight: 700;
+}
+
+.deleteDialogActions {
+  display: flex;
+  margin-top: 28px;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.deleteDialogActions button {
+  min-height: 42px;
+  padding: 0 17px;
+  border: 1px solid var(--forest);
+  background: transparent;
+  color: var(--forest);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.deleteDialogActions button:last-child {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: var(--cream);
+}
+
+.deleteDialogActions button:disabled {
+  cursor: wait;
+  opacity: .55;
 }
 
 .cardProgress a {
@@ -505,6 +613,11 @@
   .cardProgress a {
     margin-top: 18px;
   }
+
+  .cardDeleteSlot {
+    min-height: 56px;
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 600px) {
@@ -611,5 +724,14 @@
 
   .emptyAction {
     grid-column: 2;
+  }
+
+  .deleteDialog {
+    padding: 26px 22px;
+  }
+
+  .deleteDialogActions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
   }
 }

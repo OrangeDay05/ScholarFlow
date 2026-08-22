@@ -1,4 +1,7 @@
-import type { M3CreationMethod } from "@/app/lib/m3-contracts";
+import type {
+  M3CreationMethod,
+  M3OnboardingMode,
+} from "@/app/lib/m3-contracts";
 import type { M4ProjectIntakeInput } from "@/app/lib/m4-project-contracts";
 import {
   createM4ProjectForActor,
@@ -38,11 +41,14 @@ export async function POST(request: Request) {
     return apiError(400, "INVALID_PROJECT", "项目参数不完整。");
   }
   const primaryCreationMethod = text(body.primaryCreationMethod);
+  const onboardingMode = text(body.onboardingMode) || "direct";
   const goal = text(body.goal);
   const materialsSummary = text(body.materialsSummary);
   const firstAiHelp = text(body.firstAiHelp);
   if (
     !creationMethods.has(primaryCreationMethod as M3CreationMethod) ||
+    !["direct", "guided"].includes(onboardingMode) ||
+    (onboardingMode === "guided" && primaryCreationMethod !== "idea") ||
     !goal ||
     !materialsSummary ||
     !firstAiHelp
@@ -59,6 +65,7 @@ export async function POST(request: Request) {
   }
   const input: M4ProjectIntakeInput = {
     primaryCreationMethod: primaryCreationMethod as M3CreationMethod,
+    onboardingMode: onboardingMode as M3OnboardingMode,
     goal,
     materialsSummary,
     firstAiHelp,

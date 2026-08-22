@@ -9,6 +9,7 @@ import type {
 } from "@/app/lib/m3-contracts";
 import type { M3Actor } from "@/app/lib/m3-server-identity";
 import { getD1 } from "../index";
+import { ensureM5DefaultProjectAgentConfigs } from "./m5-model-orchestration";
 
 type UserRow = { id: string };
 type ProjectRow = {
@@ -17,6 +18,7 @@ type ProjectRow = {
   paper_type: string;
   language: string;
   primary_creation_method: M3ProjectSummary["primaryCreationMethod"];
+  onboarding_mode: NonNullable<M3ProjectSummary["onboardingMode"]>;
   status: M3ProjectSummary["status"];
   current_stage: string;
   updated_at: string;
@@ -65,8 +67,7 @@ export async function createM4ProjectForActor(
     .bind(ownerUserId)
     .first<{ id: string }>();
   if (!workspace) throw new Error("当前用户工作区不存在，请先完成数据库迁移。");
-  const diagnosisId = crypto.randomUUID();
-  const outlineId = crypto.randomUUID();
+  const onboardingMode = input.onboardingMode ?? "direct";
   const title = input.title?.trim() || deriveTitle(input.goal);
   const paperType = input.paperType?.trim() || "待确认";
   const language = input.language?.trim() || "待确认";
@@ -75,8 +76,8 @@ export async function createM4ProjectForActor(
       .prepare(
         `INSERT INTO projects (
           id, owner_user_id, workspace_id, title, paper_type, language,
-          primary_creation_method, status, current_stage
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, 'active', 'diagnosis')`,
+          primary_creation_method, onboarding_mode, status, current_stage
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', 'diagnosis')`,
       )
       .bind(
         projectId,
@@ -86,6 +87,7 @@ export async function createM4ProjectForActor(
         paperType,
         language,
         input.primaryCreationMethod,
+        onboardingMode,
       ),
     db
       .prepare(
@@ -94,29 +96,6 @@ export async function createM4ProjectForActor(
          ) VALUES (?, ?, ?, ?, 'AUTHOR', 1, 'active')`,
       )
       .bind(crypto.randomUUID(), workspace.id, projectId, ownerUserId),
-    db
-      .prepare(
-        `INSERT INTO diagnosis_cards (
-          id, owner_user_id, project_id, version_number, status,
-          title, paper_type, language, requirements
-        ) VALUES (?, ?, ?, 1, 'draft', ?, ?, ?, ?)`,
-      )
-      .bind(
-        diagnosisId,
-        ownerUserId,
-        projectId,
-        title,
-        paperType,
-        language,
-        input.goal,
-      ),
-    db
-      .prepare(
-        `INSERT INTO outlines (
-          id, owner_user_id, project_id, diagnosis_card_id, version_number, status
-        ) VALUES (?, ?, ?, ?, 1, 'draft')`,
-      )
-      .bind(outlineId, ownerUserId, projectId, diagnosisId),
   ];
 
   for (const [category, content] of [
@@ -154,6 +133,7 @@ export async function createM4ProjectForActor(
     statements.push(materialInsert(db, ownerUserId, projectId, material));
   }
   await db.batch(statements);
+  await ensureM5DefaultProjectAgentConfigs(actor, projectId);
   return loadM4ProjectIntake(actor, projectId);
 }
 
@@ -164,15 +144,64 @@ export async function listM4ProjectsForActor(
   const ownerUserId = await ensureUser(db, actor);
   const rows = await db
     .prepare(
-      `SELECT id, title, paper_type, language, primary_creation_method,
+      `SELECT id, title, paper_type, language, primary_creation_method, onboarding_mode,
               status, current_stage, updated_at
        FROM projects
-       WHERE owner_user_id = ?
+       WHERE owner_user_id = ? AND status IN ('active', 'archived')
        ORDER BY updated_at DESC, created_at DESC`,
     )
     .bind(ownerUserId)
     .all<ProjectRow>();
   return (rows.results ?? []).map(toProject);
+}
+
+export async function deleteM4ProjectForActor(
+  actor: M3Actor,
+  requestedProjectId: string,
+): Promise<void> {
+  const db = getD1();
+  const ownerUserId = await ensureUser(db, actor);
+  const result = await db
+    .prepare(
+      `UPDATE projects
+       SET status = 'deleted', updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND owner_user_id = ? AND status IN ('active', 'archived')`,
+    )
+    .bind(requestedProjectId, ownerUserId)
+    .run();
+  if (!result.meta.changes) {
+    throw new M4ProjectRepositoryError(
+      "PROJECT_NOT_FOUND",
+      "项目不存在或不属于当前用户。",
+    );
+  }
+}
+
+export async function updateM4ProjectIntakeForActor(
+  actor: M3Actor,
+  requestedProjectId: string,
+  input: Pick<M4ProjectIntakeInput, "goal" | "materialsSummary" | "firstAiHelp">,
+): Promise<M4ProjectIntakeSnapshot> {
+  const db = getD1();
+  const ownerUserId = await ensureUser(db, actor);
+  const project = await ownedProject(db, ownerUserId, requestedProjectId);
+  const statements: D1PreparedStatement[] = [
+    db.prepare(`UPDATE projects SET title = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ? AND owner_user_id = ?`)
+      .bind(deriveTitle(input.goal), project.id, ownerUserId),
+  ];
+  for (const [category, content] of [
+    ["intake_goal", input.goal],
+    ["intake_materials", input.materialsSummary],
+    ["intake_first_ai_help", input.firstAiHelp],
+  ] as const) {
+    statements.push(
+      db.prepare(`UPDATE project_requirements SET content = ?, updated_at = CURRENT_TIMESTAMP
+        WHERE owner_user_id = ? AND project_id = ? AND category = ?`)
+        .bind(content, ownerUserId, project.id, category),
+    );
+  }
+  await db.batch(statements);
+  return loadM4ProjectIntake(actor, project.id);
 }
 
 export async function loadM4ProjectIntake(
@@ -299,9 +328,10 @@ async function ownedProject(
   }
   const row = await db
     .prepare(
-      `SELECT id, title, paper_type, language, primary_creation_method,
+      `SELECT id, title, paper_type, language, primary_creation_method, onboarding_mode,
               status, current_stage, updated_at
-       FROM projects WHERE id = ? AND owner_user_id = ?`,
+       FROM projects
+       WHERE id = ? AND owner_user_id = ? AND status IN ('active', 'archived')`,
     )
     .bind(requestedProjectId, ownerUserId)
     .first<ProjectRow>();
@@ -344,6 +374,7 @@ function toProject(row: ProjectRow): M3ProjectSummary {
     paperType: row.paper_type,
     language: row.language,
     primaryCreationMethod: row.primary_creation_method,
+    onboardingMode: row.onboarding_mode,
     status: row.status,
     currentStage: row.current_stage,
     updatedAt: row.updated_at,

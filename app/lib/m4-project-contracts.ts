@@ -1,11 +1,13 @@
 import type {
   M3CreationMethod,
   M3MaterialSummary,
+  M3OnboardingMode,
   M3ProjectSummary,
 } from "./m3-contracts";
 
 export type M4ProjectIntakeInput = {
   primaryCreationMethod: M3CreationMethod;
+  onboardingMode?: M3OnboardingMode;
   goal: string;
   materialsSummary: string;
   firstAiHelp: string;

@@ -18,6 +18,22 @@ const workspaceContext = await readFile(
   new URL("../app/lib/MockWorkspaceContext.tsx", import.meta.url),
   "utf8",
 );
+const realAiWorkspace = await readFile(
+  new URL("../app/projects/[projectId]/editor/RealAiWorkspace.tsx", import.meta.url),
+  "utf8",
+);
+const realAiWorkspaceStyles = await readFile(
+  new URL("../app/projects/[projectId]/editor/RealAiWorkspace.module.css", import.meta.url),
+  "utf8",
+);
+const conversationSkillInstructions = await readFile(
+  new URL("../app/lib/m5-conversation-skill-instructions.ts", import.meta.url),
+  "utf8",
+);
+const conversationRespondRoute = await readFile(
+  new URL("../app/api/m5/projects/[projectId]/conversations/respond/route.ts", import.meta.url),
+  "utf8",
+);
 
 test("provides one default prompt for each of the six product skills", () => {
   assert.equal(M5_CONVERSATION_SKILL_PROMPTS.length, 6);
@@ -26,6 +42,38 @@ test("provides one default prompt for each of the six product skills", () => {
     6,
   );
   assert.ok(M5_CONVERSATION_SKILL_PROMPTS.every((prompt) => prompt.prompt.length > 12));
+  assert.ok(M5_CONVERSATION_SKILL_PROMPTS.every((prompt) => prompt.sourceSkills.length > 12));
+  assert.ok(M5_CONVERSATION_SKILL_PROMPTS.every((prompt) => prompt.activationMessage.includes("Skill")));
+});
+
+test("product skills are invoked as tagged capabilities instead of exposing their internal prompt", () => {
+  assert.match(realAiWorkspace, /activeSkillChip/);
+  assert.match(realAiWorkspace, /移除 \$\{activeSkill\.title\} Skill/);
+  assert.match(realAiWorkspace, /调用 \$\{activeSkill\.title\}/);
+  assert.doesNotMatch(realAiWorkspace, /setDraft\(skill\.prompt\)/);
+  assert.match(realAiWorkspaceStyles, /\.activeSkillChip:hover > button/);
+  assert.match(conversationRespondRoute, /conversationSkillInstruction\(productSkill\)/);
+});
+
+test("chapter writing and revision require a complete candidate plus a summary", () => {
+  assert.match(conversationSkillInstructions, /## 完整章节/);
+  assert.match(conversationSkillInstructions, /## 写作总结/);
+  assert.match(conversationSkillInstructions, /## 完整修订稿/);
+  assert.match(conversationSkillInstructions, /## 修改总结/);
+  assert.match(realAiWorkspace, /完整可用章节候选/);
+  assert.match(realAiWorkspace, /summarizeDiff\(execution\.diff\)/);
+  assert.match(realAiWorkspaceStyles, /\.completeCandidate/);
+});
+
+test("real AI workspace is conversation-first and keeps proposals in a modal list", () => {
+  assert.doesNotMatch(realAiWorkspace, /<h2>AI 工作台<\/h2>/u);
+  assert.doesNotMatch(realAiWorkspace, /className=\{styles\.preflight\}/u);
+  assert.match(realAiWorkspace, /材料与上下文/u);
+  assert.match(realAiWorkspace, /操作提案列表/u);
+  assert.match(realAiWorkspace, /proposalOverlay/u);
+  assert.match(realAiWorkspace, /delete_proposal/u);
+  assert.match(realAiWorkspaceStyles, /\.proposalShelf/u);
+  assert.match(realAiWorkspaceStyles, /\.proposalModal/u);
 });
 
 test("creates a bounded ToolIntent and requires an explicit user confirmation", () => {

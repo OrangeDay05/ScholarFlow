@@ -207,6 +207,30 @@
   font-weight: 750;
 }
 
+.fieldHeading {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.aiBadge,
+.aiFilledBadge {
+  flex: 0 0 auto;
+  padding: 4px 7px;
+  background: #edf2ea;
+  color: var(--forest);
+  font-size: 8px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.aiFilledBadge {
+  background: var(--mint);
+  color: var(--green);
+}
+
 .field input,
 .field select,
 .field textarea,
@@ -673,6 +697,23 @@
   font-size: 12px;
 }
 
+.aiFillButton {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--green);
+  background: var(--mint);
+  color: var(--forest);
+  cursor: pointer;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.aiFillButton:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .actions {
   display: flex;
   justify-content: space-between;
@@ -704,6 +745,13 @@
   background: transparent;
   color: var(--forest);
   cursor: pointer;
+}
+
+.secondaryButton:disabled {
+  border-color: var(--line-strong);
+  color: var(--muted);
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .secondaryButton span {

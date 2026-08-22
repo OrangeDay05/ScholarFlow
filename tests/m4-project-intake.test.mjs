@@ -2,11 +2,12 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
-const [contracts, repository, projectRoute, materialRoute, featureFlags] =
+const [contracts, repository, projectRoute, projectDeleteRoute, materialRoute, featureFlags] =
   await Promise.all([
     readFile(new URL("../app/lib/m4-project-contracts.ts", import.meta.url), "utf8"),
     readFile(new URL("../db/repositories/m4-projects.ts", import.meta.url), "utf8"),
     readFile(new URL("../app/api/m4/projects/route.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/api/m4/projects/[projectId]/route.ts", import.meta.url), "utf8"),
     readFile(
       new URL(
         "../app/api/m4/projects/[projectId]/materials/route.ts",
@@ -38,13 +39,21 @@ test("M4 project resources are always scoped by owner and project", () => {
   assert.match(repository, /WHERE owner_user_id = \?/);
   assert.match(
     repository,
-    /FROM projects WHERE id = \? AND owner_user_id = \?/,
+    /FROM projects\s+WHERE id = \? AND owner_user_id = \?/,
   );
   assert.match(
     repository,
     /FROM materials[\s\S]*WHERE owner_user_id = \? AND project_id = \?/,
   );
   assert.match(repository, /项目不存在或不属于当前用户/);
+});
+
+test("project deletion is owner-scoped and hidden from active project access", () => {
+  assert.match(projectDeleteRoute, /export async function DELETE/);
+  assert.match(projectDeleteRoute, /deleteM4ProjectForActor/);
+  assert.match(repository, /SET status = 'deleted'/);
+  assert.match(repository, /WHERE id = \? AND owner_user_id = \?/);
+  assert.match(repository, /status IN \('active', 'archived'\)/);
 });
 
 test("M4 intake persists user facts without pretending pending metadata is confirmed", () => {

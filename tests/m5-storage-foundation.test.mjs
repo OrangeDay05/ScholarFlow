@@ -141,6 +141,7 @@ test("M5 upload API enforces auth, ownership, idempotency and AWAITING_PARSE", {
   assert.equal(first.response.status, 201, JSON.stringify(first.payload));
   assert.equal(first.payload.data.snapshot.objectStatus, "STORED");
   assert.equal(first.payload.data.snapshot.materialStatus, "awaiting_parse");
+  assert.equal(first.payload.data.snapshot.kind, "literature");
   assert.equal(first.payload.data.snapshot.projectId, projectId);
   assert.ok(first.payload.data.snapshot.contentHash);
   assert.equal("objectKey" in first.payload.data.snapshot, false);
@@ -155,6 +156,19 @@ test("M5 upload API enforces auth, ownership, idempotency and AWAITING_PARSE", {
   assert.equal(list.response.status, 200);
   assert.equal(list.payload.data.length, 1);
   assert.equal((await api(`/api/m5/projects/${projectId}/materials`, { cookie: ownerBCookie })).response.status, 404);
+
+  const materialId = first.payload.data.snapshot.materialId;
+  const changed = await api(`/api/m5/projects/${projectId}/materials`, { method: "PATCH", cookie: ownerACookie, json: { material_id: materialId, kind: "requirement" } });
+  assert.equal(changed.response.status, 200, JSON.stringify(changed.payload));
+  assert.equal(changed.payload.data.kind, "requirement");
+  assert.equal((await api(`/api/m5/projects/${projectId}/materials`, { method: "PATCH", cookie: ownerBCookie, json: { material_id: materialId, kind: "data" } })).response.status, 404);
+
+  const removed = await api(`/api/m5/projects/${projectId}/materials`, { method: "DELETE", cookie: ownerACookie, json: { material_id: materialId } });
+  assert.equal(removed.response.status, 200, JSON.stringify(removed.payload));
+  assert.equal((await api(`/api/m5/projects/${projectId}/materials`, { cookie: ownerACookie })).payload.data.length, 0);
+  assert.equal(database.prepare("SELECT status FROM materials WHERE id = ?").get(materialId).status, "soft_deleted");
+  assert.equal(database.prepare("SELECT status FROM material_objects WHERE material_id = ?").get(materialId).status, "SOFT_DELETED");
+  assert.equal(bucket.objects.size, 1, "soft removal must retain the original object for provenance");
 });
 
 test("M5 upload API records storage failures without successful states", { skip: !apiEnabled }, async () => {

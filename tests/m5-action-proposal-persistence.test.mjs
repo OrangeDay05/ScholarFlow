@@ -5,6 +5,7 @@ import test from "node:test";
 import { env as workerEnv } from "./cloudflare-workers-shim.mjs";
 import {
   createM5ActionProposalForActor,
+  deleteM5ActionProposalForActor,
   decideM5ActionProposalForActor,
   loadM5ActionProposalWorkspace,
 } from "../db/repositories/m5-action-proposals.ts";
@@ -165,6 +166,55 @@ test("proposal decisions are isolated, idempotent and never execute a task", asy
   assert.equal(restored.decisions[0].decision, "CONFIRM");
   assert.equal(restored.recovery.action, "READY_TO_QUEUE");
 
+  await assert.rejects(
+    () => deleteM5ActionProposalForActor(ownerA, "project-a", {
+      conversationSessionId: session.session.id,
+      proposalId: created.proposal.id,
+    }),
+    (error) => error.code === "PROPOSAL_NOT_DELETABLE",
+  );
+
+  const disposable = await createM5ActionProposalForActor(ownerA, "project-a", {
+    conversationSessionId: session.session.id,
+    productSkill: "general_revision",
+    operation: "可删除的修改提案",
+    rationale: "用户尚未确认",
+    authorizedMaterialIds: [],
+    title: "临时修改提案",
+    effect: "尚未执行",
+    warnings: [],
+    idempotencyKey: "proposal-create-disposable",
+  });
+  const deleted = await deleteM5ActionProposalForActor(ownerA, "project-a", {
+    conversationSessionId: session.session.id,
+    proposalId: disposable.proposal.id,
+  });
+  assert.deepEqual(deleted, { proposalId: disposable.proposal.id, deleted: true });
+  assert.equal(
+    db.prepare("SELECT count(*) AS total FROM conversation_action_proposals WHERE id = ?").get(disposable.proposal.id).total,
+    0,
+  );
+  assert.equal(
+    db.prepare("SELECT count(*) AS total FROM conversation_tool_intents WHERE id = ?").get(disposable.intent.id).total,
+    0,
+  );
+
+  const writingWithoutBase = await createM5ActionProposalForActor(ownerA, "project-a", {
+    conversationSessionId: session.session.id,
+    productSkill: "chapter_writing",
+    operation: "Write the selected empty chapter.",
+    rationale: "The chapter has no base version yet.",
+    authorizedMaterialIds: [],
+    title: "Create a complete chapter candidate",
+    effect: "The proposal is bound to the chapter without inventing a base version.",
+    warnings: [],
+    idempotencyKey: "proposal-create-writing-without-base",
+    scopeSectionSlug: "introduction",
+    baseVersionId: null,
+  });
+  assert.equal(writingWithoutBase.intent.sectionId, "section-a");
+  assert.equal(writingWithoutBase.intent.baseVersionId, null);
+
   await archiveM5Conversation(ownerA, "project-a", session.session.id);
   await assert.rejects(
     () =>
@@ -197,7 +247,9 @@ test("proposal API requires a real actor and contains no execution path", async 
     "utf8",
   );
   assert.match(route, /requireM4Actor\(request\)/u);
+  assert.match(route, /delete_proposal/u);
   assert.match(repository, /READY_TO_QUEUE/u);
+  assert.match(repository, /PROPOSAL_NOT_DELETABLE/u);
   assert.doesNotMatch(`${route}\n${repository}`, /INSERT INTO ai_tasks|CALLING_MODEL|openai|deepseek/iu);
 });
 

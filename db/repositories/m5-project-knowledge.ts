@@ -69,6 +69,43 @@ export async function searchM5ProjectKnowledge(
   }));
 }
 
+export async function loadM5AuthorizedMaterialContext(
+  actor: M3Actor,
+  requestedProjectId: string,
+  requestedMaterialIds: string[],
+  limit = 12,
+): Promise<M5KnowledgeHit[]> {
+  const db = getD1();
+  const projectId = await ownedProjectId(db, actor.userId, requestedProjectId);
+  const materialIds = [...new Set(requestedMaterialIds)].slice(0, 20);
+  if (!materialIds.length) return [];
+  const placeholders = materialIds.map(() => "?").join(",");
+  const rows = await db.prepare(`SELECT mc.id AS chunk_id, mc.material_id, m.filename,
+      mc.parse_run_id, mc.ordinal, mc.text, mc.location_json, mc.metadata_json
+    FROM material_chunks mc
+    JOIN material_parse_runs pr ON pr.id = mc.parse_run_id
+    JOIN materials m ON m.id = mc.material_id
+    WHERE mc.owner_user_id = ? AND mc.project_id = ?
+      AND mc.material_id IN (${placeholders})
+      AND pr.status = 'SUCCEEDED' AND m.status = 'success'
+    ORDER BY mc.material_id, mc.ordinal LIMIT ?`).bind(
+      actor.userId, projectId, ...materialIds, Math.min(Math.max(limit, 1), 30),
+    ).all<{
+      chunk_id: string; material_id: string; filename: string; parse_run_id: string;
+      ordinal: number; text: string; location_json: string; metadata_json: string;
+    }>();
+  return (rows.results ?? []).map((row) => ({
+    materialId: row.material_id,
+    filename: row.filename,
+    parseRunId: row.parse_run_id,
+    chunkId: row.chunk_id,
+    ordinal: row.ordinal,
+    text: row.text,
+    location: JSON.parse(row.location_json),
+    metadata: JSON.parse(row.metadata_json),
+  }));
+}
+
 async function ownedProjectId(db: D1Database, ownerUserId: string, requestedProjectId: string): Promise<string> {
   if (!requestedProjectId || requestedProjectId === "demo") throw new M5ProjectKnowledgeError("PROJECT_NOT_FOUND", "缺少明确的项目上下文，请先选择项目。");
   const row = await db.prepare("SELECT id FROM projects WHERE id = ? AND owner_user_id = ? AND status = 'active'").bind(requestedProjectId, ownerUserId).first<{ id: string }>();

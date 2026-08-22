@@ -5,12 +5,15 @@ export type M3CreationMethod =
   | "literature"
   | "data";
 
+export type M3OnboardingMode = "direct" | "guided";
+
 export type M3ProjectSummary = {
   id: string;
   title: string;
   paperType: string;
   language: string;
   primaryCreationMethod: M3CreationMethod;
+  onboardingMode?: M3OnboardingMode;
   status: "active" | "archived";
   currentStage: string;
   updatedAt: string;
@@ -59,6 +62,7 @@ export type M3SectionVersion = {
   source: "original" | "manual" | "ai" | "restore" | "fallback_model";
   sourceVersionId: string | null;
   content: string;
+  contentJson: string | null;
   summary: string;
   createdAt: string;
 };

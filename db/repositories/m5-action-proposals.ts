@@ -15,6 +15,7 @@ export type M5ActionProposalRepositoryErrorCode =
   | "CONVERSATION_ARCHIVED"
   | "PROPOSAL_NOT_FOUND"
   | "PROPOSAL_ALREADY_DECIDED"
+  | "PROPOSAL_NOT_DELETABLE"
   | "INVALID_MATERIAL_SCOPE"
   | "IDEMPOTENCY_KEY_REUSED"
   | "DATABASE_WRITE_FAILED";
@@ -123,6 +124,7 @@ export async function createM5ActionProposalForActor(
     db,
     actor.userId,
     projectId,
+    input.productSkill,
     input.scopeSectionSlug ?? null,
     input.baseVersionId ?? null,
   );
@@ -386,6 +388,39 @@ export async function loadM5ActionProposalWorkspace(
   };
 }
 
+export async function deleteM5ActionProposalForActor(
+  actor: M3Actor,
+  requestedProjectId: string,
+  input: { conversationSessionId: string; proposalId: string },
+): Promise<{ proposalId: string; deleted: true }> {
+  const db = getD1();
+  const projectId = await ownedProjectId(db, actor.userId, requestedProjectId);
+  await requireSession(db, actor.userId, projectId, input.conversationSessionId);
+  const proposal = await requireProposal(db, actor.userId, projectId, input.proposalId);
+  if (proposal.conversation_session_id !== input.conversationSessionId) throw proposalNotFound();
+  if (proposal.status === "CONFIRMED") {
+    throw new M5ActionProposalRepositoryError(
+      "PROPOSAL_NOT_DELETABLE",
+      "已确认的操作提案需要保留任务与候选版本审计记录，不能彻底删除。",
+    );
+  }
+  try {
+    await db.batch([
+      db.prepare(
+        `DELETE FROM conversation_action_proposals
+         WHERE id = ? AND owner_user_id = ? AND project_id = ? AND conversation_session_id = ?`,
+      ).bind(proposal.id, actor.userId, projectId, input.conversationSessionId),
+      db.prepare(
+        `DELETE FROM conversation_tool_intents
+         WHERE id = ? AND owner_user_id = ? AND project_id = ? AND conversation_session_id = ?`,
+      ).bind(proposal.tool_intent_id, actor.userId, projectId, input.conversationSessionId),
+    ]);
+  } catch {
+    throw databaseFailure("无法删除操作提案。");
+  }
+  return { proposalId: proposal.id, deleted: true };
+}
+
 async function validateMaterialScope(
   db: D1Database,
   ownerUserId: string,
@@ -413,10 +448,27 @@ async function resolveExecutionScope(
   db: D1Database,
   ownerUserId: string,
   projectId: string,
+  productSkill: M5ProductSkill,
   sectionSlug: string | null,
   baseVersionId: string | null,
 ): Promise<{ sectionId: string | null; baseVersionId: string | null }> {
   if (!sectionSlug && !baseVersionId) return { sectionId: null, baseVersionId: null };
+  if (productSkill === "chapter_writing" && sectionSlug && !baseVersionId) {
+    const section = await db
+      .prepare(
+        `SELECT id FROM sections
+         WHERE owner_user_id = ? AND project_id = ? AND slug = ?`,
+      )
+      .bind(ownerUserId, projectId, sectionSlug)
+      .first<{ id: string }>();
+    if (!section) {
+      throw new M5ActionProposalRepositoryError(
+        "PROPOSAL_NOT_FOUND",
+        "当前章节不存在，不能创建章节写作提案。",
+      );
+    }
+    return { sectionId: section.id, baseVersionId: null };
+  }
   if (!sectionSlug || !baseVersionId) {
     throw new M5ActionProposalRepositoryError(
       "PROPOSAL_NOT_FOUND",

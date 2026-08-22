@@ -15,6 +15,7 @@ export type M5MaterialObjectSnapshot = {
   id: string;
   materialId: string;
   projectId: string;
+  kind: M5MaterialKind;
   originalFilename: string;
   normalizedFilename: string;
   detectedExtension: string;
@@ -50,6 +51,7 @@ export type PreparedMaterialUpload = {
 
 export type M5MaterialUploadErrorCode =
   | "PROJECT_NOT_FOUND"
+  | "MATERIAL_NOT_FOUND"
   | "STORAGE_UNAVAILABLE"
   | "STORAGE_WRITE_FAILED"
   | "DATABASE_WRITE_FAILED";
@@ -68,6 +70,7 @@ type ObjectRow = {
   id: string;
   material_id: string;
   project_id: string;
+  kind: M5MaterialKind;
   original_filename: string;
   normalized_filename: string;
   detected_extension: string;
@@ -276,6 +279,68 @@ export async function listM5MaterialObjectsForActor(
   return (rows.results ?? []).map(toSnapshot);
 }
 
+export async function updateM5MaterialKindForActor(
+  actor: M3Actor,
+  requestedProjectId: string,
+  materialId: string,
+  kind: M5MaterialKind,
+): Promise<M5MaterialObjectSnapshot> {
+  const db = getD1();
+  const project = await ownedProject(db, actor.userId, requestedProjectId);
+  const current = await loadMaterialObject(db, actor.userId, project.id, materialId);
+  if (!current) throw materialNotFound();
+
+  await db
+    .prepare(
+      `UPDATE materials
+       SET kind = ?, updated_at = CURRENT_TIMESTAMP
+       WHERE id = ? AND owner_user_id = ? AND project_id = ? AND status != 'soft_deleted'`,
+    )
+    .bind(kind, materialId, actor.userId, project.id)
+    .run();
+
+  const updated = await loadMaterialObject(db, actor.userId, project.id, materialId);
+  if (!updated) throw materialNotFound();
+  return toSnapshot(updated);
+}
+
+export async function softDeleteM5MaterialForActor(
+  actor: M3Actor,
+  requestedProjectId: string,
+  materialId: string,
+): Promise<void> {
+  const db = getD1();
+  const project = await ownedProject(db, actor.userId, requestedProjectId);
+  const current = await loadMaterialObject(db, actor.userId, project.id, materialId);
+  if (!current) throw materialNotFound();
+
+  await db.batch([
+    db
+      .prepare(
+        `UPDATE materials
+         SET status = 'soft_deleted', updated_at = CURRENT_TIMESTAMP
+         WHERE id = ? AND owner_user_id = ? AND project_id = ?`,
+      )
+      .bind(materialId, actor.userId, project.id),
+    db
+      .prepare(
+        `UPDATE material_objects
+         SET status = 'SOFT_DELETED', updated_at = CURRENT_TIMESTAMP
+         WHERE material_id = ? AND owner_user_id = ? AND project_id = ?`,
+      )
+      .bind(materialId, actor.userId, project.id),
+    storageEvent(
+      db,
+      actor.userId,
+      project.id,
+      materialId,
+      current.id,
+      "MATERIAL_REMOVED_FROM_PROJECT",
+      { retainedForAudit: true },
+    ),
+  ]);
+}
+
 async function ownedProject(
   db: D1Database,
   ownerUserId: string,
@@ -334,8 +399,24 @@ async function loadObject(
     .first<ObjectRow>();
 }
 
+async function loadMaterialObject(
+  db: D1Database,
+  ownerUserId: string,
+  projectId: string,
+  materialId: string,
+): Promise<ObjectRow | null> {
+  return db
+    .prepare(
+      objectSelect(
+        "WHERE mo.owner_user_id = ? AND mo.project_id = ? AND mo.material_id = ? AND mo.status != 'SOFT_DELETED'",
+      ),
+    )
+    .bind(ownerUserId, projectId, materialId)
+    .first<ObjectRow>();
+}
+
 function objectSelect(where: string): string {
-  return `SELECT mo.id, mo.material_id, mo.project_id, mo.original_filename,
+  return `SELECT mo.id, mo.material_id, mo.project_id, m.kind, mo.original_filename,
                  mo.normalized_filename, mo.detected_extension,
                  mo.client_content_type, mo.detected_content_type, mo.size_bytes,
                  mo.content_hash, mo.etag, mo.status AS object_status,
@@ -467,6 +548,7 @@ function toSnapshot(row: ObjectRow): M5MaterialObjectSnapshot {
     id: row.id,
     materialId: row.material_id,
     projectId: row.project_id,
+    kind: row.kind,
     originalFilename: row.original_filename,
     normalizedFilename: row.normalized_filename,
     detectedExtension: row.detected_extension,
@@ -481,4 +563,11 @@ function toSnapshot(row: ObjectRow): M5MaterialObjectSnapshot {
     errorMessage: row.error_message,
     createdAt: row.created_at,
   };
+}
+
+function materialNotFound(): M5MaterialUploadRepositoryError {
+  return new M5MaterialUploadRepositoryError(
+    "MATERIAL_NOT_FOUND",
+    "材料不存在、不属于当前项目，或已经被移除。",
+  );
 }

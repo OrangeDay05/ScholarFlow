@@ -14,7 +14,7 @@ test("M0 through M10 migrations replay into a fresh isolated database", async ()
     .filter((name) => /^\d{4}_.+\.sql$/u.test(name))
     .sort();
 
-  assert.equal(migrationNames.length, 20);
+  assert.equal(migrationNames.length, 23);
 
   const database = new DatabaseSync(":memory:");
   database.exec("PRAGMA foreign_keys = ON");
@@ -31,7 +31,7 @@ test("M0 through M10 migrations replay into a fresh isolated database", async ()
     .all()
     .map(({ name }) => name);
 
-  assert.equal(tables.length, 88);
+  assert.equal(tables.length, 96);
   for (const table of [
     "agent_role_model_configs",
     "model_capability_versions",
@@ -45,11 +45,35 @@ test("M0 through M10 migrations replay into a fresh isolated database", async ()
     "workspace_memberships",
     "project_memberships",
     "review_assignments",
+    "agent_context_snapshots",
+    "context_snapshot_items",
+    "agent_working_memories",
+    "agent_handoffs",
+    "material_chunk_embeddings",
+    "evidence_candidates",
+    "parsed_documents",
+    "parsed_document_assets",
   ]) {
     assert.ok(tables.includes(table), `${table} should exist after the full migration chain`);
   }
 
   database.close();
+});
+
+test("structured manuscript migration is additive", async () => {
+  const sql = await readFile(new URL("0022_structured_manuscript.sql", migrationsDirectory), "utf8");
+  assert.doesNotMatch(executableSql(sql), /(?:^|;)\s*(?:DROP|DELETE|TRUNCATE)\b/imu);
+  assert.match(sql, /ALTER TABLE `section_versions` ADD `content_json`/iu);
+  assert.match(sql, /CREATE TABLE `parsed_documents`/iu);
+  assert.match(sql, /CREATE TABLE `parsed_document_assets`/iu);
+});
+
+test("context engine migration is additive and links provider runs", async () => {
+  const sql = await readFile(new URL("0021_context_engine.sql", migrationsDirectory), "utf8");
+
+  assert.doesNotMatch(executableSql(sql), /(?:^|;)\s*(?:DROP|DELETE|TRUNCATE)\b/imu);
+  assert.equal((sql.match(/CREATE TABLE `/gu) ?? []).length, 6);
+  assert.match(sql, /ALTER TABLE `provider_run_records` ADD `agent_context_snapshot_id`/iu);
 });
 
 test("M10 migration is additive", async () => {

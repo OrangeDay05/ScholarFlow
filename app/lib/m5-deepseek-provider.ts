@@ -123,7 +123,7 @@ export class DeepSeekProviderAdapter implements M5ProviderAdapter {
     }, credential, signal);
   }
 
-  async streamCompletion(request: M5ProviderRequest, credential: string, signal: AbortSignal, onContent: (contentDelta: string) => void): Promise<M5ProviderResult> {
+  async streamCompletion(request: M5ProviderRequest, credential: string, signal: AbortSignal, onContent: (contentDelta: string) => void, onActivity: () => void = () => undefined): Promise<M5ProviderResult> {
     const { body, capability } = this.requestBody(request, true);
     let response: Response;
     try {
@@ -136,12 +136,14 @@ export class DeepSeekProviderAdapter implements M5ProviderAdapter {
     } catch (error) { throw normalizeDeepSeekError(error, request.modelKey); }
     if (!response.ok) throw deepSeekHttpError(response, request.modelKey);
     if (!response.body) throw new M5ProviderError("INVALID_PROVIDER_RESPONSE", "DeepSeek 未返回流式响应体。", false, { provider: "DEEPSEEK", modelId: request.modelKey });
+    onActivity();
     const reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "", content = "", reasoningCharacters = 0, finish: string | undefined, usage: DeepSeekUsage | undefined, requestId: string | undefined;
     const toolCalls = new Map<number, M5ProviderToolCall>();
     while (true) {
       const chunk = await reader.read();
+      if (!chunk.done || chunk.value?.length) onActivity();
       buffer += decoder.decode(chunk.value ?? new Uint8Array(), { stream: !chunk.done });
       const lines = buffer.split(/\r?\n/u); buffer = lines.pop() ?? "";
       for (const line of lines) {

@@ -88,6 +88,20 @@
   letter-spacing: 0.03em;
 }
 
+.versionBadge {
+  display: inline-flex;
+  margin-left: 3px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--mint);
+  color: var(--forest);
+  font-size: 9px;
+  font-weight: 850;
+  letter-spacing: 0.04em;
+  line-height: 1.3;
+  vertical-align: middle;
+}
+
 .topActions {
   flex: 0 0 auto;
   gap: 8px;
@@ -123,29 +137,6 @@
   border-color: var(--forest);
   background: var(--forest);
   color: var(--cream);
-}
-
-.mockBanner {
-  display: flex;
-  flex: 0 0 auto;
-  min-height: 32px;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 6px 24px;
-  border-bottom: 1px solid rgb(20 84 58 / 12%);
-  background: var(--mint);
-  color: var(--forest);
-  font-size: 11px;
-}
-
-.mockBanner span {
-  font-weight: 850;
-  letter-spacing: 0.12em;
-}
-
-.mockBanner p {
-  margin: 0;
 }
 
 .warningBar {
@@ -418,7 +409,12 @@
   display: block;
 }
 
+.materialMini > span:last-child {
+  min-width: 0;
+}
+
 .materialMini strong {
+  overflow-wrap: anywhere;
   font-size: 11px;
 }
 
@@ -458,8 +454,8 @@
   display: grid;
   width: 100%;
   min-height: 46px;
-  grid-template-areas: "formatting version workspace";
-  grid-template-columns: max-content minmax(180px, 1fr) max-content;
+  grid-template-areas: "formatting workspace";
+  grid-template-columns: minmax(0, 1fr) max-content;
   align-items: center;
   gap: 18px;
   margin: 0 auto 18px;
@@ -489,36 +485,6 @@
   font-size: 11px;
   overflow-wrap: normal;
   white-space: nowrap;
-  word-break: keep-all;
-}
-
-.versionRule {
-  grid-area: version;
-  min-width: 180px;
-  text-align: right;
-}
-
-.versionRule span,
-.versionRule small {
-  display: block;
-}
-
-.versionRule span {
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: 800;
-  overflow-wrap: normal;
-  white-space: nowrap;
-  word-break: keep-all;
-}
-
-.versionRule small {
-  margin-top: 2px;
-  color: var(--muted);
-  font-size: 9px;
-  line-height: 1.4;
-  overflow-wrap: normal;
-  white-space: normal;
   word-break: keep-all;
 }
 
@@ -555,45 +521,31 @@
 @container editor-column (max-width: 720px) {
   .documentToolbar {
     grid-template-areas:
-      "formatting formatting"
-      "version workspace";
-    grid-template-columns: minmax(180px, 1fr) max-content;
+      "formatting"
+      "workspace";
+    grid-template-columns: minmax(0, 1fr);
     column-gap: 12px;
     row-gap: 7px;
     padding: 7px 0;
   }
 
-  .versionRule {
-    min-width: 180px;
-    text-align: left;
-  }
-
   .panelControls {
-    justify-content: flex-end;
+    justify-content: flex-start;
   }
 }
 
 @container editor-column (max-width: 500px) {
   .documentToolbar {
     grid-template-areas:
-      "version version"
-      "formatting workspace";
-    grid-template-columns: max-content max-content;
-    justify-content: start;
-    gap: 7px 8px;
+      "formatting"
+      "workspace";
+    grid-template-columns: minmax(0, 1fr);
+    gap: 7px;
     margin-bottom: 8px;
     padding: 7px 0 6px;
-    overflow-x: auto;
-    overflow-y: hidden;
-    overscroll-behavior-inline: contain;
-    scrollbar-width: thin;
+    overflow: visible;
   }
 
-  .versionRule {
-    width: 100%;
-    min-width: 0;
-    justify-self: stretch;
-  }
 }
 
 .paperStack {
@@ -647,6 +599,20 @@
   line-height: 2.05;
   white-space: pre-wrap;
 }
+
+.paperBody p,
+.paperBody h1,
+.paperBody h2,
+.paperBody h3,
+.paperBody h4,
+.paperBody h5,
+.paperBody h6 { margin: 0 0 1em; }
+.paperBody table { width: 100%; margin: 18px 0; border-collapse: collapse; }
+.paperBody th,
+.paperBody td { min-width: 80px; padding: 8px 10px; border: 1px solid var(--line-strong); vertical-align: top; }
+.paperBody figure { margin: 20px auto; text-align: center; }
+.paperBody figure img { max-width: 100%; height: auto; }
+.paperBody figcaption { margin-top: 8px; color: var(--muted); font-size: 12px; }
 
 .paperBody:empty::before {
   color: var(--muted);
@@ -2660,14 +2626,14 @@
     position: static;
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+    gap: 10px;
     justify-content: stretch;
-    justify-items: center;
-    padding: 12px 16px;
+    justify-items: stretch;
+    padding: 10px 12px;
   }
 
   .projectIdentity {
-    justify-self: center;
+    justify-self: stretch;
   }
 
   .projectIdentity > div > p {
@@ -2692,8 +2658,12 @@
 
   .topActions {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    width: min(100%, 380px);
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .topActions > * {
+    min-width: 0;
   }
 
   .secondaryButton,
@@ -2730,16 +2700,6 @@
     border-bottom: 1px solid var(--line);
   }
 
-  .mockBanner {
-    display: block;
-    padding: 8px 16px;
-  }
-
-  .mockBanner p {
-    margin-top: 3px;
-    line-height: 1.45;
-  }
-
   .warningBar {
     grid-template-columns: auto 1fr;
     padding: 12px 16px;
@@ -2752,11 +2712,13 @@
 
   .mobileTools {
     display: grid;
+    grid-column: 1 / -1;
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 8px;
-    padding: 10px 12px;
-    border-bottom: 1px solid var(--line);
-    background: var(--paper);
+    width: 100%;
+    padding: 0;
+    border: 0;
+    background: transparent;
   }
 
   .mobileTools details {
@@ -2788,7 +2750,7 @@
   .mobileDrawer {
     position: absolute;
     z-index: 35;
-    top: 140px;
+    top: calc(100% + 8px);
     width: min(350px, calc(100vw - 24px));
     max-height: 70vh;
     padding: 18px 14px 22px;
@@ -2899,10 +2861,6 @@
     font-size: 9px;
   }
 
-  .mockBanner p {
-    font-size: 9px;
-  }
-
   .warningBar {
     gap: 10px;
   }
@@ -2994,4 +2952,137 @@
 .editorStateCard a:focus-visible {
   outline: 3px solid rgb(0 119 70 / 25%);
   outline-offset: 3px;
+}
+
+.manuscriptImportButton {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--green);
+  background: #edf6ee;
+  color: var(--forest);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.manuscriptImportButton:disabled { cursor: wait; opacity: 0.65; }
+
+.manuscriptImportOverlay {
+  position: fixed;
+  z-index: 80;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: clamp(20px, 6vh, 64px) 28px;
+  background: rgb(16 48 40 / 42%);
+}
+
+.manuscriptImportDialog {
+  width: min(960px, 100%);
+  max-height: min(780px, 88vh);
+  overflow: auto;
+  padding: 30px;
+  border: 1px solid var(--line);
+  background: var(--paper-strong);
+  box-shadow: 0 24px 70px rgb(0 40 30 / 24%);
+}
+
+.manuscriptImportDialog > header,
+.manuscriptImportDialog > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.manuscriptImportDialog > header {
+  position: sticky;
+  z-index: 2;
+  top: -30px;
+  margin: -30px -30px 0;
+  padding: 24px 30px 18px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-strong);
+}
+
+.manuscriptImportDialog > header span {
+  color: var(--green);
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: 0.15em;
+}
+
+.manuscriptImportDialog h2 {
+  margin: 7px 0 0;
+  color: var(--forest);
+  font-family: var(--font-serif);
+  font-size: 34px;
+  font-weight: 500;
+}
+
+.manuscriptImportDialog > header > button {
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  background: transparent;
+  color: var(--forest);
+  font-size: 24px;
+}
+
+.manuscriptImportNotice {
+  margin: 22px 0 0;
+  padding: 13px 15px;
+  background: #edf6ee;
+  color: var(--muted-strong);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.manuscriptImportMeta {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  margin: 18px 0;
+  border: 1px solid var(--line);
+}
+
+.manuscriptImportMeta div { padding: 13px 15px; border-right: 1px solid var(--line); }
+.manuscriptImportMeta div:last-child { border-right: 0; }
+.manuscriptImportMeta dt { color: var(--muted); font-size: 10px; }
+.manuscriptImportMeta dd { margin: 5px 0 0; color: var(--forest); font-size: 12px; font-weight: 750; }
+
+.manuscriptRecognitionActions { display: flex; margin: 18px 0 0; flex-wrap: wrap; gap: 8px; }
+.manuscriptRecognitionActions button { min-height: 40px; padding: 0 14px; border: 1px solid var(--forest); background: var(--paper); color: var(--forest); font-weight: 800; }
+.manuscriptRecognitionActions button:last-child { background: var(--forest); color: var(--cream); }
+
+.manuscriptImportSections { display: grid; gap: 10px; }
+.manuscriptImportSections article { padding: 16px; border: 1px solid var(--line); background: var(--paper); }
+.manuscriptImportSections article > div:first-child { display: flex; align-items: baseline; gap: 12px; }
+.manuscriptImportSections article span { color: var(--green); font-size: 11px; font-weight: 850; }
+.manuscriptImportSections h3 { margin: 0; color: var(--forest); font-size: 15px; }
+.manuscriptImportSections small { margin-left: auto; color: var(--muted); font-size: 10px; }
+.manuscriptImportParagraphs { display: grid; gap: 12px; margin-top: 12px; }
+.manuscriptImportSections .manuscriptImportParagraphs p { margin: 0; color: var(--muted-strong); font-size: 12px; line-height: 1.7; white-space: pre-wrap; }
+.manuscriptImportSections article > div:first-child em { color: #8a6512; font-size: 10px; font-style: normal; font-weight: 750; }
+.manuscriptImportChunk { padding: 12px; border: 1px solid var(--line); background: var(--paper-strong); }
+.manuscriptImportChunk label { display: flex; margin-bottom: 10px; align-items: center; justify-content: space-between; gap: 12px; }
+.manuscriptImportChunk label span { color: var(--muted); font-size: 9px; letter-spacing: .04em; }
+.manuscriptImportChunk select { min-height: 34px; max-width: 50%; padding: 0 10px; border: 1px solid var(--line); background: var(--paper); color: var(--forest); font: inherit; font-size: 10px; font-weight: 750; }
+
+.manuscriptImportError { color: #a33d32; font-size: 12px; }
+.manuscriptImportSuccess { max-width: 280px; color: var(--green); font-size: 11px; font-weight: 750; line-height: 1.5; }
+
+.manuscriptImportDialog > footer { position: sticky; z-index: 2; bottom: -30px; margin: 24px -30px -30px; padding: 18px 30px 24px; justify-content: flex-start; border-top: 1px solid var(--line); background: var(--paper-strong); }
+.manuscriptImportDialog > footer button { min-height: 44px; padding: 0 18px; border: 1px solid var(--forest); background: transparent; color: var(--forest); font-weight: 800; }
+.manuscriptImportDialog > footer button:first-child { background: var(--forest); color: var(--cream); }
+
+@media (max-width: 720px) {
+  .manuscriptImportOverlay { padding: 12px; }
+  .manuscriptImportDialog { max-height: calc(100vh - 40px); padding: 20px; }
+  .manuscriptImportDialog > header { top: -20px; margin: -20px -20px 0; padding: 18px 20px 14px; }
+  .manuscriptImportDialog > footer { bottom: -20px; margin: 20px -20px -20px; padding: 14px 20px 18px; }
+  .manuscriptImportMeta { grid-template-columns: 1fr; }
+  .manuscriptImportMeta div { border-right: 0; border-bottom: 1px solid var(--line); }
+  .manuscriptImportSections article > div:first-child { align-items: flex-start; flex-wrap: wrap; }
+  .manuscriptImportSections small { width: 100%; margin-left: 23px; }
+  .manuscriptImportChunk label { align-items: stretch; flex-direction: column; }
+  .manuscriptImportChunk select { width: 100%; max-width: none; }
 }

@@ -208,6 +208,57 @@ test("freezes the independent editor workspace and evidence linkage", async () =
   );
 });
 
+test("keeps editor status and actions in one product header", async () => {
+  const [pageSource, editorSource, editorCss] = await Promise.all([
+    readFile(
+      new URL("../app/projects/[projectId]/editor/page.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/projects/[projectId]/editor/EditorClient.tsx", import.meta.url),
+      "utf8",
+    ),
+    readFile(
+      new URL("../app/projects/[projectId]/editor/Editor.module.css", import.meta.url),
+      "utf8",
+    ),
+  ]);
+
+  assert.doesNotMatch(pageSource, /ProjectContextBar/);
+  assert.doesNotMatch(editorSource, /项目持久化 · D1/);
+  assert.doesNotMatch(editorSource, /新的 D1|\? "D1"/);
+  assert.doesNotMatch(editorSource, /styles\.mockBanner|styles\.versionRule/);
+  assert.match(editorSource, /styles\.versionBadge/);
+
+  const headerStart = editorSource.indexOf('<header className={styles.topbar}>');
+  const headerEnd = editorSource.indexOf("</header>", headerStart);
+  const headerSource = editorSource.slice(headerStart, headerEnd);
+  assert.notEqual(headerStart, -1);
+  assert.notEqual(headerEnd, -1);
+  assert.match(headerSource, /styles\.mobileTools/);
+  assert.match(
+    editorCss,
+    /@media \(max-width:\s*820px\)[\s\S]*?\.mobileTools\s*\{[\s\S]*?background:\s*transparent/,
+  );
+  assert.match(
+    editorCss,
+    /@container editor-column \(max-width:\s*720px\)[\s\S]*?grid-template-areas:\s*\n\s*"formatting"\s*\n\s*"workspace"/,
+  );
+});
+
+test("returns the conversation viewport to the question that was just sent", async () => {
+  const workspaceSource = await readFile(
+    new URL("../app/projects/[projectId]/editor/RealAiWorkspace.tsx", import.meta.url),
+    "utf8",
+  );
+
+  assert.match(workspaceSource, /pendingUserScrollRef/);
+  assert.match(workspaceSource, /data-client-message-id=\{message\.clientMessageId\}/);
+  assert.match(workspaceSource, /messagesRef\.current/);
+  assert.match(workspaceSource, /container\.scrollTo\(\{ top, behavior: "smooth" \}\)/);
+  assert.match(workspaceSource, /clientMessageId,\s*clientAgentMessageId/);
+});
+
 test("does not expose legacy V0.4.2 mock pages in a production build", async () => {
   const routes = [
     "/extensions",

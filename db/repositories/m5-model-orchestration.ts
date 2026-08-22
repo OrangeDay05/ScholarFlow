@@ -114,6 +114,31 @@ export async function loadM5ActiveAgentRoleConfig(
   };
 }
 
+export async function ensureM5DefaultProjectAgentConfigs(
+  actor: M3Actor,
+  requestedProjectId: string,
+) {
+  const db = getD1();
+  const projectId = await ownedProject(db, actor.userId, requestedProjectId);
+  const catalog = await ensureM5DeepSeekCatalog(db);
+  const modelId = catalog.modelIds["deepseek-v4-flash"];
+  if (!modelId) throw new M5ModelOrchestrationError("MODEL_NOT_FOUND", "默认 DeepSeek 模型不可用。");
+  for (const role of ["CONVERSATION_AGENT", "GENERATOR"] as const) {
+    const existing = await db.prepare(
+      "SELECT id FROM agent_role_model_configs WHERE owner_user_id = ? AND project_id = ? AND agent_role = ? AND status = 'ACTIVE' LIMIT 1",
+    ).bind(actor.userId, projectId, role).first();
+    if (existing) continue;
+    await db.prepare(`INSERT INTO agent_role_model_configs (
+      id, owner_user_id, project_id, agent_role, provider_id, model_id,
+      credential_type, credential_reference, thinking_mode, reasoning_effort,
+      max_output_tokens, timeout_ms, per_turn_budget, tools_allowed, status
+    ) VALUES (?, ?, ?, ?, ?, ?, 'PLATFORM_CREDENTIAL', 'env://DEEPSEEK_API_KEY',
+      'DISABLED', NULL, 4096, 120000, 1, 0, 'ACTIVE')`).bind(
+      crypto.randomUUID(), actor.userId, projectId, role, catalog.providerId, modelId,
+    ).run();
+  }
+}
+
 export async function startM5ProviderRun(
   actor: M3Actor,
   requestedProjectId: string,
@@ -133,6 +158,32 @@ export async function startM5ProviderRun(
     ) VALUES (?, ?, ?, ?, ?, 'RUNNING', ?)
   `).bind(id, actor.userId, projectId, input.snapshotId, input.usageCategory, startedAt).run();
   return { id, projectId, startedAt };
+}
+
+export async function attachM5ProviderRunContextSnapshot(
+  actor: M3Actor,
+  requestedProjectId: string,
+  input: { runId: string; contextSnapshotId: string },
+) {
+  const db = getD1();
+  const projectId = await ownedProject(db, actor.userId, requestedProjectId);
+  const snapshot = await db.prepare(`SELECT id FROM agent_context_snapshots
+    WHERE id = ? AND owner_user_id = ? AND project_id = ? AND provider_run_id = ?`)
+    .bind(input.contextSnapshotId, actor.userId, projectId, input.runId)
+    .first<{ id: string }>();
+  if (!snapshot) {
+    throw new M5ModelOrchestrationError("CONFIG_NOT_FOUND", "上下文快照不存在或不属于本次 Provider 运行。");
+  }
+  const result = await db.prepare(`UPDATE provider_run_records
+    SET agent_context_snapshot_id = ?
+    WHERE id = ? AND owner_user_id = ? AND project_id = ? AND status = 'RUNNING'
+      AND agent_context_snapshot_id IS NULL`)
+    .bind(input.contextSnapshotId, input.runId, actor.userId, projectId)
+    .run();
+  if (Number(result.meta?.changes ?? 0) !== 1) {
+    throw new M5ModelOrchestrationError("CONFIG_NOT_FOUND", "Provider 运行记录无法关联上下文快照。");
+  }
+  return { id: input.runId, contextSnapshotId: input.contextSnapshotId };
 }
 
 export async function finishM5ProviderRun(
